@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import Header from "../components/Header";
 import CollegeList from "../components/College/CollegeList";
 import EditCollegeModal from "../components/College/EditCollegeModal";
 import DeleteConfirmationModal from "../components/DeleteConfirmationModal";
-import InstallPWA from "../components/InstallPWA";
 import api from "../utils/api";
 import toast from "react-hot-toast";
 
-const Dashboard = () => {
+const Colleges = () => {
     const [colleges, setColleges] = useState([]);
     const [loading, setLoading] = useState(true);
     const [editingCollege, setEditingCollege] = useState(null);
@@ -15,13 +15,13 @@ const Dashboard = () => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isViewMode, setIsViewMode] = useState(false);
+    const { user } = useAuth();
 
     // Fetch colleges
     const fetchColleges = async () => {
         try {
             setLoading(true);
-            const response = await api.get("/college");
+            const response = await api.get("/dashboard/college");
             if (response.data.success) {
                 setColleges(response.data.data || []);
             } else {
@@ -44,17 +44,23 @@ const Dashboard = () => {
         fetchColleges();
     }, []);
 
+    // Handle add new college
+    const handleAddNew = () => {
+        setEditingCollege(null);
+        setIsEditModalOpen(true);
+    };
+
     // Handle edit college
     const handleEdit = (college) => {
         setEditingCollege(college);
-        setIsViewMode(false);
         setIsEditModalOpen(true);
     };
 
     // Handle view college
     const handleView = (college) => {
+        // For now, we'll just show edit modal in view mode
+        // You can create a separate view modal if needed
         setEditingCollege(college);
-        setIsViewMode(true);
         setIsEditModalOpen(true);
     };
 
@@ -73,19 +79,19 @@ const Dashboard = () => {
             if (editingCollege) {
                 // Update existing college
                 response = await api.put(
-                    `/college/${editingCollege._id}`,
+                    `/dashboard/college/${editingCollege._id}`,
                     formData
                 );
             } else {
-                // This shouldn't happen since we only edit existing colleges
-                throw new Error("No college selected for editing");
+                // Create new college
+                response = await api.post("/dashboard/college", formData);
             }
-
-            console.log(response);
 
             if (response.data.success) {
                 toast.success(
-                    response.data.message || "College updated successfully!"
+                    editingCollege
+                        ? "College updated successfully!"
+                        : "College created successfully!"
                 );
                 setIsEditModalOpen(false);
                 setEditingCollege(null);
@@ -110,7 +116,7 @@ const Dashboard = () => {
         try {
             setIsSubmitting(true);
             const response = await api.delete(
-                `/college/${collegeToDelete._id}`
+                `/dashboard/college/${collegeToDelete._id}`
             );
 
             if (response.data.success) {
@@ -136,7 +142,6 @@ const Dashboard = () => {
         if (!isSubmitting) {
             setIsEditModalOpen(false);
             setEditingCollege(null);
-            setIsViewMode(false);
         }
     };
 
@@ -152,54 +157,60 @@ const Dashboard = () => {
             <Header />
 
             <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                <div className="space-y-6">
-                    {/* Colleges Section */}
-                    <div>
-                        <div className="mb-6">
-                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                {/* Page Header */}
+                <div className="mb-8">
+                    <div className="md:flex md:items-center md:justify-between">
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                                 Colleges Management
-                            </h3>
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            </h1>
+                            <p className="mt-2 text-gray-600 dark:text-gray-400">
                                 Manage all colleges in the Student Senior
                                 platform
                             </p>
                         </div>
-
-                        <CollegeList
-                            colleges={colleges}
-                            loading={loading}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                            onView={handleView}
-                        />
+                        <div className="mt-4 md:mt-0">
+                            <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                                <span>Welcome, {user?.name}</span>
+                                <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+                                <span className="capitalize">{user?.role}</span>
+                            </div>
+                        </div>
                     </div>
-
-                    {/* Edit/Create Modal */}
-                    <EditCollegeModal
-                        isOpen={isEditModalOpen}
-                        onClose={closeEditModal}
-                        college={editingCollege}
-                        onSave={handleSaveCollege}
-                        loading={isSubmitting}
-                        readOnly={isViewMode}
-                    />
-
-                    {/* Delete Confirmation Modal */}
-                    <DeleteConfirmationModal
-                        isOpen={isDeleteModalOpen}
-                        onClose={closeDeleteModal}
-                        onConfirm={handleConfirmDelete}
-                        title="Delete College"
-                        message="Are you sure you want to delete this college? This action will permanently remove all associated data including posts, notes, and user content."
-                        itemName={collegeToDelete?.name}
-                        loading={isSubmitting}
-                    />
                 </div>
+
+                {/* College List */}
+                <CollegeList
+                    colleges={colleges}
+                    loading={loading}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onView={handleView}
+                    onAddNew={handleAddNew}
+                />
+
+                {/* Edit/Create Modal */}
+                <EditCollegeModal
+                    isOpen={isEditModalOpen}
+                    onClose={closeEditModal}
+                    college={editingCollege}
+                    onSave={handleSaveCollege}
+                    loading={isSubmitting}
+                />
+
+                {/* Delete Confirmation Modal */}
+                <DeleteConfirmationModal
+                    isOpen={isDeleteModalOpen}
+                    onClose={closeDeleteModal}
+                    onConfirm={handleConfirmDelete}
+                    title="Delete College"
+                    message="Are you sure you want to delete this college? This action will permanently remove all associated data including posts, notes, and user content."
+                    itemName={collegeToDelete?.name}
+                    loading={isSubmitting}
+                />
             </main>
-            {/* PWA Install Prompt */}
-            <InstallPWA />
         </div>
     );
 };
 
-export default Dashboard;
+export default Colleges;

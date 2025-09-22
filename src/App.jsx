@@ -5,6 +5,7 @@ import {
     Route,
     Navigate,
 } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import OfflineIndicator from "./components/OfflineIndicator";
@@ -17,6 +18,34 @@ function App() {
         <AuthProvider>
             <Router>
                 <OfflineIndicator />
+                <Toaster
+                    position="top-right"
+                    toastOptions={{
+                        duration: 4000,
+                        style: {
+                            background: "#363636",
+                            color: "#fff",
+                            zIndex: 99999,
+                        },
+                        success: {
+                            duration: 3000,
+                            theme: {
+                                primary: "green",
+                                secondary: "black",
+                            },
+                        },
+                        error: {
+                            duration: 4000,
+                            theme: {
+                                primary: "red",
+                                secondary: "black",
+                            },
+                        },
+                    }}
+                    containerStyle={{
+                        zIndex: 99999,
+                    }}
+                />
                 <Routes>
                     {/* Public routes */}
                     <Route path="/login" element={<Login />} />

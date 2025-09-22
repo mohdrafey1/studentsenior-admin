@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API_BASE_URL =
-    import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+    import.meta.env.VITE_API_URL || "http://localhost:8081/dashboard";
 
 // Create axios instance
 const api = axios.create({
@@ -43,13 +43,13 @@ api.interceptors.response.use(
 
 // Auth API calls
 export const authAPI = {
-    signup: (data) => api.post("/dashboard/auth/signup", data),
-    signin: (data) => api.post("/dashboard/auth/signin", data),
+    signup: (data) => api.post("/auth/signup", data),
+    signin: (data) => api.post("/auth/signin", data),
 };
 
 // Dashboard API calls
 export const dashboardAPI = {
-    getStats: () => api.get("/dashboard/stats"),
+    getStats: () => api.get("/stats"),
     // Add more dashboard endpoints as needed
 };
 
