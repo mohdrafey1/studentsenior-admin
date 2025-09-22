@@ -12,6 +12,12 @@ import OfflineIndicator from "./components/OfflineIndicator";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import Reports from "./pages/Reports";
+import Payments from "./pages/Payments";
+import Contacts from "./pages/Contacts";
+import ComingSoon from "./pages/ComingSoon";
+import CollegeDetail from "./pages/CollegeDetail";
+import CollegeComingSoon from "./pages/CollegeComingSoon";
 
 function App() {
     return (
@@ -57,6 +63,62 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <Dashboard />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Reports route */}
+                    <Route
+                        path="/reports"
+                        element={
+                            <ProtectedRoute>
+                                <Reports />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Reports detail routes */}
+                    <Route
+                        path="/reports/payments"
+                        element={
+                            <ProtectedRoute>
+                                <Payments />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/reports/contacts"
+                        element={
+                            <ProtectedRoute>
+                                <Contacts />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/reports/:category"
+                        element={
+                            <ProtectedRoute>
+                                <ComingSoon />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* College detail route */}
+                    <Route
+                        path="/:collegeslug"
+                        element={
+                            <ProtectedRoute>
+                                <CollegeDetail />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* College category detail routes */}
+                    <Route
+                        path="/college/:collegeslug/:category"
+                        element={
+                            <ProtectedRoute>
+                                <CollegeComingSoon />
                             </ProtectedRoute>
                         }
                     />

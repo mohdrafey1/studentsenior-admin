@@ -1,9 +1,23 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { MapPin, Users, Eye, Edit, Trash2 } from "lucide-react";
 
 const CollegeCard = ({ college, onEdit, onDelete, onView }) => {
+    const navigate = useNavigate();
+
+    const handleCardClick = (e) => {
+        // Don't navigate if clicking on action buttons
+        if (e.target.closest("button")) {
+            return;
+        }
+        navigate(`/${college.slug}`);
+    };
+
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden group">
+        <div
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden group cursor-pointer"
+            onClick={handleCardClick}
+        >
             {/* Card Content */}
             <div className="p-6">
                 {/* Header with title and actions */}
