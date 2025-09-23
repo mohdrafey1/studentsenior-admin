@@ -14,6 +14,7 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Reports from "./pages/Reports";
 import Payments from "./pages/Payments";
+import PaymentDetail from "./pages/PaymentDetail";
 import Contacts from "./pages/Contacts";
 import ComingSoon from "./pages/ComingSoon";
 import CollegeDetail from "./pages/CollegeDetail";
@@ -83,6 +84,14 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <Payments />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/reports/payments/:id"
+                        element={
+                            <ProtectedRoute>
+                                <PaymentDetail />
                             </ProtectedRoute>
                         }
                     />

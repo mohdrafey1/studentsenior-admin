@@ -13,9 +13,7 @@ import {
     Gift,
     CreditCard,
     PhoneCall,
-    RefreshCw,
     AlertCircle,
-    FileText,
     Plus,
     Loader,
 } from "lucide-react";
@@ -24,7 +22,7 @@ const Reports = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [isRefreshing, setIsRefreshing] = useState(false);
+
     const navigate = useNavigate();
 
     const fetchReportStats = async () => {
@@ -44,14 +42,6 @@ const Reports = () => {
     useEffect(() => {
         fetchReportStats();
     }, []);
-
-    const refreshData = async () => {
-        setIsRefreshing(true);
-        await fetchReportStats();
-        setTimeout(() => {
-            setIsRefreshing(false);
-        }, 600);
-    };
 
     // Define stats categories for better organization
     const statsCategories = [
@@ -194,36 +184,6 @@ const Reports = () => {
 
             <main className="pt-6 pb-12">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header Section */}
-                    <div className="flex flex-col md:flex-row items-center justify-between mb-8">
-                        <div className="flex items-center mb-4 md:mb-0">
-                            <div className="bg-blue-600 text-white p-3 rounded-lg mr-4">
-                                <BarChart3 className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                                    Dashboard Reports
-                                </h1>
-                                <p className="text-gray-600 dark:text-gray-400 mt-1">
-                                    Platform statistics and insights
-                                </p>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={refreshData}
-                            disabled={isRefreshing}
-                            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-                        >
-                            <RefreshCw
-                                className={`w-4 h-4 ${
-                                    isRefreshing ? "animate-spin" : ""
-                                }`}
-                            />
-                            Refresh Data
-                        </button>
-                    </div>
-
                     {/* Error Message */}
                     {error && (
                         <div className="bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8">
@@ -324,13 +284,6 @@ const Reports = () => {
                                     There are no statistics available to display
                                     at this time.
                                 </p>
-                                <button
-                                    onClick={refreshData}
-                                    className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                                >
-                                    <RefreshCw className="mr-2 h-4 w-4" />
-                                    Refresh Data
-                                </button>
                             </div>
                         </div>
                     )}

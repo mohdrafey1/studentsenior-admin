@@ -4,6 +4,7 @@ import Header from "../components/Header";
 import api from "../utils/api";
 import toast from "react-hot-toast";
 import { CreditCard, Eye, Search, ArrowLeft, Loader } from "lucide-react";
+import Pagination from "../components/Pagination";
 
 const Payments = () => {
     const [payments, setPayments] = useState([]);
@@ -13,14 +14,14 @@ const Payments = () => {
     const [filterType, setFilterType] = useState("");
     const [filterStatus, setFilterStatus] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [totalAmount, setTotalAmount] = useState(0);
-    const paymentsPerPage = 10;
     const navigate = useNavigate();
 
     const fetchPayments = async () => {
         try {
             setError(null);
-            const response = await api.get("/transactions/payments"); // This endpoint needs to be created
+            const response = await api.get("/transactions/payments");
             setPayments(response.data.data || []);
 
             // Calculate total amount for paid payments
@@ -61,13 +62,13 @@ const Payments = () => {
     );
 
     // Pagination logic
-    const indexOfLastPayment = currentPage * paymentsPerPage;
-    const indexOfFirstPayment = indexOfLastPayment - paymentsPerPage;
+    const indexOfLastPayment = currentPage * pageSize;
+    const indexOfFirstPayment = indexOfLastPayment - pageSize;
     const currentPayments = filteredPayments.slice(
         indexOfFirstPayment,
         indexOfLastPayment
     );
-    const totalPages = Math.ceil(filteredPayments.length / paymentsPerPage);
+    // totalPages managed by Pagination via totalItems
 
     const handlePageChange = (page) => {
         setCurrentPage(page);
@@ -316,113 +317,18 @@ const Payments = () => {
                             </div>
 
                             {/* Pagination */}
-                            {totalPages > 1 && (
+                            {filteredPayments.length > 0 && (
                                 <div className="bg-white dark:bg-gray-800 px-4 py-3 border-t border-gray-200 dark:border-gray-700 sm:px-6">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex-1 flex justify-between sm:hidden">
-                                            <button
-                                                onClick={() =>
-                                                    handlePageChange(
-                                                        currentPage - 1
-                                                    )
-                                                }
-                                                disabled={currentPage === 1}
-                                                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                                            >
-                                                Previous
-                                            </button>
-                                            <button
-                                                onClick={() =>
-                                                    handlePageChange(
-                                                        currentPage + 1
-                                                    )
-                                                }
-                                                disabled={
-                                                    currentPage === totalPages
-                                                }
-                                                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                                            >
-                                                Next
-                                            </button>
-                                        </div>
-                                        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                                            <div>
-                                                <p className="text-sm text-gray-700 dark:text-gray-300">
-                                                    Showing{" "}
-                                                    <span className="font-medium">
-                                                        {indexOfFirstPayment +
-                                                            1}
-                                                    </span>{" "}
-                                                    to{" "}
-                                                    <span className="font-medium">
-                                                        {Math.min(
-                                                            indexOfLastPayment,
-                                                            filteredPayments.length
-                                                        )}
-                                                    </span>{" "}
-                                                    of{" "}
-                                                    <span className="font-medium">
-                                                        {
-                                                            filteredPayments.length
-                                                        }
-                                                    </span>{" "}
-                                                    results
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                                                    <button
-                                                        onClick={() =>
-                                                            handlePageChange(
-                                                                currentPage - 1
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            currentPage === 1
-                                                        }
-                                                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
-                                                    >
-                                                        Previous
-                                                    </button>
-                                                    {Array.from(
-                                                        { length: totalPages },
-                                                        (_, i) => i + 1
-                                                    ).map((page) => (
-                                                        <button
-                                                            key={page}
-                                                            onClick={() =>
-                                                                handlePageChange(
-                                                                    page
-                                                                )
-                                                            }
-                                                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                                                                page ===
-                                                                currentPage
-                                                                    ? "z-10 bg-blue-50 dark:bg-blue-900 border-blue-500 text-blue-600 dark:text-blue-400"
-                                                                    : "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600"
-                                                            }`}
-                                                        >
-                                                            {page}
-                                                        </button>
-                                                    ))}
-                                                    <button
-                                                        onClick={() =>
-                                                            handlePageChange(
-                                                                currentPage + 1
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            currentPage ===
-                                                            totalPages
-                                                        }
-                                                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
-                                                    >
-                                                        Next
-                                                    </button>
-                                                </nav>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <Pagination
+                                        currentPage={currentPage}
+                                        pageSize={pageSize}
+                                        totalItems={filteredPayments.length}
+                                        onPageChange={handlePageChange}
+                                        onPageSizeChange={(size) => {
+                                            setPageSize(size);
+                                            setCurrentPage(1);
+                                        }}
+                                    />
                                 </div>
                             )}
                         </div>
