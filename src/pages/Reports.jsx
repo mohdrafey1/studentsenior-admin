@@ -94,6 +94,16 @@ const Reports = () => {
                     href: "/reports/clients",
                 },
                 {
+                    id: "dashboardUsers",
+                    title: "Total Dashboard Users",
+                    value: data?.totalDashboardUsers || 0,
+                    icon: <Users className="w-6 h-6" />,
+                    bgColor: "bg-indigo-100 dark:bg-indigo-900",
+                    textColor: "text-indigo-600 dark:text-indigo-400",
+                    iconColor: "text-indigo-500 dark:text-indigo-300",
+                    href: "/reports/dashboard-users",
+                },
+                {
                     id: "contactUs",
                     title: "Contact Requests",
                     value: data?.totalContactUs || 0,
