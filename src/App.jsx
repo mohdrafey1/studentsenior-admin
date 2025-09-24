@@ -23,6 +23,9 @@ import DashboardUsers from "./pages/DashboardUsers";
 import ComingSoon from "./pages/ComingSoon";
 import CollegeDetail from "./pages/CollegeDetail";
 import CollegeComingSoon from "./pages/CollegeComingSoon";
+import Courses from "./pages/Courses";
+import Branches from "./pages/Branches";
+import Subjects from "./pages/Subjects";
 
 function App() {
     return (
@@ -140,10 +143,26 @@ function App() {
                         }
                     />
                     <Route
-                        path="/reports/:category"
+                        path="/reports/courses"
                         element={
                             <ProtectedRoute>
-                                <ComingSoon />
+                                <Courses />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/reports/branches"
+                        element={
+                            <ProtectedRoute>
+                                <Branches />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/reports/subjects"
+                        element={
+                            <ProtectedRoute>
+                                <Subjects />
                             </ProtectedRoute>
                         }
                     />
@@ -154,16 +173,6 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <CollegeDetail />
-                            </ProtectedRoute>
-                        }
-                    />
-
-                    {/* College category detail routes */}
-                    <Route
-                        path="/college/:collegeslug/:category"
-                        element={
-                            <ProtectedRoute>
-                                <CollegeComingSoon />
                             </ProtectedRoute>
                         }
                     />
