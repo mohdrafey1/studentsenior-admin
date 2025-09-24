@@ -176,7 +176,7 @@ const CollegeDetail = () => {
             bgColor: "bg-yellow-100 dark:bg-yellow-900",
             textColor: "text-yellow-600 dark:text-yellow-400",
             iconColor: "text-yellow-500 dark:text-yellow-300",
-            href: `/college/${collegeslug}/pyqs`,
+            href: `/${collegeslug}/pyqs`,
         },
         {
             id: "notes",
@@ -186,7 +186,7 @@ const CollegeDetail = () => {
             bgColor: "bg-green-100 dark:bg-green-900",
             textColor: "text-green-600 dark:text-green-400",
             iconColor: "text-green-500 dark:text-green-300",
-            href: `/college/${collegeslug}/notes`,
+            href: `/${collegeslug}/notes`,
         },
         {
             id: "products",
@@ -196,7 +196,7 @@ const CollegeDetail = () => {
             bgColor: "bg-purple-100 dark:bg-purple-900",
             textColor: "text-purple-600 dark:text-purple-400",
             iconColor: "text-purple-500 dark:text-purple-300",
-            href: `/college/${collegeslug}/products`,
+            href: `/${collegeslug}/products`,
         },
         {
             id: "seniors",
@@ -206,7 +206,7 @@ const CollegeDetail = () => {
             bgColor: "bg-blue-100 dark:bg-blue-900",
             textColor: "text-blue-600 dark:text-blue-400",
             iconColor: "text-blue-500 dark:text-blue-300",
-            href: `/college/${collegeslug}/seniors`,
+            href: `/${collegeslug}/seniors`,
         },
         {
             id: "groups",
@@ -216,7 +216,7 @@ const CollegeDetail = () => {
             bgColor: "bg-indigo-100 dark:bg-indigo-900",
             textColor: "text-indigo-600 dark:text-indigo-400",
             iconColor: "text-indigo-500 dark:text-indigo-300",
-            href: `/college/${collegeslug}/groups`,
+            href: `/${collegeslug}/groups`,
         },
         {
             id: "opportunities",
@@ -226,7 +226,7 @@ const CollegeDetail = () => {
             bgColor: "bg-cyan-100 dark:bg-cyan-900",
             textColor: "text-cyan-600 dark:text-cyan-400",
             iconColor: "text-cyan-500 dark:text-cyan-300",
-            href: `/college/${collegeslug}/opportunities`,
+            href: `/${collegeslug}/opportunities`,
         },
         {
             id: "pyq-requests",
@@ -236,7 +236,7 @@ const CollegeDetail = () => {
             bgColor: "bg-orange-100 dark:bg-orange-900",
             textColor: "text-orange-600 dark:text-orange-400",
             iconColor: "text-orange-500 dark:text-orange-300",
-            href: `/college/${collegeslug}/pyq-requests`,
+            href: `/${collegeslug}/pyq-requests`,
         },
         {
             id: "lost-found",
@@ -246,7 +246,7 @@ const CollegeDetail = () => {
             bgColor: "bg-red-100 dark:bg-red-900",
             textColor: "text-red-600 dark:text-red-400",
             iconColor: "text-red-500 dark:text-red-300",
-            href: `/college/${collegeslug}/lost-found`,
+            href: `/${collegeslug}/lost-found`,
         },
         {
             id: "videos",
@@ -256,7 +256,7 @@ const CollegeDetail = () => {
             bgColor: "bg-teal-100 dark:bg-teal-900",
             textColor: "text-teal-600 dark:text-teal-400",
             iconColor: "text-teal-500 dark:text-teal-300",
-            href: `/college/${collegeslug}/videos`,
+            href: `/${collegeslug}/videos`,
         },
     ];
 

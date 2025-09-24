@@ -26,6 +26,8 @@ import CollegeComingSoon from "./pages/CollegeComingSoon";
 import Courses from "./pages/Courses";
 import Branches from "./pages/Branches";
 import Subjects from "./pages/Subjects";
+import PyqList from "./pages/PyqList";
+import PyqDetail from "./pages/PyqDetail";
 
 function App() {
     return (
@@ -163,6 +165,24 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <Subjects />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* PYQ routes */}
+                    <Route
+                        path="/:collegeslug/pyqs"
+                        element={
+                            <ProtectedRoute>
+                                <PyqList />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/:collegeslug/pyqs/:pyqid"
+                        element={
+                            <ProtectedRoute>
+                                <PyqDetail />
                             </ProtectedRoute>
                         }
                     />
