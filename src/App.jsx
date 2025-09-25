@@ -20,14 +20,14 @@ import Transactions from "./pages/Transactions";
 import Contacts from "./pages/Contacts";
 import Users from "./pages/Users";
 import DashboardUsers from "./pages/DashboardUsers";
-import ComingSoon from "./pages/ComingSoon";
 import CollegeDetail from "./pages/CollegeDetail";
-import CollegeComingSoon from "./pages/CollegeComingSoon";
 import Courses from "./pages/Courses";
 import Branches from "./pages/Branches";
 import Subjects from "./pages/Subjects";
 import PyqList from "./pages/PyqList";
 import PyqDetail from "./pages/PyqDetail";
+import NotesList from "./pages/NotesList";
+import NotesDetail from "./pages/NotesDetail";
 
 function App() {
     return (
@@ -183,6 +183,24 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <PyqDetail />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Notes routes */}
+                    <Route
+                        path="/:collegeslug/notes"
+                        element={
+                            <ProtectedRoute>
+                                <NotesList />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/:collegeslug/notes/:noteid"
+                        element={
+                            <ProtectedRoute>
+                                <NotesDetail />
                             </ProtectedRoute>
                         }
                     />
