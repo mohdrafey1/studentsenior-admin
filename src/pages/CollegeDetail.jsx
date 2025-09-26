@@ -228,16 +228,7 @@ const CollegeDetail = () => {
             iconColor: "text-cyan-500 dark:text-cyan-300",
             href: `/${collegeslug}/opportunities`,
         },
-        {
-            id: "pyq-requests",
-            title: "PYQ Requests",
-            value: collegeData.totalRequestedPyqs || 0,
-            icon: HelpCircle,
-            bgColor: "bg-orange-100 dark:bg-orange-900",
-            textColor: "text-orange-600 dark:text-orange-400",
-            iconColor: "text-orange-500 dark:text-orange-300",
-            href: `/${collegeslug}/pyq-requests`,
-        },
+
         {
             id: "lost-found",
             title: "Lost & Found",
@@ -258,6 +249,16 @@ const CollegeDetail = () => {
             iconColor: "text-teal-500 dark:text-teal-300",
             href: `/${collegeslug}/videos`,
         },
+        // {
+        //     id: "pyq-requests",
+        //     title: "PYQ Requests",
+        //     value: collegeData.totalRequestedPyqs || 0,
+        //     icon: HelpCircle,
+        //     bgColor: "bg-orange-100 dark:bg-orange-900",
+        //     textColor: "text-orange-600 dark:text-orange-400",
+        //     iconColor: "text-orange-500 dark:text-orange-300",
+        //     href: `/${collegeslug}/pyq-requests`,
+        // },
     ];
 
     return (

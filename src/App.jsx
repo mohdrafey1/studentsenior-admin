@@ -28,6 +28,17 @@ import PyqList from "./pages/PyqList";
 import PyqDetail from "./pages/PyqDetail";
 import NotesList from "./pages/NotesList";
 import NotesDetail from "./pages/NotesDetail";
+import ProductList from "./pages/ProductList";
+import ProductDetail from "./pages/ProductDetail";
+import SeniorList from "./pages/SeniorList";
+import SeniorDetail from "./pages/SeniorDetail";
+import GroupList from "./pages/GroupList";
+import GroupDetail from "./pages/GroupDetail";
+import OpportunityList from "./pages/OpportunityList";
+import OpportunityDetail from "./pages/OpportunityDetail";
+import LostFoundList from "./pages/LostFoundList";
+import VideoList from "./pages/VideoList";
+import VideoDetail from "./pages/VideoDetail";
 
 function App() {
     return (
@@ -201,6 +212,106 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <NotesDetail />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Product routes */}
+                    <Route
+                        path="/:collegeslug/products"
+                        element={
+                            <ProtectedRoute>
+                                <ProductList />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/:collegeslug/products/:productid"
+                        element={
+                            <ProtectedRoute>
+                                <ProductDetail />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Senior routes */}
+                    <Route
+                        path="/:collegeslug/seniors"
+                        element={
+                            <ProtectedRoute>
+                                <SeniorList />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/:collegeslug/seniors/:seniorid"
+                        element={
+                            <ProtectedRoute>
+                                <SeniorDetail />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Group routes */}
+                    <Route
+                        path="/:collegeslug/groups"
+                        element={
+                            <ProtectedRoute>
+                                <GroupList />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/:collegeslug/groups/:groupid"
+                        element={
+                            <ProtectedRoute>
+                                <GroupDetail />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Opportunity routes */}
+                    <Route
+                        path="/:collegeslug/opportunities"
+                        element={
+                            <ProtectedRoute>
+                                <OpportunityList />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/:collegeslug/opportunities/:opportunityid"
+                        element={
+                            <ProtectedRoute>
+                                <OpportunityDetail />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Lost & Found routes */}
+                    <Route
+                        path="/:collegeslug/lost-found"
+                        element={
+                            <ProtectedRoute>
+                                <LostFoundList />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Video routes */}
+                    <Route
+                        path="/:collegeslug/videos"
+                        element={
+                            <ProtectedRoute>
+                                <VideoList />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/:collegeslug/videos/:videoid"
+                        element={
+                            <ProtectedRoute>
+                                <VideoDetail />
                             </ProtectedRoute>
                         }
                     />
