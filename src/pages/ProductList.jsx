@@ -121,9 +121,8 @@ const ProductList = () => {
     // Filter products based on search
     const filteredProducts = products.filter(
         (product) =>
-            product.title?.toLowerCase().includes(search.toLowerCase()) ||
-            product.description?.toLowerCase().includes(search.toLowerCase()) ||
-            product.category?.toLowerCase().includes(search.toLowerCase()),
+            product.name?.toLowerCase().includes(search.toLowerCase()) ||
+            product.description?.toLowerCase().includes(search.toLowerCase()),
     );
 
     // Pagination
@@ -252,7 +251,7 @@ const ProductList = () => {
                                             Product
                                         </th>
                                         <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Category
+                                            status
                                         </th>
                                         <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
                                             Price
@@ -260,9 +259,7 @@ const ProductList = () => {
                                         <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
                                             Owner
                                         </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Date
-                                        </th>
+
                                         <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
                                             Actions
                                         </th>
@@ -278,17 +275,14 @@ const ProductList = () => {
                                             <td className='px-6 py-4 whitespace-nowrap'>
                                                 <div className='flex items-center'>
                                                     <div className='flex-shrink-0 h-12 w-12'>
-                                                        {product.images &&
-                                                        product.images.length >
-                                                            0 ? (
+                                                        {product.image ? (
                                                             <img
                                                                 className='h-12 w-12 rounded-lg object-cover'
                                                                 src={
-                                                                    product
-                                                                        .images[0]
+                                                                    product.image
                                                                 }
                                                                 alt={
-                                                                    product.title
+                                                                    product.name
                                                                 }
                                                             />
                                                         ) : (
@@ -298,8 +292,8 @@ const ProductList = () => {
                                                         )}
                                                     </div>
                                                     <div className='ml-4'>
-                                                        <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
-                                                            {product.title}
+                                                        <div className='text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-xs'>
+                                                            {product.name}
                                                         </div>
                                                         <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs'>
                                                             {
@@ -311,29 +305,27 @@ const ProductList = () => {
                                             </td>
                                             <td className='px-6 py-4 whitespace-nowrap'>
                                                 <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'>
-                                                    {product.category ||
-                                                        'Uncategorized'}
+                                                    {product.submissionStatus ||
+                                                        'Pending Review'}
                                                 </span>
                                             </td>
                                             <td className='px-6 py-4 whitespace-nowrap'>
                                                 <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                    <DollarSign className='h-4 w-4 text-green-500 mr-1' />
                                                     ₹{product.price || 0}
                                                 </div>
                                             </td>
-                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                    <User className='h-4 w-4 text-gray-400 mr-2' />
+                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                <div className='text-sm text-gray-500 dark:text-gray-400'>
+                                                    {product.createdAt
+                                                        ? new Date(
+                                                              product.createdAt,
+                                                          ).toLocaleString()
+                                                        : 'N/A'}
+                                                </div>
+                                                <div className='text-xs text-gray-400 dark:text-gray-500 flex items-center mt-1'>
+                                                    By-
                                                     {product.owner?.username ||
                                                         'N/A'}
-                                                </div>
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                    <Calendar className='h-4 w-4 mr-2' />
-                                                    {new Date(
-                                                        product.createdAt,
-                                                    ).toLocaleDateString()}
                                                 </div>
                                             </td>
                                             <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>

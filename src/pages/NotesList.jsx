@@ -261,9 +261,7 @@ const NotesList = () => {
                                                         note.submissionStatus,
                                                     )}`}
                                                 >
-                                                    {note.submissionStatus
-                                                        ? 'Approved'
-                                                        : 'Pending'}
+                                                    {note.submissionStatus}
                                                 </span>
                                             </td>
 

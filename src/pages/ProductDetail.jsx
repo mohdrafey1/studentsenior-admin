@@ -30,7 +30,7 @@ const ProductDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
-    const [activeImageIndex, setActiveImageIndex] = useState(0);
+
     const { collegeslug, productid } = useParams();
     const navigate = useNavigate();
 
@@ -139,26 +139,6 @@ const ProductDetail = () => {
             >
                 {config.icon}
                 {config.label}
-            </span>
-        );
-    };
-
-    const getConditionBadge = (condition) => {
-        const conditionConfig = {
-            new: 'text-green-800 dark:text-green-300 bg-green-100 dark:bg-green-900/30',
-            'like-new':
-                'text-blue-800 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30',
-            good: 'text-yellow-800 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900/30',
-            fair: 'text-orange-800 dark:text-orange-300 bg-orange-100 dark:bg-orange-900/30',
-        };
-
-        const color = conditionConfig[condition] || conditionConfig.good;
-        return (
-            <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${color}`}
-            >
-                {condition?.charAt(0).toUpperCase() + condition?.slice(1) ||
-                    'Good'}
             </span>
         );
     };
@@ -275,52 +255,14 @@ const ProductDetail = () => {
                             {/* Product Images */}
                             <div className='space-y-4'>
                                 <div className='aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden'>
-                                    {product.images &&
-                                    product.images.length > 0 ? (
+                                    {product.image && (
                                         <img
-                                            src={
-                                                product.images[activeImageIndex]
-                                            }
+                                            src={product.image}
                                             alt={product.title}
                                             className='w-full h-full object-cover'
                                         />
-                                    ) : (
-                                        <div className='w-full h-full flex items-center justify-center'>
-                                            <ImageIcon className='h-16 w-16 text-gray-400' />
-                                        </div>
                                     )}
                                 </div>
-
-                                {/* Image Thumbnails */}
-                                {product.images &&
-                                    product.images.length > 1 && (
-                                        <div className='flex space-x-2 overflow-x-auto'>
-                                            {product.images.map(
-                                                (image, index) => (
-                                                    <button
-                                                        key={index}
-                                                        onClick={() =>
-                                                            setActiveImageIndex(
-                                                                index,
-                                                            )
-                                                        }
-                                                        className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
-                                                            index ===
-                                                            activeImageIndex
-                                                                ? 'border-blue-500'
-                                                                : 'border-gray-200 dark:border-gray-600'
-                                                        }`}
-                                                    >
-                                                        <img
-                                                            src={image}
-                                                            alt={`${product.title} ${index + 1}`}
-                                                            className='w-full h-full object-cover'
-                                                        />
-                                                    </button>
-                                                ),
-                                            )}
-                                        </div>
-                                    )}
                             </div>
 
                             {/* Product Info */}
@@ -333,18 +275,9 @@ const ProductDetail = () => {
                                                 ₹{product.price || 0}
                                             </span>
                                         </div>
-                                        {getStatusBadge(product.status)}
-                                    </div>
-
-                                    <div className='flex items-center space-x-4 mb-4'>
-                                        <div className='flex items-center space-x-2'>
-                                            <Tag className='h-4 w-4 text-gray-400' />
-                                            <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                                {product.category ||
-                                                    'Uncategorized'}
-                                            </span>
-                                        </div>
-                                        {getConditionBadge(product.condition)}
+                                        {getStatusBadge(
+                                            product.submissionStatus,
+                                        )}
                                     </div>
 
                                     <div className='prose prose-sm dark:prose-invert max-w-none'>
@@ -371,49 +304,8 @@ const ProductDetail = () => {
                                                     'Unknown'}
                                             </span>
                                         </div>
-                                        <div className='flex items-center space-x-2'>
-                                            <Building className='h-4 w-4 text-gray-400' />
-                                            <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                                {product.college?.collegeName ||
-                                                    'Unknown College'}
-                                            </span>
-                                        </div>
-                                        <div className='flex items-center space-x-2'>
-                                            <Calendar className='h-4 w-4 text-gray-400' />
-                                            <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                                Listed on{' '}
-                                                {new Date(
-                                                    product.createdAt,
-                                                ).toLocaleDateString()}
-                                            </span>
-                                        </div>
                                     </div>
                                 </div>
-
-                                {/* Contact Actions */}
-                                {product.status === 'available' && (
-                                    <div className='bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4'>
-                                        <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2'>
-                                            Interested in this product?
-                                        </h3>
-                                        <p className='text-sm text-gray-600 dark:text-gray-400 mb-3'>
-                                            Contact the seller to arrange a
-                                            meeting or ask questions.
-                                        </p>
-                                        <button
-                                            onClick={() => {
-                                                // Add contact functionality here
-                                                toast.info(
-                                                    'Contact functionality to be implemented',
-                                                );
-                                            }}
-                                            className='flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors'
-                                        >
-                                            <ExternalLink className='h-4 w-4' />
-                                            <span>Contact Seller</span>
-                                        </button>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -421,50 +313,6 @@ const ProductDetail = () => {
 
                 {/* Additional Details */}
                 <div className='grid md:grid-cols-2 gap-6'>
-                    <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                        <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4'>
-                            Product Details
-                        </h3>
-                        <div className='space-y-3'>
-                            <div className='flex justify-between'>
-                                <span className='text-gray-600 dark:text-gray-400'>
-                                    Product ID:
-                                </span>
-                                <span className='font-mono text-sm text-gray-900 dark:text-gray-100'>
-                                    {product._id}
-                                </span>
-                            </div>
-                            <div className='flex justify-between'>
-                                <span className='text-gray-600 dark:text-gray-400'>
-                                    Category:
-                                </span>
-                                <span className='text-gray-900 dark:text-gray-100'>
-                                    {product.category || 'Uncategorized'}
-                                </span>
-                            </div>
-                            <div className='flex justify-between'>
-                                <span className='text-gray-600 dark:text-gray-400'>
-                                    Condition:
-                                </span>
-                                <span className='text-gray-900 dark:text-gray-100'>
-                                    {product.condition
-                                        ?.charAt(0)
-                                        .toUpperCase() +
-                                        product.condition?.slice(1) || 'Good'}
-                                </span>
-                            </div>
-                            <div className='flex justify-between'>
-                                <span className='text-gray-600 dark:text-gray-400'>
-                                    Status:
-                                </span>
-                                <span className='text-gray-900 dark:text-gray-100'>
-                                    {product.status?.charAt(0).toUpperCase() +
-                                        product.status?.slice(1) || 'Available'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
                     <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
                         <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4'>
                             Timestamps

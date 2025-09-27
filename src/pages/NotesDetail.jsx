@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import NotesEditModal from '../components/NotesEditModal';
+import { getStatusBadge } from '../utils/getStatusColor';
 
 const NotesDetail = () => {
     const [note, setNote] = useState(null);
@@ -134,17 +135,6 @@ const NotesDetail = () => {
         }
     };
 
-    const getStatusBadge = (status) => {
-        switch (status) {
-            case true:
-                return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-            case false:
-                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-            default:
-                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-        }
-    };
-
     if (loading) {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
@@ -216,14 +206,14 @@ const NotesDetail = () => {
                                     <div className='flex items-center space-x-4 mt-1'>
                                         <span
                                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(
-                                                note.status,
+                                                note.submissionStatus,
                                             )}`}
                                         >
-                                            {getStatusIcon(note.status)}
+                                            {getStatusIcon(
+                                                note.submissionStatus,
+                                            )}
                                             <span className='ml-1'>
-                                                {note.status
-                                                    ? 'Approved'
-                                                    : 'Pending'}
+                                                {note.submissionStatus}
                                             </span>
                                         </span>
                                     </div>

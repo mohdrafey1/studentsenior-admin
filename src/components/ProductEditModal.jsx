@@ -20,56 +20,58 @@ import toast from 'react-hot-toast';
 const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
-        title: '',
+        name: '',
         description: '',
-        price: '',
-        category: '',
-        condition: 'new',
-        status: 'available',
+        price: 0,
+        image: '',
+        submissionStatus: 'pending',
+        rejectionReason: '',
+        slug: '',
+        available: true,
     });
     const [errors, setErrors] = useState({});
 
-    const conditionOptions = [
-        { value: 'new', label: 'New', icon: <Package className='h-4 w-4' /> },
-        {
-            value: 'like-new',
-            label: 'Like New',
-            icon: <Package className='h-4 w-4' />,
-        },
-        { value: 'good', label: 'Good', icon: <Package className='h-4 w-4' /> },
-        { value: 'fair', label: 'Fair', icon: <Package className='h-4 w-4' /> },
-    ];
-
     const statusOptions = [
         {
-            value: 'available',
-            label: 'Available',
-            icon: <CheckCircle2 className='h-4 w-4' />,
-            color: 'text-green-600 dark:text-green-400',
-        },
-        {
-            value: 'sold',
-            label: 'Sold',
-            icon: <XCircle className='h-4 w-4' />,
-            color: 'text-red-600 dark:text-red-400',
-        },
-        {
             value: 'pending',
-            label: 'Pending',
+            label: 'Pending Review',
             icon: <Clock className='h-4 w-4' />,
-            color: 'text-yellow-600 dark:text-yellow-400',
+            color: 'amber',
+            description: 'Waiting for admin approval',
+        },
+        {
+            value: 'approved',
+            label: 'Approved',
+            icon: <CheckCircle2 className='h-4 w-4' />,
+            color: 'green',
+            description: 'Available to students',
+        },
+        {
+            value: 'rejected',
+            label: 'Rejected',
+            icon: <XCircle className='h-4 w-4' />,
+            color: 'red',
+            description: 'Not approved for use',
         },
     ];
 
     useEffect(() => {
         if (product && isOpen) {
             setFormData({
-                title: product.title || '',
+                name: product.name || '',
                 description: product.description || '',
-                price: product.price || '',
-                category: product.category || '',
-                condition: product.condition || 'new',
-                status: product.status || 'available',
+                price: product.price || 0,
+                image: product.image || '',
+                submissionStatus:
+                    product.submissionStatus === true
+                        ? 'approved'
+                        : product.submissionStatus === false
+                          ? 'pending'
+                          : product.submissionStatus || 'pending',
+                rejectionReason: product.rejectionReason || '',
+                slug: product.slug || '',
+                available:
+                    product.available !== undefined ? product.available : true,
             });
             setErrors({});
         }
@@ -78,24 +80,59 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
     const validateForm = () => {
         const newErrors = {};
 
-        if (!formData.title.trim()) {
-            newErrors.title = 'Title is required';
+        if (!formData.name?.trim()) {
+            newErrors.name = 'Name is required';
+        } else if (formData.name.trim().length < 2) {
+            newErrors.name = 'Name must be at least 2 characters';
+        } else if (formData.name.trim().length > 200) {
+            newErrors.name = 'Name cannot exceed 200 characters';
         }
 
-        if (!formData.description.trim()) {
+        if (!formData.description?.trim()) {
             newErrors.description = 'Description is required';
+        } else if (formData.description.trim().length > 1000) {
+            newErrors.description = 'Description cannot exceed 1000 characters';
+        }
+
+        if (formData.price < 0) {
+            newErrors.price = 'Price cannot be negative';
+        } else if (formData.price > 100000) {
+            newErrors.price = 'Price cannot exceed ₹1,00,000';
+        }
+
+        if (formData.slug && formData.slug.trim()) {
+            const slugPattern = /^[a-z0-9-]+$/;
+            if (!slugPattern.test(formData.slug.trim())) {
+                newErrors.slug =
+                    'Slug can only contain lowercase letters, numbers, and hyphens';
+            }
+        }
+
+        if (formData.image && formData.image.trim()) {
+            try {
+                new URL(formData.image);
+            } catch {
+                newErrors.image = 'Please provide a valid image URL';
+            }
         }
 
         if (
-            !formData.price ||
-            isNaN(formData.price) ||
-            Number(formData.price) < 0
+            formData.submissionStatus === 'rejected' &&
+            !formData.rejectionReason?.trim()
         ) {
-            newErrors.price = 'Valid price is required';
-        }
-
-        if (!formData.category.trim()) {
-            newErrors.category = 'Category is required';
+            newErrors.rejectionReason = 'Rejection reason is required';
+        } else if (
+            formData.rejectionReason &&
+            formData.rejectionReason.trim().length < 10
+        ) {
+            newErrors.rejectionReason =
+                'Rejection reason must be at least 10 characters';
+        } else if (
+            formData.rejectionReason &&
+            formData.rejectionReason.trim().length > 500
+        ) {
+            newErrors.rejectionReason =
+                'Rejection reason cannot exceed 500 characters';
         }
 
         setErrors(newErrors);
@@ -103,10 +140,15 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
     };
 
     const handleInputChange = (e) => {
-        const { name, value } = e.target;
+        const { name, value, type, checked } = e.target;
         setFormData((prev) => ({
             ...prev,
-            [name]: value,
+            [name]:
+                type === 'checkbox'
+                    ? checked
+                    : type === 'number'
+                      ? Number(value)
+                      : value,
         }));
 
         // Clear error when user starts typing
@@ -116,6 +158,13 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
                 [name]: '',
             }));
         }
+    };
+
+    const handleStatusChange = (value) => {
+        setFormData((prev) => ({
+            ...prev,
+            submissionStatus: value,
+        }));
     };
 
     const handleSubmit = async (e) => {
@@ -129,19 +178,24 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
         setIsSubmitting(true);
 
         try {
-            const updatedProduct = {
-                title: formData.title.trim(),
+            const updateData = {
+                name: formData.name.trim(),
                 description: formData.description.trim(),
                 price: Number(formData.price),
-                category: formData.category.trim(),
-                condition: formData.condition,
-                status: formData.status,
+                image: formData.image.trim() || undefined,
+                submissionStatus: formData.submissionStatus,
+                rejectionReason:
+                    formData.submissionStatus === 'rejected'
+                        ? formData.rejectionReason.trim()
+                        : undefined,
+                slug: formData.slug.trim() || undefined,
+                available: formData.available,
             };
 
-            await api.put(`/store/edit/${product._id}`, updatedProduct);
+            await api.put(`/dashboard/store/edit/${product._id}`, updateData);
             toast.success('Product updated successfully!');
-            onSuccess && onSuccess();
             onClose();
+            onSuccess && onSuccess();
         } catch (error) {
             console.error(error);
             toast.error(
@@ -181,14 +235,10 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
         </div>
     );
 
-    const getCurrentCondition = () => {
-        return conditionOptions.find(
-            (option) => option.value === formData.condition,
-        );
-    };
-
     const getCurrentStatus = () => {
-        return statusOptions.find((option) => option.value === formData.status);
+        return statusOptions.find(
+            (option) => option.value === formData.submissionStatus,
+        );
     };
 
     if (!isOpen) return null;
@@ -250,48 +300,50 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
 
                                     <div className='grid md:grid-cols-2 gap-6'>
                                         <FormField
-                                            label='Title'
+                                            label='Name'
                                             icon={
                                                 <Type className='h-4 w-4 text-gray-500' />
                                             }
                                             required
-                                            description='Clear and descriptive product title'
-                                            error={errors.title}
+                                            description='Clear and descriptive product name'
+                                            error={errors.name}
                                         >
                                             <input
                                                 type='text'
-                                                name='title'
-                                                value={formData.title}
+                                                name='name'
+                                                value={formData.name}
                                                 onChange={handleInputChange}
                                                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                                    errors.title
+                                                    errors.name
                                                         ? 'border-red-300 dark:border-red-600'
                                                         : 'border-gray-300 dark:border-gray-600'
                                                 } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                                placeholder='Enter product title...'
+                                                placeholder='Enter product name...'
                                             />
                                         </FormField>
 
                                         <FormField
-                                            label='Category'
+                                            label='Price (₹)'
                                             icon={
-                                                <Tag className='h-4 w-4 text-gray-500' />
+                                                <DollarSign className='h-4 w-4 text-gray-500' />
                                             }
                                             required
-                                            description='Product category or type'
-                                            error={errors.category}
+                                            description='Product price in rupees'
+                                            error={errors.price}
                                         >
                                             <input
-                                                type='text'
-                                                name='category'
-                                                value={formData.category}
+                                                type='number'
+                                                name='price'
+                                                value={formData.price}
                                                 onChange={handleInputChange}
+                                                min='0'
+                                                max='100000'
                                                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                                    errors.category
+                                                    errors.price
                                                         ? 'border-red-300 dark:border-red-600'
                                                         : 'border-gray-300 dark:border-gray-600'
                                                 } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                                placeholder='e.g., Electronics, Books, Clothing'
+                                                placeholder='0'
                                             />
                                         </FormField>
                                     </div>
@@ -319,85 +371,145 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
                                         />
                                     </FormField>
 
-                                    <FormField
-                                        label='Price'
-                                        icon={
-                                            <DollarSign className='h-4 w-4 text-gray-500' />
-                                        }
-                                        required
-                                        description='Product price in rupees'
-                                        error={errors.price}
-                                    >
+                                    <div className='grid md:grid-cols-2 gap-6'>
+                                        <FormField
+                                            label='Image URL'
+                                            icon={
+                                                <Package className='h-4 w-4 text-gray-500' />
+                                            }
+                                            description='Product image URL'
+                                            error={errors.image}
+                                        >
+                                            <input
+                                                type='url'
+                                                name='image'
+                                                value={formData.image}
+                                                onChange={handleInputChange}
+                                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                                    errors.image
+                                                        ? 'border-red-300 dark:border-red-600'
+                                                        : 'border-gray-300 dark:border-gray-600'
+                                                } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                                placeholder='https://example.com/image.jpg'
+                                            />
+                                        </FormField>
+
+                                        <FormField
+                                            label='Slug'
+                                            icon={
+                                                <Tag className='h-4 w-4 text-gray-500' />
+                                            }
+                                            description='URL slug for the product'
+                                            error={errors.slug}
+                                        >
+                                            <input
+                                                type='text'
+                                                name='slug'
+                                                value={formData.slug}
+                                                onChange={handleInputChange}
+                                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                                    errors.slug
+                                                        ? 'border-red-300 dark:border-red-600'
+                                                        : 'border-gray-300 dark:border-gray-600'
+                                                } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                                placeholder='product-slug'
+                                            />
+                                        </FormField>
+                                    </div>
+
+                                    <div className='flex items-center space-x-3'>
                                         <input
-                                            type='number'
-                                            name='price'
-                                            value={formData.price}
+                                            type='checkbox'
+                                            name='available'
+                                            checked={formData.available}
                                             onChange={handleInputChange}
-                                            min='0'
-                                            step='0.01'
-                                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                                errors.price
-                                                    ? 'border-red-300 dark:border-red-600'
-                                                    : 'border-gray-300 dark:border-gray-600'
-                                            } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                            placeholder='0.00'
+                                            className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded'
                                         />
-                                    </FormField>
+                                        <label className='text-sm font-medium text-gray-900 dark:text-gray-100'>
+                                            Available for purchase
+                                        </label>
+                                    </div>
                                 </div>
 
-                                {/* Status and Condition Section */}
+                                {/* Status Management Section */}
                                 <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
                                     <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
                                         <CheckCircle2 className='h-5 w-5 text-blue-500' />
-                                        Status & Condition
+                                        Status Management
                                     </h3>
 
-                                    <div className='grid md:grid-cols-2 gap-6'>
+                                    <div className='space-y-4'>
                                         <FormField
-                                            label='Condition'
-                                            icon={getCurrentCondition()?.icon}
-                                            description='Current condition of the product'
+                                            label='Approval Status'
+                                            icon={getCurrentStatus()?.icon}
+                                            required
+                                            description='Current approval status of this product'
+                                            error={errors.submissionStatus}
                                         >
-                                            <select
-                                                name='condition'
-                                                value={formData.condition}
-                                                onChange={handleInputChange}
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                            >
-                                                {conditionOptions.map(
-                                                    (option) => (
-                                                        <option
-                                                            key={option.value}
-                                                            value={option.value}
-                                                        >
-                                                            {option.label}
-                                                        </option>
-                                                    ),
-                                                )}
-                                            </select>
+                                            <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
+                                                {statusOptions.map((option) => (
+                                                    <button
+                                                        key={option.value}
+                                                        type='button'
+                                                        onClick={() =>
+                                                            handleStatusChange(
+                                                                option.value,
+                                                            )
+                                                        }
+                                                        className={`p-4 rounded-lg border-2 transition-all text-left ${
+                                                            formData.submissionStatus ===
+                                                            option.value
+                                                                ? option.color ===
+                                                                  'green'
+                                                                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                                                                    : option.color ===
+                                                                        'amber'
+                                                                      ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                                                                      : 'border-red-500 bg-red-50 dark:bg-red-900/20'
+                                                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                                        }`}
+                                                    >
+                                                        <div className='flex items-center gap-2 mb-1'>
+                                                            {option.icon}
+                                                            <span className='font-medium text-gray-900 dark:text-gray-100'>
+                                                                {option.label}
+                                                            </span>
+                                                        </div>
+                                                        <p className='text-xs text-gray-500 dark:text-gray-400'>
+                                                            {option.description}
+                                                        </p>
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </FormField>
 
-                                        <FormField
-                                            label='Availability Status'
-                                            icon={getCurrentStatus()?.icon}
-                                            description='Current availability status'
-                                        >
-                                            <select
-                                                name='status'
-                                                value={formData.status}
-                                                onChange={handleInputChange}
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                        {formData.submissionStatus ===
+                                            'rejected' && (
+                                            <FormField
+                                                label='Rejection Reason'
+                                                icon={
+                                                    <AlertTriangle className='h-4 w-4 text-red-500' />
+                                                }
+                                                required
+                                                description='Explain why this product was rejected'
+                                                error={errors.rejectionReason}
                                             >
-                                                {statusOptions.map((option) => (
-                                                    <option
-                                                        key={option.value}
-                                                        value={option.value}
-                                                    >
-                                                        {option.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </FormField>
+                                                <textarea
+                                                    name='rejectionReason'
+                                                    value={
+                                                        formData.rejectionReason
+                                                    }
+                                                    onChange={handleInputChange}
+                                                    rows={3}
+                                                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-colors resize-none ${
+                                                        errors.rejectionReason
+                                                            ? 'border-red-300 dark:border-red-600'
+                                                            : 'border-gray-300 dark:border-gray-600'
+                                                    } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                                    placeholder='Enter the reason for rejection...'
+                                                />
+                                            </FormField>
+                                        )}
                                     </div>
                                 </div>
 

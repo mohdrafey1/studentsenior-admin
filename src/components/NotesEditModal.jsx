@@ -10,6 +10,9 @@ import {
     XCircle,
     Link,
     User,
+    DollarSign,
+    CreditCard,
+    Info,
 } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
@@ -19,25 +22,35 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
-        status: false,
+        submissionStatus: 'pending',
         slug: '',
+        isPaid: false,
+        price: 0,
+        rejectionReason: '',
     });
     const [errors, setErrors] = useState({});
 
     const statusOptions = [
         {
-            value: false,
+            value: 'pending',
             label: 'Pending Review',
             icon: <Clock className='h-4 w-4' />,
             color: 'amber',
             description: 'Waiting for admin approval',
         },
         {
-            value: true,
+            value: 'approved',
             label: 'Approved',
             icon: <CheckCircle2 className='h-4 w-4' />,
             color: 'green',
             description: 'Available to students',
+        },
+        {
+            value: 'rejected',
+            label: 'Rejected',
+            icon: <XCircle className='h-4 w-4' />,
+            color: 'red',
+            description: 'Not approved for use',
         },
     ];
 
@@ -46,8 +59,11 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
             setFormData({
                 title: note.title || '',
                 description: note.description || '',
-                status: note.status || false,
+                submissionStatus: note.submissionStatus || 'pending',
                 slug: note.slug || '',
+                isPaid: note.isPaid || false,
+                price: note.price || 0,
+                rejectionReason: note.rejectionReason || '',
             });
             setErrors({});
         }
@@ -82,6 +98,21 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
             }
         }
 
+        if (formData.isPaid) {
+            if (!formData.price || formData.price < 0) {
+                newErrors.price = 'Price must be a positive number';
+            } else if (formData.price > 1000) {
+                newErrors.price = 'Price cannot exceed ₹1000';
+            }
+        }
+
+        if (
+            formData.submissionStatus === 'rejected' &&
+            !formData.rejectionReason?.trim()
+        ) {
+            newErrors.rejectionReason = 'Rejection reason is required';
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -97,8 +128,17 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
     const handleStatusChange = (value) => {
         setFormData((prev) => ({
             ...prev,
-            status: value,
+            submissionStatus: value,
         }));
+    };
+
+    const handleToggleChange = (name) => {
+        setFormData((prev) => ({ ...prev, [name]: !prev[name] }));
+
+        // Reset price when switching from paid to free
+        if (name === 'isPaid' && formData.isPaid) {
+            setFormData((prev) => ({ ...prev, price: 0 }));
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -114,8 +154,14 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
             const updateData = {
                 title: formData.title.trim(),
                 description: formData.description.trim(),
-                status: formData.status,
+                submissionStatus: formData.submissionStatus,
                 slug: formData.slug.trim() || undefined,
+                isPaid: formData.isPaid,
+                price: formData.isPaid ? Number(formData.price) : 0,
+                rejectionReason:
+                    formData.submissionStatus === 'rejected'
+                        ? formData.rejectionReason.trim()
+                        : undefined,
             };
 
             const response = await api.put(
@@ -125,6 +171,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
 
             if (response.data.success) {
                 toast.success('Note updated successfully');
+                onClose();
                 onSuccess?.(response.data.data.updatedNotes);
             }
         } catch (error) {
@@ -167,7 +214,9 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
     );
 
     const getCurrentStatus = () => {
-        return statusOptions.find((option) => option.value === formData.status);
+        return statusOptions.find(
+            (option) => option.value === formData.submissionStatus,
+        );
     };
 
     if (!isOpen) return null;
@@ -185,7 +234,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                 >
                     &#8203;
                 </span>
-                <div className='inline-block align-bottom bg-white dark:bg-gray-900 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full relative z-10'>
+                <div className='inline-block align-bottom bg-white dark:bg-gray-900 rounded-lg text-left overflow-auto shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full relative z-10'>
                     <div className='flex flex-col h-full max-h-[90vh]'>
                         {/* Header with gradient */}
                         <div className='flex-shrink-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 text-white p-6'>
@@ -306,7 +355,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                                             <label
                                                 key={option.value}
                                                 className={`relative flex cursor-pointer rounded-lg border p-4 focus:outline-none transition-all ${
-                                                    formData.status ===
+                                                    formData.submissionStatus ===
                                                     option.value
                                                         ? `border-${option.color}-500 bg-${option.color}-50 dark:bg-${option.color}-900/20`
                                                         : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
@@ -314,9 +363,9 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                                             >
                                                 <input
                                                     type='radio'
-                                                    name='status'
+                                                    name='submissionStatus'
                                                     checked={
-                                                        formData.status ===
+                                                        formData.submissionStatus ===
                                                         option.value
                                                     }
                                                     onChange={() =>
@@ -335,7 +384,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                                                     <div className='ml-3 flex-1'>
                                                         <div
                                                             className={`text-sm font-medium ${
-                                                                formData.status ===
+                                                                formData.submissionStatus ===
                                                                 option.value
                                                                     ? `text-${option.color}-900 dark:text-${option.color}-100`
                                                                     : 'text-gray-900 dark:text-gray-100'
@@ -345,7 +394,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                                                         </div>
                                                         <div
                                                             className={`text-xs ${
-                                                                formData.status ===
+                                                                formData.submissionStatus ===
                                                                 option.value
                                                                     ? `text-${option.color}-700 dark:text-${option.color}-300`
                                                                     : 'text-gray-500 dark:text-gray-400'
@@ -354,7 +403,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                                                             {option.description}
                                                         </div>
                                                     </div>
-                                                    {formData.status ===
+                                                    {formData.submissionStatus ===
                                                         option.value && (
                                                         <div
                                                             className={`flex-shrink-0 text-${option.color}-600`}
@@ -367,6 +416,127 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                                         ))}
                                     </div>
                                 </FormField>
+
+                                {formData.submissionStatus === 'rejected' && (
+                                    <FormField
+                                        label='Rejection Reason'
+                                        icon={
+                                            <AlertTriangle className='h-4 w-4 text-red-500' />
+                                        }
+                                        required
+                                        description='Explain why this note was rejected'
+                                        error={errors.rejectionReason}
+                                    >
+                                        <textarea
+                                            name='rejectionReason'
+                                            value={formData.rejectionReason}
+                                            onChange={handleInputChange}
+                                            rows={3}
+                                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-colors resize-none ${
+                                                errors.rejectionReason
+                                                    ? 'border-red-300 dark:border-red-600'
+                                                    : 'border-gray-300 dark:border-gray-600'
+                                            } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                            placeholder='Enter the reason for rejection...'
+                                        />
+                                    </FormField>
+                                )}
+                            </div>
+
+                            {/* Pricing Section */}
+                            <div className='space-y-4'>
+                                <h4 className='text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700 pb-2'>
+                                    Pricing Options
+                                </h4>
+
+                                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                                    <div className='space-y-2'>
+                                        <label className='flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100'>
+                                            <CreditCard className='h-4 w-4' />
+                                            Paid Resource
+                                        </label>
+                                        <div className='flex items-center'>
+                                            <button
+                                                type='button'
+                                                onClick={() =>
+                                                    handleToggleChange('isPaid')
+                                                }
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                                                    formData.isPaid
+                                                        ? 'bg-indigo-600'
+                                                        : 'bg-gray-200 dark:bg-gray-700'
+                                                }`}
+                                            >
+                                                <span
+                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                        formData.isPaid
+                                                            ? 'translate-x-6'
+                                                            : 'translate-x-1'
+                                                    }`}
+                                                />
+                                            </button>
+                                            <span className='ml-3 text-sm text-gray-700 dark:text-gray-300'>
+                                                {formData.isPaid
+                                                    ? 'Paid'
+                                                    : 'Free'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {formData.isPaid && (
+                                        <FormField
+                                            label='Price (₹)'
+                                            icon={
+                                                <DollarSign className='h-4 w-4 text-gray-500' />
+                                            }
+                                            required={formData.isPaid}
+                                            description='Price students will pay for this note'
+                                            error={errors.price}
+                                        >
+                                            <input
+                                                type='number'
+                                                name='price'
+                                                value={formData.price}
+                                                onChange={handleInputChange}
+                                                min='0'
+                                                max='1000'
+                                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                                    errors.price
+                                                        ? 'border-red-300 dark:border-red-600'
+                                                        : 'border-gray-300 dark:border-gray-600'
+                                                } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                                placeholder='0'
+                                            />
+                                        </FormField>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Summary */}
+                            <div className='bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800'>
+                                <div className='flex items-start gap-3'>
+                                    <Info className='h-5 w-5 text-blue-500 mt-0.5' />
+                                    <div className='text-sm text-blue-700 dark:text-blue-300'>
+                                        <p className='font-medium mb-1'>
+                                            Summary
+                                        </p>
+                                        <p>
+                                            This{' '}
+                                            {formData.isPaid
+                                                ? `paid (₹${formData.price})`
+                                                : 'free'}{' '}
+                                            note will be{' '}
+                                            {formData.submissionStatus ===
+                                            'approved'
+                                                ? 'available to students'
+                                                : formData.submissionStatus ===
+                                                    'rejected'
+                                                  ? 'hidden from students'
+                                                  : 'pending approval'}
+                                            .
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Note Information */}
