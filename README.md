@@ -4,39 +4,39 @@ A modern, responsive Progressive Web Application (PWA) for managing the Student 
 
 ## Features
 
--   🔐 **Secure Authentication** - JWT-based login/signup with role-based access control
--   📱 **Progressive Web App** - Installable app with offline functionality
--   🎨 **Modern UI** - Clean, responsive design with Tailwind CSS
--   🔄 **Real-time Status** - Online/offline indicators and connection status
--   👥 **Role Management** - Admin, Moderator, and Visitor roles with different permissions
--   🛡️ **Security Best Practices** - Protected routes, token validation, and secure API calls
+- 🔐 **Secure Authentication** - JWT-based login/signup with role-based access control
+- 📱 **Progressive Web App** - Installable app with offline functionality
+- 🎨 **Modern UI** - Clean, responsive design with Tailwind CSS
+- 🔄 **Real-time Status** - Online/offline indicators and connection status
+- 👥 **Role Management** - Admin, Moderator, and Visitor roles with different permissions
+- 🛡️ **Security Best Practices** - Protected routes, token validation, and secure API calls
 
 ## Tech Stack
 
 ### Frontend
 
--   **React** - UI framework
--   **React Router DOM** - Client-side routing
--   **Tailwind CSS** - Utility-first CSS framework
--   **Lucide React** - Icon library
--   **Axios** - HTTP client
--   **Vite** - Build tool and dev server
+- **React** - UI framework
+- **React Router DOM** - Client-side routing
+- **Tailwind CSS** - Utility-first CSS framework
+- **Lucide React** - Icon library
+- **Axios** - HTTP client
+- **Vite** - Build tool and dev server
 
 ### Backend Integration
 
--   **Node.js/Express** - Backend API
--   **MongoDB** - Database
--   **JWT** - Authentication tokens
--   **bcryptjs** - Password hashing
+- **Node.js/Express** - Backend API
+- **MongoDB** - Database
+- **JWT** - Authentication tokens
+- **bcryptjs** - Password hashing
 
 ## Getting Started
 
 ### Prerequisites
 
--   Node.js (v14 or higher)
--   npm or yarn
--   MongoDB database
--   Backend API running
+- Node.js (v14 or higher)
+- npm or yarn
+- MongoDB database
+- Backend API running
 
 ### Installation
 
@@ -72,9 +72,9 @@ A modern, responsive Progressive Web Application (PWA) for managing the Student 
 
 Ensure the backend API is running on the specified port (8081 by default). The backend should have:
 
--   Dashboard authentication endpoints (`/api/dashboard/auth/signup`, `/api/dashboard/auth/signin`)
--   Proper CORS configuration
--   JWT secret configured
+- Dashboard authentication endpoints (`/api/dashboard/auth/signup`, `/api/dashboard/auth/signin`)
+- Proper CORS configuration
+- JWT secret configured
 
 ## Authentication
 
@@ -86,38 +86,38 @@ Ensure the backend API is running on the specified port (8081 by default). The b
 
 ### Signup Process
 
--   Users can signup with email, name, and optional college information
--   Secret codes can be provided during signup for elevated roles:
-    -   Admin secret code grants Admin role
-    -   Moderator secret code grants Moderator role
-    -   No secret code defaults to Visitor role
+- Users can signup with email, name, and optional college information
+- Secret codes can be provided during signup for elevated roles:
+    - Admin secret code grants Admin role
+    - Moderator secret code grants Moderator role
+    - No secret code defaults to Visitor role
 
 ### Login Process
 
--   Email and password authentication
--   JWT token stored securely in localStorage
--   Automatic redirect to dashboard on successful login
--   Token validation on protected routes
+- Email and password authentication
+- JWT token stored securely in localStorage
+- Automatic redirect to dashboard on successful login
+- Token validation on protected routes
 
 ## PWA Features
 
 ### Installation
 
--   Browser prompt for app installation
--   Works on desktop and mobile devices
--   Standalone app experience
+- Browser prompt for app installation
+- Works on desktop and mobile devices
+- Standalone app experience
 
 ### Offline Support
 
--   Service worker for caching critical resources
--   Offline indicator when network is unavailable
--   Graceful degradation of features
+- Service worker for caching critical resources
+- Offline indicator when network is unavailable
+- Graceful degradation of features
 
 ### Performance
 
--   Optimized loading with code splitting
--   Efficient caching strategies
--   Fast, app-like experience
+- Optimized loading with code splitting
+- Efficient caching strategies
+- Fast, app-like experience
 
 ## API Integration
 
@@ -185,33 +185,33 @@ src/
 
 ### Available Scripts
 
--   `npm run dev` - Start development server
--   `npm run build` - Build for production
--   `npm run preview` - Preview production build
--   `npm run lint` - Run ESLint
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
 
 ### Code Style
 
--   ESLint configuration for code quality
--   Consistent component structure
--   Proper error handling
--   Responsive design patterns
+- ESLint configuration for code quality
+- Consistent component structure
+- Proper error handling
+- Responsive design patterns
 
 ## Security
 
 ### Frontend Security
 
--   Protected routes with authentication checks
--   Secure token storage
--   Input validation and sanitization
--   HTTPS enforcement in production
+- Protected routes with authentication checks
+- Secure token storage
+- Input validation and sanitization
+- HTTPS enforcement in production
 
 ### Backend Integration
 
--   JWT token validation
--   Role-based access control
--   Secure password hashing
--   API rate limiting (backend)
+- JWT token validation
+- Role-based access control
+- Secure password hashing
+- API rate limiting (backend)
 
 ## Deployment
 
@@ -231,9 +231,9 @@ VITE_API_URL=https://your-api-domain.com/api
 
 ### PWA Deployment
 
--   Ensure HTTPS for PWA features
--   Configure proper caching headers
--   Test installation on various devices
+- Ensure HTTPS for PWA features
+- Configure proper caching headers
+- Test installation on various devices
 
 ## Troubleshooting
 
@@ -268,9 +268,9 @@ This project is part of the Student Senior platform and follows the same licensi
 
 For issues and questions:
 
--   Check existing GitHub issues
--   Create new issue with detailed description
--   Include browser console logs and network requests
+- Check existing GitHub issues
+- Create new issue with detailed description
+- Include browser console logs and network requests
 
 ---
 

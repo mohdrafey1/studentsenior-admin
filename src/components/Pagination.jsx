@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 
 /**
  * Reusable Pagination component with ellipsis and optional page size selector.
@@ -23,11 +23,11 @@ const Pagination = ({
     onPageChange,
     onPageSizeChange,
     showSummary = true,
-    className = "",
+    className = '',
     siblingCount = 1,
 }) => {
     const totalPages =
-        typeof totalItems === "number"
+        typeof totalItems === 'number'
             ? Math.max(1, Math.ceil(totalItems / (pageSize || 1)))
             : Math.max(1, totalPagesProp || 1);
 
@@ -53,7 +53,7 @@ const Pagination = ({
         const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
         const rightSiblingIndex = Math.min(
             currentPage + siblingCount,
-            totalPages
+            totalPages,
         );
 
         const showLeftEllipsis = leftSiblingIndex > 2;
@@ -61,13 +61,13 @@ const Pagination = ({
 
         const range = [];
         range.push(1);
-        if (showLeftEllipsis) range.push("...");
+        if (showLeftEllipsis) range.push('...');
 
         const start = showLeftEllipsis ? leftSiblingIndex : 2;
         const end = showRightEllipsis ? rightSiblingIndex : totalPages - 1;
         for (let i = start; i <= end; i++) range.push(i);
 
-        if (showRightEllipsis) range.push("...");
+        if (showRightEllipsis) range.push('...');
         range.push(totalPages);
         return range;
     };
@@ -76,18 +76,18 @@ const Pagination = ({
         <div
             className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${className}`}
         >
-            {showSummary && typeof totalItems === "number" && (
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                    Showing <span className="font-medium">{startIndex}</span> to
-                    <span className="font-medium"> {endIndex}</span> of
-                    <span className="font-medium"> {totalItems}</span> results
+            {showSummary && typeof totalItems === 'number' && (
+                <p className='text-sm text-gray-700 dark:text-gray-300'>
+                    Showing <span className='font-medium'>{startIndex}</span> to
+                    <span className='font-medium'> {endIndex}</span> of
+                    <span className='font-medium'> {totalItems}</span> results
                 </p>
             )}
 
-            <div className="flex items-center gap-3">
+            <div className='flex items-center gap-3'>
                 {onPageSizeChange && (
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600 dark:text-gray-300">
+                    <div className='flex items-center gap-2'>
+                        <span className='text-sm text-gray-600 dark:text-gray-300'>
                             Rows per page
                         </span>
                         <select
@@ -95,7 +95,7 @@ const Pagination = ({
                             onChange={(e) =>
                                 onPageSizeChange(Number(e.target.value))
                             }
-                            className="px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className='px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500'
                         >
                             {pageSizeOptions.map((opt) => (
                                 <option key={opt} value={opt}>
@@ -106,20 +106,20 @@ const Pagination = ({
                     </div>
                 )}
 
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                <nav className='relative z-0 inline-flex rounded-md shadow-sm -space-x-px'>
                     <button
                         onClick={() => goToPage(currentPage - 1)}
                         disabled={currentPage <= 1}
-                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
-                        aria-label="Previous page"
+                        className='relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50'
+                        aria-label='Previous page'
                     >
                         Previous
                     </button>
                     {getPageRange().map((p, idx) =>
-                        p === "..." ? (
+                        p === '...' ? (
                             <span
                                 key={`ellipsis-${idx}`}
-                                className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 select-none"
+                                className='relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 select-none'
                             >
                                 …
                             </span>
@@ -129,22 +129,22 @@ const Pagination = ({
                                 onClick={() => goToPage(p)}
                                 className={
                                     p === currentPage
-                                        ? "relative inline-flex items-center px-4 py-2 border border-blue-500 bg-blue-50 dark:bg-blue-900 text-sm font-medium text-blue-600 dark:text-blue-300 z-10"
-                                        : "relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+                                        ? 'relative inline-flex items-center px-4 py-2 border border-blue-500 bg-blue-50 dark:bg-blue-900 text-sm font-medium text-blue-600 dark:text-blue-300 z-10'
+                                        : 'relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
                                 }
                                 aria-current={
-                                    p === currentPage ? "page" : undefined
+                                    p === currentPage ? 'page' : undefined
                                 }
                             >
                                 {p}
                             </button>
-                        )
+                        ),
                     )}
                     <button
                         onClick={() => goToPage(currentPage + 1)}
                         disabled={currentPage >= totalPages}
-                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
-                        aria-label="Next page"
+                        className='relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50'
+                        aria-label='Next page'
                     >
                         Next
                     </button>

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import Header from "../components/Header";
-import api from "../utils/api";
-import toast from "react-hot-toast";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Header from '../components/Header';
+import api from '../utils/api';
+import toast from 'react-hot-toast';
 import {
     Building,
     ArrowLeft,
@@ -12,24 +12,24 @@ import {
     Edit2,
     Trash2,
     X,
-} from "lucide-react";
-import Pagination from "../components/Pagination";
-import ConfirmModal from "../components/ConfirmModal";
+} from 'lucide-react';
+import Pagination from '../components/Pagination';
+import ConfirmModal from '../components/ConfirmModal';
 
 const Branches = () => {
     const [branches, setBranches] = useState([]);
     const [courses, setCourses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [showModal, setShowModal] = useState(false);
     const [editingBranch, setEditingBranch] = useState(null);
     const [formData, setFormData] = useState({
-        branchName: "",
-        branchCode: "",
-        course: "",
+        branchName: '',
+        branchCode: '',
+        course: '',
     });
     const [submitting, setSubmitting] = useState(false);
     const navigate = useNavigate();
@@ -37,19 +37,19 @@ const Branches = () => {
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
         isOpen: false,
-        title: "",
-        message: "",
+        title: '',
+        message: '',
         onConfirm: null,
-        variant: "danger",
+        variant: 'danger',
     });
 
     const showConfirm = (config) => {
         return new Promise((resolve) => {
             setConfirmModal({
                 isOpen: true,
-                title: config.title || "Confirm Action",
+                title: config.title || 'Confirm Action',
                 message: config.message,
-                variant: config.variant || "danger",
+                variant: config.variant || 'danger',
                 onConfirm: () => resolve(true),
             });
         });
@@ -63,15 +63,15 @@ const Branches = () => {
         try {
             setError(null);
             const [branchesRes, coursesRes] = await Promise.all([
-                api.get("/resource/branches"),
-                api.get("/resource/courses"),
+                api.get('/resource/branches'),
+                api.get('/resource/courses'),
             ]);
             setBranches(branchesRes.data.data || []);
             setCourses(coursesRes.data.data || []);
         } catch (e) {
             console.error(e);
-            setError("Failed to load data");
-            toast.error("Failed to load data");
+            setError('Failed to load data');
+            toast.error('Failed to load data');
         } finally {
             setLoading(false);
         }
@@ -88,7 +88,7 @@ const Branches = () => {
             !formData.branchCode.trim() ||
             !formData.course
         ) {
-            toast.error("Please fill in all fields");
+            toast.error('Please fill in all fields');
             return;
         }
 
@@ -97,19 +97,19 @@ const Branches = () => {
             if (editingBranch) {
                 await api.put(
                     `/resource/branches/${editingBranch._id}`,
-                    formData
+                    formData,
                 );
-                toast.success("Branch updated successfully");
+                toast.success('Branch updated successfully');
                 fetchData(); // Refresh to get updated data
             } else {
-                await api.post("/resource/branches", formData);
-                toast.success("Branch created successfully");
+                await api.post('/resource/branches', formData);
+                toast.success('Branch created successfully');
                 fetchData(); // Refresh to get updated data
             }
             handleCloseModal();
         } catch (e) {
             console.error(e);
-            toast.error(e.response?.data?.message || "Operation failed");
+            toast.error(e.response?.data?.message || 'Operation failed');
         } finally {
             setSubmitting(false);
         }
@@ -120,33 +120,33 @@ const Branches = () => {
         setFormData({
             branchName: branch.branchName,
             branchCode: branch.branchCode,
-            course: branch.course?._id || "",
+            course: branch.course?._id || '',
         });
         setShowModal(true);
     };
 
     const handleDelete = async (branch) => {
         const ok = await showConfirm({
-            title: "Delete Branch",
+            title: 'Delete Branch',
             message: `Are you sure you want to delete "${branch.branchName}"? This action cannot be undone.`,
-            variant: "danger",
+            variant: 'danger',
         });
         if (!ok) return;
 
         try {
             await api.delete(`/resource/branches/${branch._id}`);
             setBranches(branches.filter((b) => b._id !== branch._id));
-            toast.success("Branch deleted successfully");
+            toast.success('Branch deleted successfully');
         } catch (e) {
             console.error(e);
-            toast.error("Failed to delete branch");
+            toast.error('Failed to delete branch');
         }
     };
 
     const handleCloseModal = () => {
         setShowModal(false);
         setEditingBranch(null);
-        setFormData({ branchName: "", branchCode: "", course: "" });
+        setFormData({ branchName: '', branchCode: '', course: '' });
     };
 
     const filtered = branches.filter((b) => {
@@ -164,12 +164,12 @@ const Branches = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <div className="flex items-center justify-center py-20">
-                    <div className="flex items-center space-x-2">
-                        <Loader className="w-6 h-6 animate-spin text-blue-600" />
-                        <span className="text-gray-600 dark:text-gray-400">
+                <div className='flex items-center justify-center py-20'>
+                    <div className='flex items-center space-x-2'>
+                        <Loader className='w-6 h-6 animate-spin text-blue-600' />
+                        <span className='text-gray-600 dark:text-gray-400'>
                             Loading branches...
                         </span>
                     </div>
@@ -179,28 +179,28 @@ const Branches = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
-            <main className="pt-6 pb-12">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <main className='pt-6 pb-12'>
+                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
                     {/* Header */}
-                    <div className="flex items-center justify-between mb-8">
-                        <div className="flex items-center">
+                    <div className='flex items-center justify-between mb-8'>
+                        <div className='flex items-center'>
                             <button
-                                onClick={() => navigate("/reports")}
-                                className="mr-4 p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                onClick={() => navigate('/reports')}
+                                className='mr-4 p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors'
                             >
-                                <ArrowLeft className="w-5 h-5" />
+                                <ArrowLeft className='w-5 h-5' />
                             </button>
-                            <div className="flex items-center">
-                                <div className="bg-teal-600 text-white p-3 rounded-lg mr-4">
-                                    <Building className="w-6 h-6" />
+                            <div className='flex items-center'>
+                                <div className='bg-teal-600 text-white p-3 rounded-lg mr-4'>
+                                    <Building className='w-6 h-6' />
                                 </div>
                                 <div>
-                                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                                    <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
                                         Branches
                                     </h1>
-                                    <p className="text-gray-600 dark:text-gray-400 mt-1">
+                                    <p className='text-gray-600 dark:text-gray-400 mt-1'>
                                         Manage course branches
                                     </p>
                                 </div>
@@ -208,102 +208,102 @@ const Branches = () => {
                         </div>
                         <button
                             onClick={() => setShowModal(true)}
-                            className="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                            className='inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors'
                         >
-                            <Plus className="w-4 h-4 mr-2" />
+                            <Plus className='w-4 h-4 mr-2' />
                             Add Branch
                         </button>
                     </div>
 
                     {/* Search */}
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
-                        <div className="relative max-w-md">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8'>
+                        <div className='relative max-w-md'>
+                            <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
                             <input
-                                type="text"
-                                placeholder="Search by branch name, code, or course..."
+                                type='text'
+                                placeholder='Search by branch name, code, or course...'
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                className='w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
                             />
                         </div>
                     </div>
 
                     {error && (
-                        <div className="bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8">
+                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8'>
                             {error}
                         </div>
                     )}
 
                     {/* Branches Table */}
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead className="bg-gray-50 dark:bg-gray-700">
+                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                        <div className='overflow-x-auto'>
+                            <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
+                                <thead className='bg-gray-50 dark:bg-gray-700'>
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                                             Branch Name
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                                             Branch Code
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                                             Course
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                                             Total Subjects
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                                             Created
                                         </th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                                             Actions
                                         </th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
                                     {current.map((branch) => (
                                         <tr
                                             key={branch._id}
-                                            className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                                            className='hover:bg-gray-50 dark:hover:bg-gray-700'
                                         >
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                                            <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white'>
                                                 {branch.branchName}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
                                                 {branch.branchCode}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
                                                 {branch.course?.courseName ||
-                                                    "N/A"}
+                                                    'N/A'}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
                                                 {branch.totalSubject || 0}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
                                                 {branch.createdAt
                                                     ? new Date(
-                                                          branch.createdAt
+                                                          branch.createdAt,
                                                       ).toLocaleDateString()
-                                                    : "N/A"}
+                                                    : 'N/A'}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <div className="flex items-center justify-end space-x-2">
+                                            <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
+                                                <div className='flex items-center justify-end space-x-2'>
                                                     <button
                                                         onClick={() =>
                                                             handleEdit(branch)
                                                         }
-                                                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 p-1 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded"
+                                                        className='text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 p-1 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded'
                                                     >
-                                                        <Edit2 className="w-4 h-4" />
+                                                        <Edit2 className='w-4 h-4' />
                                                     </button>
                                                     <button
                                                         onClick={() =>
                                                             handleDelete(branch)
                                                         }
-                                                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                                                        className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded'
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <Trash2 className='w-4 h-4' />
                                                     </button>
                                                 </div>
                                             </td>
@@ -312,7 +312,7 @@ const Branches = () => {
                                 </tbody>
                             </table>
                         </div>
-                        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                        <div className='px-4 py-3 border-t border-gray-200 dark:border-gray-700'>
                             <Pagination
                                 currentPage={page}
                                 pageSize={pageSize}
@@ -330,42 +330,42 @@ const Branches = () => {
 
             {/* Branch Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 overflow-y-auto">
-                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0'>
                         <div
-                            className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+                            className='fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75'
                             onClick={handleCloseModal}
                         ></div>
                         <span
-                            className="hidden sm:inline-block sm:align-middle sm:h-screen"
-                            aria-hidden="true"
+                            className='hidden sm:inline-block sm:align-middle sm:h-screen'
+                            aria-hidden='true'
                         >
                             &#8203;
                         </span>
-                        <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10">
+                        <div className='inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10'>
                             <form onSubmit={handleSubmit}>
-                                <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                                <div className='bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4'>
+                                    <div className='flex items-center justify-between mb-4'>
+                                        <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
                                             {editingBranch
-                                                ? "Edit Branch"
-                                                : "Add New Branch"}
+                                                ? 'Edit Branch'
+                                                : 'Add New Branch'}
                                         </h3>
                                         <button
-                                            type="button"
+                                            type='button'
                                             onClick={handleCloseModal}
-                                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                            className='text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
                                         >
-                                            <X className="w-5 h-5" />
+                                            <X className='w-5 h-5' />
                                         </button>
                                     </div>
-                                    <div className="space-y-4">
+                                    <div className='space-y-4'>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                                                 Branch Name
                                             </label>
                                             <input
-                                                type="text"
+                                                type='text'
                                                 value={formData.branchName}
                                                 onChange={(e) =>
                                                     setFormData({
@@ -374,17 +374,17 @@ const Branches = () => {
                                                             e.target.value,
                                                     })
                                                 }
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                                                placeholder="Enter branch name"
+                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                                placeholder='Enter branch name'
                                                 required
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                                                 Branch Code
                                             </label>
                                             <input
-                                                type="text"
+                                                type='text'
                                                 value={formData.branchCode}
                                                 onChange={(e) =>
                                                     setFormData({
@@ -393,13 +393,13 @@ const Branches = () => {
                                                             e.target.value,
                                                     })
                                                 }
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                                                placeholder="Enter branch code"
+                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                                placeholder='Enter branch code'
                                                 required
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                                                 Course
                                             </label>
                                             <select
@@ -410,10 +410,10 @@ const Branches = () => {
                                                         course: e.target.value,
                                                     })
                                                 }
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
                                                 required
                                             >
-                                                <option value="">
+                                                <option value=''>
                                                     Select a course
                                                 </option>
                                                 {courses.map((course) => (
@@ -429,22 +429,22 @@ const Branches = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                                <div className='bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse'>
                                     <button
-                                        type="submit"
+                                        type='submit'
                                         disabled={submitting}
-                                        className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-teal-600 text-base font-medium text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                                        className='w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-teal-600 text-base font-medium text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50'
                                     >
                                         {submitting
-                                            ? "Saving..."
+                                            ? 'Saving...'
                                             : editingBranch
-                                            ? "Update"
-                                            : "Create"}
+                                              ? 'Update'
+                                              : 'Create'}
                                     </button>
                                     <button
-                                        type="button"
+                                        type='button'
                                         onClick={handleCloseModal}
-                                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm"
+                                        className='mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm'
                                     >
                                         Cancel
                                     </button>

@@ -1,44 +1,44 @@
-import React from "react";
+import React from 'react';
 import {
     BrowserRouter as Router,
     Routes,
     Route,
     Navigate,
-} from "react-router-dom";
-import { Toaster } from "react-hot-toast";
-import { AuthProvider } from "./context/AuthContext";
-import ProtectedRoute from "./components/ProtectedRoute";
-import OfflineIndicator from "./components/OfflineIndicator";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import Dashboard from "./pages/Dashboard";
-import Reports from "./pages/Reports";
-import Payments from "./pages/Payments";
-import PaymentDetail from "./pages/PaymentDetail";
-import Redemptions from "./pages/Redemptions";
-import Transactions from "./pages/Transactions";
-import Contacts from "./pages/Contacts";
-import Users from "./pages/Users";
-import DashboardUsers from "./pages/DashboardUsers";
-import CollegeDetail from "./pages/CollegeDetail";
-import Courses from "./pages/Courses";
-import Branches from "./pages/Branches";
-import Subjects from "./pages/Subjects";
-import PyqList from "./pages/PyqList";
-import PyqDetail from "./pages/PyqDetail";
-import NotesList from "./pages/NotesList";
-import NotesDetail from "./pages/NotesDetail";
-import ProductList from "./pages/ProductList";
-import ProductDetail from "./pages/ProductDetail";
-import SeniorList from "./pages/SeniorList";
-import SeniorDetail from "./pages/SeniorDetail";
-import GroupList from "./pages/GroupList";
-import GroupDetail from "./pages/GroupDetail";
-import OpportunityList from "./pages/OpportunityList";
-import OpportunityDetail from "./pages/OpportunityDetail";
-import LostFoundList from "./pages/LostFoundList";
-import VideoList from "./pages/VideoList";
-import VideoDetail from "./pages/VideoDetail";
+} from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import OfflineIndicator from './components/OfflineIndicator';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import Dashboard from './pages/Dashboard';
+import Reports from './pages/Reports';
+import Payments from './pages/Payments';
+import PaymentDetail from './pages/PaymentDetail';
+import Redemptions from './pages/Redemptions';
+import Transactions from './pages/Transactions';
+import Contacts from './pages/Contacts';
+import Users from './pages/Users';
+import DashboardUsers from './pages/DashboardUsers';
+import CollegeDetail from './pages/CollegeDetail';
+import Courses from './pages/Courses';
+import Branches from './pages/Branches';
+import Subjects from './pages/Subjects';
+import PyqList from './pages/PyqList';
+import PyqDetail from './pages/PyqDetail';
+import NotesList from './pages/NotesList';
+import NotesDetail from './pages/NotesDetail';
+import ProductList from './pages/ProductList';
+import ProductDetail from './pages/ProductDetail';
+import SeniorList from './pages/SeniorList';
+import SeniorDetail from './pages/SeniorDetail';
+import GroupList from './pages/GroupList';
+import GroupDetail from './pages/GroupDetail';
+import OpportunityList from './pages/OpportunityList';
+import OpportunityDetail from './pages/OpportunityDetail';
+import LostFoundList from './pages/LostFoundList';
+import VideoList from './pages/VideoList';
+import VideoDetail from './pages/VideoDetail';
 
 function App() {
     return (
@@ -46,26 +46,26 @@ function App() {
             <Router>
                 <OfflineIndicator />
                 <Toaster
-                    position="top-right"
+                    position='top-right'
                     toastOptions={{
                         duration: 4000,
                         style: {
-                            background: "#363636",
-                            color: "#fff",
+                            background: '#363636',
+                            color: '#fff',
                             zIndex: 99999,
                         },
                         success: {
                             duration: 3000,
                             theme: {
-                                primary: "green",
-                                secondary: "black",
+                                primary: 'green',
+                                secondary: 'black',
                             },
                         },
                         error: {
                             duration: 4000,
                             theme: {
-                                primary: "red",
-                                secondary: "black",
+                                primary: 'red',
+                                secondary: 'black',
                             },
                         },
                     }}
@@ -75,12 +75,12 @@ function App() {
                 />
                 <Routes>
                     {/* Public routes */}
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/signup" element={<Signup />} />
+                    <Route path='/login' element={<Login />} />
+                    <Route path='/signup' element={<Signup />} />
 
                     {/* Protected routes */}
                     <Route
-                        path="/dashboard"
+                        path='/dashboard'
                         element={
                             <ProtectedRoute>
                                 <Dashboard />
@@ -90,7 +90,7 @@ function App() {
 
                     {/* Reports route */}
                     <Route
-                        path="/reports"
+                        path='/reports'
                         element={
                             <ProtectedRoute>
                                 <Reports />
@@ -100,7 +100,7 @@ function App() {
 
                     {/* Reports detail routes */}
                     <Route
-                        path="/reports/payments"
+                        path='/reports/payments'
                         element={
                             <ProtectedRoute>
                                 <Payments />
@@ -108,7 +108,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/reports/payments/:id"
+                        path='/reports/payments/:id'
                         element={
                             <ProtectedRoute>
                                 <PaymentDetail />
@@ -116,7 +116,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/reports/contacts"
+                        path='/reports/contacts'
                         element={
                             <ProtectedRoute>
                                 <Contacts />
@@ -124,7 +124,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/reports/redemptions"
+                        path='/reports/redemptions'
                         element={
                             <ProtectedRoute>
                                 <Redemptions />
@@ -132,7 +132,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/reports/transactions"
+                        path='/reports/transactions'
                         element={
                             <ProtectedRoute>
                                 <Transactions />
@@ -140,7 +140,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/reports/clients"
+                        path='/reports/clients'
                         element={
                             <ProtectedRoute>
                                 <Users />
@@ -148,7 +148,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/reports/dashboard-users"
+                        path='/reports/dashboard-users'
                         element={
                             <ProtectedRoute>
                                 <DashboardUsers />
@@ -156,7 +156,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/reports/courses"
+                        path='/reports/courses'
                         element={
                             <ProtectedRoute>
                                 <Courses />
@@ -164,7 +164,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/reports/branches"
+                        path='/reports/branches'
                         element={
                             <ProtectedRoute>
                                 <Branches />
@@ -172,7 +172,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/reports/subjects"
+                        path='/reports/subjects'
                         element={
                             <ProtectedRoute>
                                 <Subjects />
@@ -182,7 +182,7 @@ function App() {
 
                     {/* PYQ routes */}
                     <Route
-                        path="/:collegeslug/pyqs"
+                        path='/:collegeslug/pyqs'
                         element={
                             <ProtectedRoute>
                                 <PyqList />
@@ -190,7 +190,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/:collegeslug/pyqs/:pyqid"
+                        path='/:collegeslug/pyqs/:pyqid'
                         element={
                             <ProtectedRoute>
                                 <PyqDetail />
@@ -200,7 +200,7 @@ function App() {
 
                     {/* Notes routes */}
                     <Route
-                        path="/:collegeslug/notes"
+                        path='/:collegeslug/notes'
                         element={
                             <ProtectedRoute>
                                 <NotesList />
@@ -208,7 +208,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/:collegeslug/notes/:noteid"
+                        path='/:collegeslug/notes/:noteid'
                         element={
                             <ProtectedRoute>
                                 <NotesDetail />
@@ -218,7 +218,7 @@ function App() {
 
                     {/* Product routes */}
                     <Route
-                        path="/:collegeslug/products"
+                        path='/:collegeslug/products'
                         element={
                             <ProtectedRoute>
                                 <ProductList />
@@ -226,7 +226,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/:collegeslug/products/:productid"
+                        path='/:collegeslug/products/:productid'
                         element={
                             <ProtectedRoute>
                                 <ProductDetail />
@@ -236,7 +236,7 @@ function App() {
 
                     {/* Senior routes */}
                     <Route
-                        path="/:collegeslug/seniors"
+                        path='/:collegeslug/seniors'
                         element={
                             <ProtectedRoute>
                                 <SeniorList />
@@ -244,7 +244,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/:collegeslug/seniors/:seniorid"
+                        path='/:collegeslug/seniors/:seniorid'
                         element={
                             <ProtectedRoute>
                                 <SeniorDetail />
@@ -254,7 +254,7 @@ function App() {
 
                     {/* Group routes */}
                     <Route
-                        path="/:collegeslug/groups"
+                        path='/:collegeslug/groups'
                         element={
                             <ProtectedRoute>
                                 <GroupList />
@@ -262,7 +262,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/:collegeslug/groups/:groupid"
+                        path='/:collegeslug/groups/:groupid'
                         element={
                             <ProtectedRoute>
                                 <GroupDetail />
@@ -272,7 +272,7 @@ function App() {
 
                     {/* Opportunity routes */}
                     <Route
-                        path="/:collegeslug/opportunities"
+                        path='/:collegeslug/opportunities'
                         element={
                             <ProtectedRoute>
                                 <OpportunityList />
@@ -280,7 +280,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/:collegeslug/opportunities/:opportunityid"
+                        path='/:collegeslug/opportunities/:opportunityid'
                         element={
                             <ProtectedRoute>
                                 <OpportunityDetail />
@@ -290,7 +290,7 @@ function App() {
 
                     {/* Lost & Found routes */}
                     <Route
-                        path="/:collegeslug/lost-found"
+                        path='/:collegeslug/lost-found'
                         element={
                             <ProtectedRoute>
                                 <LostFoundList />
@@ -300,7 +300,7 @@ function App() {
 
                     {/* Video routes */}
                     <Route
-                        path="/:collegeslug/videos"
+                        path='/:collegeslug/videos'
                         element={
                             <ProtectedRoute>
                                 <VideoList />
@@ -308,7 +308,7 @@ function App() {
                         }
                     />
                     <Route
-                        path="/:collegeslug/videos/:videoid"
+                        path='/:collegeslug/videos/:videoid'
                         element={
                             <ProtectedRoute>
                                 <VideoDetail />
@@ -318,7 +318,7 @@ function App() {
 
                     {/* College detail route */}
                     <Route
-                        path="/:collegeslug"
+                        path='/:collegeslug'
                         element={
                             <ProtectedRoute>
                                 <CollegeDetail />
@@ -328,14 +328,14 @@ function App() {
 
                     {/* Default redirect */}
                     <Route
-                        path="/"
-                        element={<Navigate to="/dashboard" replace />}
+                        path='/'
+                        element={<Navigate to='/dashboard' replace />}
                     />
 
                     {/* Catch all other routes */}
                     <Route
-                        path="*"
-                        element={<Navigate to="/dashboard" replace />}
+                        path='*'
+                        element={<Navigate to='/dashboard' replace />}
                     />
                 </Routes>
             </Router>

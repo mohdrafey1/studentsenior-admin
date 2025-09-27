@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
-import Header from "../components/Header";
-import CollegeList from "../components/College/CollegeList";
-import EditCollegeModal from "../components/College/EditCollegeModal";
-import DeleteConfirmationModal from "../components/DeleteConfirmationModal";
-import InstallPWA from "../components/InstallPWA";
-import api from "../utils/api";
-import toast from "react-hot-toast";
+import React, { useState, useEffect } from 'react';
+import Header from '../components/Header';
+import CollegeList from '../components/College/CollegeList';
+import EditCollegeModal from '../components/College/EditCollegeModal';
+import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
+import InstallPWA from '../components/InstallPWA';
+import api from '../utils/api';
+import toast from 'react-hot-toast';
 
 const Dashboard = () => {
     const [colleges, setColleges] = useState([]);
@@ -21,18 +21,18 @@ const Dashboard = () => {
     const fetchColleges = async () => {
         try {
             setLoading(true);
-            const response = await api.get("/college");
+            const response = await api.get('/college');
             if (response.data.success) {
                 setColleges(response.data.data || []);
             } else {
                 throw new Error(
-                    response.data.message || "Failed to fetch colleges"
+                    response.data.message || 'Failed to fetch colleges',
                 );
             }
         } catch (error) {
-            console.error("Error fetching colleges:", error);
+            console.error('Error fetching colleges:', error);
             toast.error(
-                error.response?.data?.message || "Failed to fetch colleges"
+                error.response?.data?.message || 'Failed to fetch colleges',
             );
             setColleges([]);
         } finally {
@@ -74,29 +74,29 @@ const Dashboard = () => {
                 // Update existing college
                 response = await api.put(
                     `/college/${editingCollege._id}`,
-                    formData
+                    formData,
                 );
             } else {
                 // This shouldn't happen since we only edit existing colleges
-                throw new Error("No college selected for editing");
+                throw new Error('No college selected for editing');
             }
 
             console.log(response);
 
             if (response.data.success) {
                 toast.success(
-                    response.data.message || "College updated successfully!"
+                    response.data.message || 'College updated successfully!',
                 );
                 setIsEditModalOpen(false);
                 setEditingCollege(null);
                 await fetchColleges(); // Refresh the list
             } else {
-                throw new Error(response.data.message || "Operation failed");
+                throw new Error(response.data.message || 'Operation failed');
             }
         } catch (error) {
-            console.error("Error saving college:", error);
+            console.error('Error saving college:', error);
             toast.error(
-                error.response?.data?.message || "Failed to save college"
+                error.response?.data?.message || 'Failed to save college',
             );
         } finally {
             setIsSubmitting(false);
@@ -110,21 +110,21 @@ const Dashboard = () => {
         try {
             setIsSubmitting(true);
             const response = await api.delete(
-                `/college/${collegeToDelete._id}`
+                `/college/${collegeToDelete._id}`,
             );
 
             if (response.data.success) {
-                toast.success("College deleted successfully!");
+                toast.success('College deleted successfully!');
                 setIsDeleteModalOpen(false);
                 setCollegeToDelete(null);
                 await fetchColleges(); // Refresh the list
             } else {
-                throw new Error(response.data.message || "Delete failed");
+                throw new Error(response.data.message || 'Delete failed');
             }
         } catch (error) {
-            console.error("Error deleting college:", error);
+            console.error('Error deleting college:', error);
             toast.error(
-                error.response?.data?.message || "Failed to delete college"
+                error.response?.data?.message || 'Failed to delete college',
             );
         } finally {
             setIsSubmitting(false);
@@ -148,18 +148,18 @@ const Dashboard = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
 
-            <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                <div className="space-y-6">
+            <main className='max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8'>
+                <div className='space-y-6'>
                     {/* Colleges Section */}
                     <div>
-                        <div className="mb-6">
-                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                        <div className='mb-6'>
+                            <h3 className='text-lg leading-6 font-medium text-gray-900 dark:text-white'>
                                 Colleges Management
                             </h3>
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            <p className='mt-1 text-sm text-gray-500 dark:text-gray-400'>
                                 Manage all colleges in the Student Senior
                                 platform
                             </p>
@@ -189,8 +189,8 @@ const Dashboard = () => {
                         isOpen={isDeleteModalOpen}
                         onClose={closeDeleteModal}
                         onConfirm={handleConfirmDelete}
-                        title="Delete College"
-                        message="Are you sure you want to delete this college? This action will permanently remove all associated data including posts, notes, and user content."
+                        title='Delete College'
+                        message='Are you sure you want to delete this college? This action will permanently remove all associated data including posts, notes, and user content.'
                         itemName={collegeToDelete?.name}
                         loading={isSubmitting}
                     />

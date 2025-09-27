@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 
 export const usePWA = () => {
     const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -9,9 +9,9 @@ export const usePWA = () => {
         // Check if app is already installed
         const checkIfInstalled = () => {
             const isInStandaloneMode = () =>
-                window.matchMedia("(display-mode: standalone)").matches ||
+                window.matchMedia('(display-mode: standalone)').matches ||
                 window.navigator.standalone ||
-                document.referrer.includes("android-app://");
+                document.referrer.includes('android-app://');
 
             setIsInstalled(isInStandaloneMode());
         };
@@ -33,17 +33,17 @@ export const usePWA = () => {
         checkIfInstalled();
 
         window.addEventListener(
-            "beforeinstallprompt",
-            handleBeforeInstallPrompt
+            'beforeinstallprompt',
+            handleBeforeInstallPrompt,
         );
-        window.addEventListener("appinstalled", handleAppInstalled);
+        window.addEventListener('appinstalled', handleAppInstalled);
 
         return () => {
             window.removeEventListener(
-                "beforeinstallprompt",
-                handleBeforeInstallPrompt
+                'beforeinstallprompt',
+                handleBeforeInstallPrompt,
             );
-            window.removeEventListener("appinstalled", handleAppInstalled);
+            window.removeEventListener('appinstalled', handleAppInstalled);
         };
     }, []);
 
@@ -54,14 +54,14 @@ export const usePWA = () => {
             deferredPrompt.prompt();
             const { outcome } = await deferredPrompt.userChoice;
 
-            if (outcome === "accepted") {
+            if (outcome === 'accepted') {
                 setDeferredPrompt(null);
                 setIsInstallable(false);
                 return true;
             }
             return false;
         } catch (error) {
-            console.error("Installation failed:", error);
+            console.error('Installation failed:', error);
             return false;
         }
     };
@@ -80,12 +80,12 @@ export const useOnlineStatus = () => {
         const handleOnline = () => setIsOnline(true);
         const handleOffline = () => setIsOnline(false);
 
-        window.addEventListener("online", handleOnline);
-        window.addEventListener("offline", handleOffline);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
 
         return () => {
-            window.removeEventListener("online", handleOnline);
-            window.removeEventListener("offline", handleOffline);
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
         };
     }, []);
 

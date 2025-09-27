@@ -1,46 +1,51 @@
 <!doctype html>
 <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <!-- PWA Meta Tags -->
+        <meta
+            name="description"
+            content="Administrative dashboard for Student Senior platform"
+        />
+        <meta name="theme-color" content="#2563eb" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="SS Admin" />
+        <meta name="mobile-web-app-capable" content="yes" />
 
-  <!-- PWA Meta Tags -->
-  <meta name="description" content="Administrative dashboard for Student Senior platform" />
-  <meta name="theme-color" content="#2563eb" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="SS Admin" />
-  <meta name="mobile-web-app-capable" content="yes" />
+        <!-- PWA Manifest -->
+        <link rel="manifest" href="/manifest.json" />
 
-  <!-- PWA Manifest -->
-  <link rel="manifest" href="/manifest.json" />
+        <!-- Apple Touch Icons -->
+        <link rel="apple-touch-icon" href="/icons/image192.png" />
 
-  <!-- Apple Touch Icons -->
-  <link rel="apple-touch-icon" href="/icons/image192.png" />
+        <title>Student Senior Admin Dashboard</title>
+    </head>
 
-  <title>Student Senior Admin Dashboard</title>
-</head>
+    <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.jsx"></script>
 
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
-
-  <!-- Service Worker Registration -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then((registration) => {
-            console.log('SW registered: ', registration);
-          })
-          .catch((registrationError) => {
-            console.log('SW registration failed: ', registrationError);
-          });
-      });
-    }
-  </script>
-</body>
-
+        <!-- Service Worker Registration -->
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker
+                        .register('/sw.js')
+                        .then((registration) => {
+                            console.log('SW registered: ', registration);
+                        })
+                        .catch((registrationError) => {
+                            console.log(
+                                'SW registration failed: ',
+                                registrationError,
+                            );
+                        });
+                });
+            }
+        </script>
+    </body>
 </html>

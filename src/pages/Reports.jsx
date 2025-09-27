@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import Header from "../components/Header";
-import api from "../utils/api";
-import toast from "react-hot-toast";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Header from '../components/Header';
+import api from '../utils/api';
+import toast from 'react-hot-toast';
 import {
     BarChart3,
     Users,
@@ -16,7 +16,7 @@ import {
     AlertCircle,
     Plus,
     Loader,
-} from "lucide-react";
+} from 'lucide-react';
 
 const Reports = () => {
     const [data, setData] = useState(null);
@@ -28,12 +28,12 @@ const Reports = () => {
     const fetchReportStats = async () => {
         try {
             setError(null);
-            const response = await api.get("/stats/stats");
+            const response = await api.get('/stats/stats');
             setData(response.data.data);
         } catch (error) {
-            console.error("Error fetching stats:", error);
-            setError("Failed to load statistics");
-            toast.error("Failed to load statistics");
+            console.error('Error fetching stats:', error);
+            setError('Failed to load statistics');
+            toast.error('Failed to load statistics');
         } finally {
             setLoading(false);
         }
@@ -46,72 +46,72 @@ const Reports = () => {
     // Define stats categories for better organization
     const statsCategories = [
         {
-            title: "Financial",
+            title: 'Financial',
             stats: [
                 {
-                    id: "payments",
-                    title: "Total Payments",
+                    id: 'payments',
+                    title: 'Total Payments',
                     value: data?.totalPayments || 0,
-                    icon: <CreditCard className="w-6 h-6" />,
-                    bgColor: "bg-green-100 dark:bg-green-900",
-                    textColor: "text-green-600 dark:text-green-400",
-                    iconColor: "text-green-500 dark:text-green-300",
-                    href: "/reports/payments",
+                    icon: <CreditCard className='w-6 h-6' />,
+                    bgColor: 'bg-green-100 dark:bg-green-900',
+                    textColor: 'text-green-600 dark:text-green-400',
+                    iconColor: 'text-green-500 dark:text-green-300',
+                    href: '/reports/payments',
                 },
                 {
-                    id: "redemption",
-                    title: "Redemption Requests",
+                    id: 'redemption',
+                    title: 'Redemption Requests',
                     value: data?.totalRedemptionRequest || 0,
-                    icon: <Gift className="w-6 h-6" />,
-                    bgColor: "bg-purple-100 dark:bg-purple-900",
-                    textColor: "text-purple-600 dark:text-purple-400",
-                    iconColor: "text-purple-500 dark:text-purple-300",
-                    href: "/reports/redemptions",
+                    icon: <Gift className='w-6 h-6' />,
+                    bgColor: 'bg-purple-100 dark:bg-purple-900',
+                    textColor: 'text-purple-600 dark:text-purple-400',
+                    iconColor: 'text-purple-500 dark:text-purple-300',
+                    href: '/reports/redemptions',
                 },
                 {
-                    id: "transactions",
-                    title: "Total Transactions",
+                    id: 'transactions',
+                    title: 'Total Transactions',
                     value: data?.totalTransactions || 0,
-                    icon: <BarChart3 className="w-6 h-6" />,
-                    bgColor: "bg-blue-100 dark:bg-blue-900",
-                    textColor: "text-blue-600 dark:text-blue-400",
-                    iconColor: "text-blue-500 dark:text-blue-300",
-                    href: "/reports/transactions",
+                    icon: <BarChart3 className='w-6 h-6' />,
+                    bgColor: 'bg-blue-100 dark:bg-blue-900',
+                    textColor: 'text-blue-600 dark:text-blue-400',
+                    iconColor: 'text-blue-500 dark:text-blue-300',
+                    href: '/reports/transactions',
                 },
             ],
         },
         {
-            title: "Users & Support",
+            title: 'Users & Support',
             stats: [
                 {
-                    id: "users",
-                    title: "Total Clients",
+                    id: 'users',
+                    title: 'Total Clients',
                     value: data?.totalClient || 0,
-                    icon: <Users className="w-6 h-6" />,
-                    bgColor: "bg-indigo-100 dark:bg-indigo-900",
-                    textColor: "text-indigo-600 dark:text-indigo-400",
-                    iconColor: "text-indigo-500 dark:text-indigo-300",
-                    href: "/reports/clients",
+                    icon: <Users className='w-6 h-6' />,
+                    bgColor: 'bg-indigo-100 dark:bg-indigo-900',
+                    textColor: 'text-indigo-600 dark:text-indigo-400',
+                    iconColor: 'text-indigo-500 dark:text-indigo-300',
+                    href: '/reports/clients',
                 },
                 {
-                    id: "dashboardUsers",
-                    title: "Total Dashboard Users",
+                    id: 'dashboardUsers',
+                    title: 'Total Dashboard Users',
                     value: data?.totalDashboardUsers || 0,
-                    icon: <Users className="w-6 h-6" />,
-                    bgColor: "bg-indigo-100 dark:bg-indigo-900",
-                    textColor: "text-indigo-600 dark:text-indigo-400",
-                    iconColor: "text-indigo-500 dark:text-indigo-300",
-                    href: "/reports/dashboard-users",
+                    icon: <Users className='w-6 h-6' />,
+                    bgColor: 'bg-indigo-100 dark:bg-indigo-900',
+                    textColor: 'text-indigo-600 dark:text-indigo-400',
+                    iconColor: 'text-indigo-500 dark:text-indigo-300',
+                    href: '/reports/dashboard-users',
                 },
                 {
-                    id: "contactUs",
-                    title: "Contact Requests",
+                    id: 'contactUs',
+                    title: 'Contact Requests',
                     value: data?.totalContactUs || 0,
-                    icon: <PhoneCall className="w-6 h-6" />,
-                    bgColor: "bg-pink-100 dark:bg-pink-900",
-                    textColor: "text-pink-600 dark:text-pink-400",
-                    iconColor: "text-pink-500 dark:text-pink-300",
-                    href: "/reports/contacts",
+                    icon: <PhoneCall className='w-6 h-6' />,
+                    bgColor: 'bg-pink-100 dark:bg-pink-900',
+                    textColor: 'text-pink-600 dark:text-pink-400',
+                    iconColor: 'text-pink-500 dark:text-pink-300',
+                    href: '/reports/contacts',
                 },
                 // {
                 //     id: "addPoints",
@@ -126,37 +126,37 @@ const Reports = () => {
             ],
         },
         {
-            title: "Education & Products",
+            title: 'Education & Products',
             stats: [
                 {
-                    id: "subjects",
-                    title: "Total Subjects",
+                    id: 'subjects',
+                    title: 'Total Subjects',
                     value: data?.totalSubjects || 0,
-                    icon: <Book className="w-6 h-6" />,
-                    bgColor: "bg-cyan-100 dark:bg-cyan-900",
-                    textColor: "text-cyan-600 dark:text-cyan-400",
-                    iconColor: "text-cyan-500 dark:text-cyan-300",
-                    href: "/reports/subjects",
+                    icon: <Book className='w-6 h-6' />,
+                    bgColor: 'bg-cyan-100 dark:bg-cyan-900',
+                    textColor: 'text-cyan-600 dark:text-cyan-400',
+                    iconColor: 'text-cyan-500 dark:text-cyan-300',
+                    href: '/reports/subjects',
                 },
                 {
-                    id: "branches",
-                    title: "Total Branches",
+                    id: 'branches',
+                    title: 'Total Branches',
                     value: data?.totalBranch || 0,
-                    icon: <Building className="w-6 h-6" />,
-                    bgColor: "bg-teal-100 dark:bg-teal-900",
-                    textColor: "text-teal-600 dark:text-teal-400",
-                    iconColor: "text-teal-500 dark:text-teal-300",
-                    href: "/reports/branches",
+                    icon: <Building className='w-6 h-6' />,
+                    bgColor: 'bg-teal-100 dark:bg-teal-900',
+                    textColor: 'text-teal-600 dark:text-teal-400',
+                    iconColor: 'text-teal-500 dark:text-teal-300',
+                    href: '/reports/branches',
                 },
                 {
-                    id: "courses",
-                    title: "Total Courses",
+                    id: 'courses',
+                    title: 'Total Courses',
                     value: data?.totalCourse || 0,
-                    icon: <GraduationCap className="w-6 h-6" />,
-                    bgColor: "bg-emerald-100 dark:bg-emerald-900",
-                    textColor: "text-emerald-600 dark:text-emerald-400",
-                    iconColor: "text-emerald-500 dark:text-emerald-300",
-                    href: "/reports/courses",
+                    icon: <GraduationCap className='w-6 h-6' />,
+                    bgColor: 'bg-emerald-100 dark:bg-emerald-900',
+                    textColor: 'text-emerald-600 dark:text-emerald-400',
+                    iconColor: 'text-emerald-500 dark:text-emerald-300',
+                    href: '/reports/courses',
                 },
                 // {
                 //     id: "affiliateProducts",
@@ -174,12 +174,12 @@ const Reports = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <div className="flex items-center justify-center py-20">
-                    <div className="flex items-center space-x-2">
-                        <Loader className="w-6 h-6 animate-spin text-blue-600" />
-                        <span className="text-gray-600 dark:text-gray-400">
+                <div className='flex items-center justify-center py-20'>
+                    <div className='flex items-center space-x-2'>
+                        <Loader className='w-6 h-6 animate-spin text-blue-600' />
+                        <span className='text-gray-600 dark:text-gray-400'>
                             Loading statistics...
                         </span>
                     </div>
@@ -189,16 +189,16 @@ const Reports = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
 
-            <main className="pt-6 pb-12">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <main className='pt-6 pb-12'>
+                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
                     {/* Error Message */}
                     {error && (
-                        <div className="bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8">
-                            <div className="flex items-center">
-                                <AlertCircle className="w-5 h-5 mr-2" />
+                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8'>
+                            <div className='flex items-center'>
+                                <AlertCircle className='w-5 h-5 mr-2' />
                                 <span>{error}</span>
                             </div>
                         </div>
@@ -206,32 +206,32 @@ const Reports = () => {
 
                     {/* Statistics Categories */}
                     {data ? (
-                        <div className="space-y-8">
+                        <div className='space-y-8'>
                             {statsCategories.map((category, index) => (
                                 <div
                                     key={index}
-                                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden"
+                                    className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'
                                 >
-                                    <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                                    <div className='p-6 border-b border-gray-200 dark:border-gray-700'>
+                                        <h2 className='text-xl font-semibold text-gray-900 dark:text-white'>
                                             {category.title} Statistics
                                         </h2>
                                     </div>
-                                    <div className="p-6">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                    <div className='p-6'>
+                                        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
                                             {category.stats.map((stat) => (
                                                 <button
                                                     key={stat.id}
                                                     onClick={() =>
                                                         navigate(stat.href)
                                                     }
-                                                    className="block group w-full text-left"
+                                                    className='block group w-full text-left'
                                                 >
-                                                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+                                                    <div className='bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1'>
                                                         <div
                                                             className={`p-6 ${stat.bgColor} bg-opacity-20 dark:bg-opacity-20`}
                                                         >
-                                                            <div className="flex justify-between items-start mb-4">
+                                                            <div className='flex justify-between items-start mb-4'>
                                                                 <div>
                                                                     <h3
                                                                         className={`text-lg font-medium ${stat.textColor}`}
@@ -240,8 +240,8 @@ const Reports = () => {
                                                                             stat.title
                                                                         }
                                                                     </h3>
-                                                                    <div className="mt-2">
-                                                                        <p className="text-3xl font-semibold text-gray-900 dark:text-white">
+                                                                    <div className='mt-2'>
+                                                                        <p className='text-3xl font-semibold text-gray-900 dark:text-white'>
                                                                             {stat.value.toLocaleString()}
                                                                         </p>
                                                                     </div>
@@ -254,23 +254,23 @@ const Reports = () => {
                                                             </div>
                                                         </div>
 
-                                                        <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
-                                                            <div className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center">
+                                                        <div className='px-6 py-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700'>
+                                                            <div className='text-sm text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center'>
                                                                 <span>
                                                                     View details
                                                                 </span>
                                                                 <svg
-                                                                    className="ml-1 w-4 h-4 transition-transform group-hover:translate-x-1"
-                                                                    fill="none"
-                                                                    stroke="currentColor"
-                                                                    viewBox="0 0 24 24"
-                                                                    xmlns="http://www.w3.org/2000/svg"
+                                                                    className='ml-1 w-4 h-4 transition-transform group-hover:translate-x-1'
+                                                                    fill='none'
+                                                                    stroke='currentColor'
+                                                                    viewBox='0 0 24 24'
+                                                                    xmlns='http://www.w3.org/2000/svg'
                                                                 >
                                                                     <path
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                        strokeWidth="2"
-                                                                        d="M9 5l7 7-7 7"
+                                                                        strokeLinecap='round'
+                                                                        strokeLinejoin='round'
+                                                                        strokeWidth='2'
+                                                                        d='M9 5l7 7-7 7'
                                                                     ></path>
                                                                 </svg>
                                                             </div>
@@ -284,13 +284,13 @@ const Reports = () => {
                             ))}
                         </div>
                     ) : (
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 text-center p-12">
-                            <div className="mx-auto max-w-md">
-                                <BarChart3 className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                                <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
+                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 text-center p-12'>
+                            <div className='mx-auto max-w-md'>
+                                <BarChart3 className='w-16 h-16 mx-auto text-gray-400 mb-4' />
+                                <h3 className='text-xl font-medium text-gray-900 dark:text-white mb-2'>
                                     No Statistics Available
                                 </h3>
-                                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                                <p className='text-gray-600 dark:text-gray-400 mb-6'>
                                     There are no statistics available to display
                                     at this time.
                                 </p>
