@@ -7,6 +7,7 @@ import {
 } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
+import { SidebarProvider } from './context/SidebarContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import OfflineIndicator from './components/OfflineIndicator';
 import Login from './pages/Login';
@@ -43,7 +44,8 @@ import VideoDetail from './pages/VideoDetail';
 function App() {
     return (
         <AuthProvider>
-            <Router>
+            <SidebarProvider>
+                <Router>
                 <OfflineIndicator />
                 <Toaster
                     position='top-right'
@@ -338,7 +340,8 @@ function App() {
                         element={<Navigate to='/dashboard' replace />}
                     />
                 </Routes>
-            </Router>
+                </Router>
+            </SidebarProvider>
         </AuthProvider>
     );
 }

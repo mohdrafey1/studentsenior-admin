@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
+import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import {
@@ -35,6 +37,7 @@ const OpportunityList = () => {
     const [editingOpportunity, setEditingOpportunity] = useState(null);
     const { collegeslug } = useParams();
     const navigate = useNavigate();
+    const { mainContentMargin } = useSidebarLayout();
 
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -170,6 +173,7 @@ const OpportunityList = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
+                <Sidebar />
                 <div className='flex items-center justify-center min-h-[60vh]'>
                     <div className='text-center'>
                         <Loader className='h-8 w-8 animate-spin text-blue-600 mx-auto mb-4' />
@@ -186,7 +190,8 @@ const OpportunityList = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+                <Sidebar />
+                <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${mainContentMargin} transition-all duration-300`}>
                     <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-8 text-center'>
                         <div className='text-red-600 dark:text-red-400 text-lg font-medium mb-2'>
                             Error Loading Opportunities
@@ -209,7 +214,8 @@ const OpportunityList = () => {
     return (
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
-            <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+            <Sidebar />
+            <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${mainContentMargin} transition-all duration-300`}>
                 {/* Header Section */}
                 <div className='mb-8'>
                     <button

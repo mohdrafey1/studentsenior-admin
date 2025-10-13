@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
+import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import {
@@ -31,6 +33,7 @@ const NotesList = () => {
     const [editingNote, setEditingNote] = useState(null);
     const { collegeslug } = useParams();
     const navigate = useNavigate();
+    const { mainContentMargin } = useSidebarLayout();
 
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -122,7 +125,8 @@ const NotesList = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <main className='max-w-7xl mx-auto py-6 sm:px-6 lg:px-8'>
+                <Sidebar />
+                <main className={`max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}>
                     <div className='flex items-center justify-center h-96'>
                         <div className='text-center'>
                             <Loader className='w-12 h-12 animate-spin mx-auto text-indigo-600 dark:text-indigo-400' />
@@ -139,7 +143,8 @@ const NotesList = () => {
     return (
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
-            <main className='max-w-7xl mx-auto py-6 sm:px-6 lg:px-8'>
+            <Sidebar />
+            <main className={`max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}>
                 <div className='px-4 py-6 sm:px-0'>
                     <div className='flex items-center justify-between mb-6'>
                         <div className='flex items-center space-x-4'>

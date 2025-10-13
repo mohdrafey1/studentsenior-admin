@@ -13,6 +13,8 @@ import {
     Star,
 } from 'lucide-react';
 import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
+import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -80,6 +82,7 @@ const CollegeDetail = () => {
     const navigate = useNavigate();
     const [collegeData, setCollegeData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const { mainContentMargin } = useSidebarLayout();
 
     // Fetch college data and stats
     const fetchCollegeData = async () => {
@@ -119,7 +122,8 @@ const CollegeDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <main className='max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8'>
+                <Sidebar />
+                <main className={`max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}>
                     <div className='animate-pulse'>
                         <div className='flex items-center mb-6'>
                             <div className='h-6 w-6 bg-gray-200 dark:bg-gray-700 rounded mr-3'></div>
@@ -149,7 +153,8 @@ const CollegeDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <main className='max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8'>
+                <Sidebar />
+                <main className={`max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}>
                     <div className='text-center py-12'>
                         <h2 className='text-2xl font-bold text-gray-900 dark:text-white mb-4'>
                             College Data Not Found
@@ -264,8 +269,9 @@ const CollegeDetail = () => {
     return (
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
+            <Sidebar />
 
-            <main className='max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8'>
+            <main className='max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 md:ml-72'>
                 {/* Back Button and Page Header */}
                 <div className='mb-8'>
                     <button
@@ -292,6 +298,10 @@ const CollegeDetail = () => {
                         />
                     ))}
                 </div>
+
+
+
+                
             </main>
         </div>
     );
