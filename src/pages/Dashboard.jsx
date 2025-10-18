@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
-import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import CollegeList from '../components/College/CollegeList';
 import EditCollegeModal from '../components/College/EditCollegeModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
-import InstallPWA from '../components/InstallPWA';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -18,7 +16,6 @@ const Dashboard = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isViewMode, setIsViewMode] = useState(false);
-    const { mainContentMargin } = useSidebarLayout();
 
     // Fetch colleges
     const fetchColleges = async () => {
@@ -155,7 +152,9 @@ const Dashboard = () => {
             <Header />
             <Sidebar />
 
-            <main className={`max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}>
+            <main
+                className={`max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 transition-all duration-300`}
+            >
                 <div className='space-y-6'>
                     {/* Colleges Section */}
                     <div>
@@ -200,8 +199,6 @@ const Dashboard = () => {
                     />
                 </div>
             </main>
-            {/* PWA Install Prompt */}
-            <InstallPWA />
         </div>
     );
 };
