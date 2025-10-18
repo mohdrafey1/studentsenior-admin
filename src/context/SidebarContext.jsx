@@ -12,6 +12,7 @@ export const useSidebar = () => {
 
 export const SidebarProvider = ({ children }) => {
     const [collapsed, setCollapsed] = useState(false);
+    const [mobileOpen, setMobileOpen] = useState(false);
 
     // Load collapsed state from localStorage on mount
     useEffect(() => {
@@ -23,17 +24,32 @@ export const SidebarProvider = ({ children }) => {
 
     // Save collapsed state to localStorage whenever it changes
     useEffect(() => {
-        localStorage.setItem('ss_admin_sidebar_collapsed', collapsed ? '1' : '0');
+        localStorage.setItem(
+            'ss_admin_sidebar_collapsed',
+            collapsed ? '1' : '0',
+        );
     }, [collapsed]);
 
     const toggleSidebar = () => {
-        setCollapsed(prev => !prev);
+        setCollapsed((prev) => !prev);
+    };
+
+    const toggleMobileSidebar = () => {
+        setMobileOpen((prev) => !prev);
+    };
+
+    const closeMobileSidebar = () => {
+        setMobileOpen(false);
     };
 
     const value = {
         collapsed,
         setCollapsed,
         toggleSidebar,
+        mobileOpen,
+        setMobileOpen,
+        toggleMobileSidebar,
+        closeMobileSidebar,
     };
 
     return (

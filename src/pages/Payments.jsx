@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
+import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { CreditCard, Eye, Search, ArrowLeft, Loader } from 'lucide-react';
@@ -16,6 +18,7 @@ const Payments = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [totalAmount, setTotalAmount] = useState(0);
+    const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
 
     const fetchPayments = async () => {
@@ -34,8 +37,11 @@ const Payments = () => {
             setTotalAmount(total);
         } catch (error) {
             console.error('Error fetching payments:', error);
-            setError('Failed to load payments');
-            toast.error('Failed to load payments');
+            const errorMessage =
+                error.response?.data?.message ||
+                error.message ||
+                'Failed to load payments';
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -108,7 +114,10 @@ const Payments = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <div className='flex items-center justify-center py-20'>
+                <Sidebar />
+                <div
+                    className={`flex items-center justify-center py-20 ${mainContentMargin} transition-all duration-300`}
+                >
                     <div className='flex items-center space-x-2'>
                         <Loader className='w-6 h-6 animate-spin text-blue-600' />
                         <span className='text-gray-600 dark:text-gray-400'>
@@ -123,8 +132,11 @@ const Payments = () => {
     return (
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
+            <Sidebar />
 
-            <main className='pt-6 pb-12'>
+            <main
+                className={`pt-6 pb-12 ${mainContentMargin} transition-all duration-300`}
+            >
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
                     {/* Header Section */}
                     <div className='flex items-center justify-between mb-8'>
