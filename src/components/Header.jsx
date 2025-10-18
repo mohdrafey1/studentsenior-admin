@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSidebar } from '../context/SidebarContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Menu,
@@ -16,6 +17,7 @@ const Header = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(false);
     const { user, logout } = useAuth();
+    const { toggleMobileSidebar } = useSidebar();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -53,12 +55,26 @@ const Header = () => {
         );
     };
 
+    // Check if sidebar should be shown (not on /dashboard)
+    const shouldShowSidebar = location.pathname !== '/dashboard';
+
     return (
         <header className='bg-white dark:bg-gray-800 shadow-md border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40'>
             <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
                 <div className='flex justify-between items-center py-4'>
                     {/* Logo and Brand */}
                     <div className='flex items-center'>
+                        {/* Mobile sidebar toggle button - only show when sidebar should be visible */}
+                        {shouldShowSidebar && (
+                            <button
+                                onClick={toggleMobileSidebar}
+                                className='md:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 mr-2'
+                                aria-label='Toggle sidebar'
+                            >
+                                <Menu className='w-6 h-6' />
+                            </button>
+                        )}
+
                         <div className='flex-shrink-0 flex items-center'>
                             <GraduationCap className='h-8 w-8 text-blue-600 dark:text-blue-400' />
                             <h1 className='ml-2 text-xl sm:text-2xl font-bold text-gray-900 dark:text-white'>

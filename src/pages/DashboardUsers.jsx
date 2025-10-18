@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
+import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { Shield, ArrowLeft, Loader, Search } from 'lucide-react';
@@ -13,6 +15,7 @@ const DashboardUsersPage = () => {
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
+    const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
 
     const fetchData = async () => {
@@ -52,7 +55,10 @@ const DashboardUsersPage = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <div className='flex items-center justify-center py-20'>
+                <Sidebar />
+                <div
+                    className={`flex items-center justify-center py-20 ${mainContentMargin} transition-all duration-300`}
+                >
                     <div className='flex items-center space-x-2'>
                         <Loader className='w-6 h-6 animate-spin text-blue-600' />
                         <span className='text-gray-600 dark:text-gray-400'>
@@ -67,7 +73,10 @@ const DashboardUsersPage = () => {
     return (
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
-            <main className='pt-6 pb-12'>
+            <Sidebar />
+            <main
+                className={`pt-6 pb-12 ${mainContentMargin} transition-all duration-300`}
+            >
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
                     <div className='flex items-center mb-8'>
                         <button

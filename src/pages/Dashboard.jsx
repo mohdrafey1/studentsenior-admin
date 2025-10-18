@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
 import CollegeList from '../components/College/CollegeList';
 import EditCollegeModal from '../components/College/EditCollegeModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
-import InstallPWA from '../components/InstallPWA';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -150,8 +150,11 @@ const Dashboard = () => {
     return (
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
+            <Sidebar />
 
-            <main className='max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8'>
+            <main
+                className={`max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 transition-all duration-300`}
+            >
                 <div className='space-y-6'>
                     {/* Colleges Section */}
                     <div>
@@ -196,8 +199,6 @@ const Dashboard = () => {
                     />
                 </div>
             </main>
-            {/* PWA Install Prompt */}
-            <InstallPWA />
         </div>
     );
 };

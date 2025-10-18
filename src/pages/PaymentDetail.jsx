@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
+import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import {
@@ -42,6 +44,7 @@ const PaymentDetail = () => {
     const [error, setError] = useState(null);
     const [payment, setPayment] = useState(null);
     const [showRaw, setShowRaw] = useState(false);
+    const { mainContentMargin } = useSidebarLayout();
 
     const fetchPayment = async () => {
         try {
@@ -100,7 +103,10 @@ const PaymentDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <div className='flex items-center justify-center py-20'>
+                <Sidebar />
+                <div
+                    className={`flex items-center justify-center py-20 ${mainContentMargin} transition-all duration-300`}
+                >
                     <div className='flex items-center gap-2 text-gray-600 dark:text-gray-400'>
                         <CreditCard className='w-5 h-5 animate-pulse' />
                         Loading payment...
@@ -114,7 +120,10 @@ const PaymentDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <div className='max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10'>
+                <Sidebar />
+                <div
+                    className={`max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 ${mainContentMargin} transition-all duration-300`}
+                >
                     <div className='bg-red-50 dark:bg-red-900/40 border-l-4 border-red-500 text-red-700 dark:text-red-300 p-4 rounded'>
                         {error}
                     </div>
@@ -130,7 +139,10 @@ const PaymentDetail = () => {
     return (
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
-            <main className='pt-6 pb-12'>
+            <Sidebar />
+            <main
+                className={`pt-6 pb-12 ${mainContentMargin} transition-all duration-300`}
+            >
                 <div className='max-w-5xl mx-auto px-4 sm:px-6 lg:px-8'>
                     {/* Header */}
                     <div className='flex items-center justify-between mb-8'>

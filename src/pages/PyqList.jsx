@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
+import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import api from '../utils/api';
 import { getStatusBadge } from '../utils/getStatusColor';
 import toast from 'react-hot-toast';
@@ -30,6 +32,7 @@ const PyqList = () => {
     const [editingPyq, setEditingPyq] = useState(null);
     const { collegeslug } = useParams();
     const navigate = useNavigate();
+    const { mainContentMargin } = useSidebarLayout();
 
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -122,6 +125,7 @@ const PyqList = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
+                <Sidebar />
                 <div className='flex items-center justify-center py-20'>
                     <div className='flex items-center space-x-2'>
                         <Loader className='w-6 h-6 animate-spin text-blue-600' />
@@ -137,8 +141,9 @@ const PyqList = () => {
     return (
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
+            <Sidebar />
             <main className='pt-6 pb-12'>
-                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+                <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}>
                     {/* Header */}
                     <div className='flex items-center justify-between mb-8'>
                         <div className='flex items-center'>
