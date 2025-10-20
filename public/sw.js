@@ -4,8 +4,8 @@ const urlsToCache = [
     '/static/js/bundle.js',
     '/static/css/main.css',
     '/manifest.json',
-    '/icons/image192.png',
-    '/icons/image512.png',
+    '/icons/android-chrome-192x192.png',
+    '/icons/android-chrome-512x512.png',
 ];
 
 // Install event - cache resources
