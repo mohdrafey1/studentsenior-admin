@@ -49,7 +49,7 @@ const PaymentDetail = () => {
     const fetchPayment = async () => {
         try {
             setError(null);
-            const res = await api.get(`/transactions/payments/${id}`);
+            const res = await api.get(`/payment/${id}`);
             setPayment(res.data.data || res.data);
         } catch (err) {
             console.error('Failed to load payment', err);
@@ -67,8 +67,12 @@ const PaymentDetail = () => {
 
     const statusMeta = (status) => {
         switch ((status || '').toLowerCase()) {
-            case 'paid':
-                return { icon: CheckCircle2, color: 'green', label: 'Paid' };
+            case 'captured':
+                return {
+                    icon: CheckCircle2,
+                    color: 'green',
+                    label: 'Captured',
+                };
             case 'pending':
                 return { icon: Clock, color: 'yellow', label: 'Pending' };
             case 'failed':
@@ -84,20 +88,7 @@ const PaymentDetail = () => {
         }
     };
 
-    const typeColor = (type) => {
-        switch (type) {
-            case 'note_purchase':
-                return 'purple';
-            case 'pyq_purchase':
-                return 'indigo';
-            case 'course_purchase':
-                return 'blue';
-            case 'add_points':
-                return 'amber';
-            default:
-                return 'gray';
-        }
-    };
+    // no-op
 
     if (loading) {
         return (
@@ -183,21 +174,23 @@ const PaymentDetail = () => {
                                 Amount
                             </div>
                             <div className='mt-1 text-2xl font-semibold text-gray-900 dark:text-white'>
-                                {payment.currency || '₹'} {payment.amount || 0}
+                                {payment.currency || 'INR'}{' '}
+                                {payment.amount || 0}
                             </div>
                         </div>
                         <div className='bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5'>
                             <div className='text-sm text-gray-500 dark:text-gray-400'>
-                                Type
+                                Provider
                             </div>
                             <div className='mt-1 text-lg font-medium text-gray-900 dark:text-white'>
                                 <Badge
-                                    color={typeColor(payment.typeOfPurchase)}
+                                    color={
+                                        payment.provider === 'PhonePe'
+                                            ? 'purple'
+                                            : 'blue'
+                                    }
                                 >
-                                    {payment.typeOfPurchase?.replace(
-                                        '_',
-                                        ' ',
-                                    ) || 'N/A'}
+                                    {payment.provider || 'N/A'}
                                 </Badge>
                             </div>
                         </div>
@@ -227,12 +220,10 @@ const PaymentDetail = () => {
                                     <div>
                                         <dt className='text-sm text-gray-500 dark:text-gray-400 inline-flex items-center gap-2'>
                                             <Wallet className='w-4 h-4' />{' '}
-                                            Payment Method
+                                            Provider
                                         </dt>
                                         <dd className='mt-1 text-sm font-medium text-gray-900 dark:text-white'>
-                                            {payment.paymentMethod ||
-                                                payment.provider ||
-                                                'N/A'}
+                                            {payment.provider || 'N/A'}
                                         </dd>
                                     </div>
                                     <div>
@@ -246,33 +237,22 @@ const PaymentDetail = () => {
                                     </div>
                                     <div>
                                         <dt className='text-sm text-gray-500 dark:text-gray-400 inline-flex items-center gap-2'>
-                                            <Hash className='w-4 h-4' />{' '}
-                                            Transaction ID
+                                            <Hash className='w-4 h-4' /> Payment
+                                            ID
                                         </dt>
                                         <dd className='mt-1 text-sm font-medium text-gray-900 dark:text-white break-all'>
-                                            {payment.transactionId ||
-                                                payment.referenceId ||
-                                                payment._id}
+                                            {payment._id}
                                         </dd>
                                     </div>
                                     <div>
                                         <dt className='text-sm text-gray-500 dark:text-gray-400 inline-flex items-center gap-2'>
-                                            <Hash className='w-4 h-4' />{' '}
-                                            Order/Receipt ID
+                                            <Hash className='w-4 h-4' /> Order
+                                            ID
                                         </dt>
                                         <dd className='mt-1 text-sm font-medium text-gray-900 dark:text-white break-all'>
-                                            {payment.orderId ||
-                                                payment.receipt ||
+                                            {payment.orderId?._id ||
+                                                payment.orderId ||
                                                 'N/A'}
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt className='text-sm text-gray-500 dark:text-gray-400 inline-flex items-center gap-2'>
-                                            <Hash className='w-4 h-4' /> PhonePe
-                                            Order ID
-                                        </dt>
-                                        <dd className='mt-1 text-sm font-medium text-gray-900 dark:text-white break-all'>
-                                            {payment.phonePeOrderId || 'N/A'}
                                         </dd>
                                     </div>
                                     <div>
@@ -288,22 +268,22 @@ const PaymentDetail = () => {
                                                 : 'N/A'}
                                         </dd>
                                     </div>
-                                    {payment.paymentResponse?.state && (
+                                    {payment.gatewayResponse?.state && (
                                         <div className='sm:col-span-2'>
                                             <dt className='text-sm text-gray-500 dark:text-gray-400 inline-flex items-center gap-2'>
                                                 <Hash className='w-4 h-4' />{' '}
                                                 Gateway Status
                                             </dt>
                                             <dd className='mt-1 text-sm font-medium text-gray-900 dark:text-white'>
-                                                {payment.paymentResponse.state}
-                                                {payment.paymentResponse
+                                                {payment.gatewayResponse.state}
+                                                {payment.gatewayResponse
                                                     .orderId && (
                                                     <span className='text-gray-500 dark:text-gray-400'>
                                                         {' '}
                                                         {' • '}Order:{' '}
                                                         {
                                                             payment
-                                                                .paymentResponse
+                                                                .gatewayResponse
                                                                 .orderId
                                                         }
                                                     </span>
@@ -312,20 +292,23 @@ const PaymentDetail = () => {
                                         </div>
                                     )}
                                     {(payment.paymentLink ||
-                                        payment.paymentResponse?.redirectUrl ||
-                                        payment.redirectBackUrl) && (
+                                        payment.orderId?.metadata
+                                            ?.returnUrl) && (
                                         <div className='sm:col-span-2'>
                                             <dt className='text-sm text-gray-500 dark:text-gray-400 inline-flex items-center gap-2'>
                                                 <Hash className='w-4 h-4' />{' '}
                                                 Links
                                             </dt>
                                             <dd className='mt-1 text-sm font-medium text-blue-600 dark:text-blue-400 break-all space-y-1'>
-                                                {payment.redirectBackUrl && (
+                                                {payment.orderId?.metadata
+                                                    ?.returnUrl && (
                                                     <div>
                                                         <a
                                                             className='hover:underline'
                                                             href={
-                                                                payment.redirectBackUrl
+                                                                payment.orderId
+                                                                    ?.metadata
+                                                                    ?.returnUrl
                                                             }
                                                             target='_blank'
                                                             rel='noreferrer'
@@ -339,7 +322,7 @@ const PaymentDetail = () => {
                                     )}
                                 </dl>
                             </div>
-                            {payment.purchaseItemId && (
+                            {payment.orderId?.resourceId && (
                                 <div className='bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6'>
                                     <h2 className='text-lg font-semibold text-gray-900 dark:text-white mb-4'>
                                         Purchased Item
@@ -347,67 +330,22 @@ const PaymentDetail = () => {
                                     <dl className='grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4'>
                                         <div>
                                             <dt className='text-sm text-gray-500 dark:text-gray-400'>
-                                                Slug
+                                                Title
                                             </dt>
                                             <dd className='mt-1 text-sm font-medium text-gray-900 dark:text-white break-all'>
-                                                {payment.purchaseItemId.slug ||
-                                                    'N/A'}
+                                                {payment.orderId.resourceId
+                                                    ?.title || 'N/A'}
                                             </dd>
                                         </div>
-                                        {typeof payment.purchaseItemId.price !==
-                                            'undefined' && (
-                                            <div>
-                                                <dt className='text-sm text-gray-500 dark:text-gray-400'>
-                                                    Item Price
-                                                </dt>
-                                                <dd className='mt-1 text-sm font-medium text-gray-900 dark:text-white'>
-                                                    {
-                                                        payment.purchaseItemId
-                                                            .price
-                                                    }
-                                                </dd>
-                                            </div>
-                                        )}
-                                        {payment.purchaseItemId.examType && (
-                                            <div>
-                                                <dt className='text-sm text-gray-500 dark:text-gray-400'>
-                                                    Exam Type
-                                                </dt>
-                                                <dd className='mt-1 text-sm font-medium text-gray-900 dark:text-white'>
-                                                    {
-                                                        payment.purchaseItemId
-                                                            .examType
-                                                    }
-                                                </dd>
-                                            </div>
-                                        )}
-                                        {payment.purchaseItemId.year && (
-                                            <div>
-                                                <dt className='text-sm text-gray-500 dark:text-gray-400'>
-                                                    Year
-                                                </dt>
-                                                <dd className='mt-1 text-sm font-medium text-gray-900 dark:text-white'>
-                                                    {
-                                                        payment.purchaseItemId
-                                                            .year
-                                                    }
-                                                </dd>
-                                            </div>
-                                        )}
-                                        {typeof payment.purchaseItemId
-                                            .solved !== 'undefined' && (
-                                            <div>
-                                                <dt className='text-sm text-gray-500 dark:text-gray-400'>
-                                                    Solved
-                                                </dt>
-                                                <dd className='mt-1 text-sm font-medium text-gray-900 dark:text-white'>
-                                                    {payment.purchaseItemId
-                                                        .solved
-                                                        ? 'Yes'
-                                                        : 'No'}
-                                                </dd>
-                                            </div>
-                                        )}
+                                        <div>
+                                            <dt className='text-sm text-gray-500 dark:text-gray-400'>
+                                                Subject
+                                            </dt>
+                                            <dd className='mt-1 text-sm font-medium text-gray-900 dark:text-white'>
+                                                {payment.orderId.resourceId
+                                                    ?.subject || 'N/A'}
+                                            </dd>
+                                        </div>
                                     </dl>
                                 </div>
                             )}
@@ -451,59 +389,59 @@ const PaymentDetail = () => {
                                         <div className='text-sm text-gray-600 dark:text-gray-300'>
                                             {payment.user?.email || 'N/A'}
                                         </div>
-                                        {payment.user?.phone && (
-                                            <div className='text-sm text-gray-600 dark:text-gray-300'>
-                                                {payment.user?.phone}
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             </div>
 
-                            {(payment.college ||
-                                payment.course ||
-                                payment.branch) && (
-                                <div className='bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6'>
-                                    <h2 className='text-lg font-semibold text-gray-900 dark:text-white mb-4'>
-                                        Context
-                                    </h2>
+                            <div className='bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6'>
+                                <h2 className='text-lg font-semibold text-gray-900 dark:text-white mb-4'>
+                                    Order
+                                </h2>
+                                {payment.orderId ? (
                                     <dl className='space-y-2'>
-                                        {payment.college && (
-                                            <div>
-                                                <dt className='text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400'>
-                                                    College
-                                                </dt>
-                                                <dd className='text-sm text-gray-900 dark:text-white'>
-                                                    {payment.college?.name ||
-                                                        payment.college}
-                                                </dd>
-                                            </div>
-                                        )}
-                                        {payment.course && (
-                                            <div>
-                                                <dt className='text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400'>
-                                                    Course
-                                                </dt>
-                                                <dd className='text-sm text-gray-900 dark:text-white'>
-                                                    {payment.course?.name ||
-                                                        payment.course}
-                                                </dd>
-                                            </div>
-                                        )}
-                                        {payment.branch && (
-                                            <div>
-                                                <dt className='text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400'>
-                                                    Branch
-                                                </dt>
-                                                <dd className='text-sm text-gray-900 dark:text-white'>
-                                                    {payment.branch?.name ||
-                                                        payment.branch}
-                                                </dd>
-                                            </div>
-                                        )}
+                                        <div>
+                                            <dt className='text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400'>
+                                                Status
+                                            </dt>
+                                            <dd className='text-sm text-gray-900 dark:text-white'>
+                                                {payment.orderId.status}
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className='text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400'>
+                                                Type
+                                            </dt>
+                                            <dd className='text-sm text-gray-900 dark:text-white'>
+                                                {payment.orderId.orderType}
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className='text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400'>
+                                                Payment Method
+                                            </dt>
+                                            <dd className='text-sm text-gray-900 dark:text-white'>
+                                                {payment.orderId.paymentMethod}
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className='text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400'>
+                                                Created
+                                            </dt>
+                                            <dd className='text-sm text-gray-900 dark:text-white'>
+                                                {payment.orderId.createdAt
+                                                    ? new Date(
+                                                          payment.orderId.createdAt,
+                                                      ).toLocaleString()
+                                                    : 'N/A'}
+                                            </dd>
+                                        </div>
                                     </dl>
-                                </div>
-                            )}
+                                ) : (
+                                    <div className='text-sm text-gray-600 dark:text-gray-300'>
+                                        No order linked
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

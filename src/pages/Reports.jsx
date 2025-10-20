@@ -62,6 +62,16 @@ const Reports = () => {
                     href: '/reports/payments',
                 },
                 {
+                    id: 'orders',
+                    title: 'Total Orders',
+                    value: data?.totalOrders || 0,
+                    icon: <ShoppingBag className='w-6 h-6' />,
+                    bgColor: 'bg-amber-100 dark:bg-amber-900',
+                    textColor: 'text-amber-600 dark:text-amber-400',
+                    iconColor: 'text-amber-500 dark:text-amber-300',
+                    href: '/reports/orders',
+                },
+                {
                     id: 'redemption',
                     title: 'Redemption Requests',
                     value: data?.totalRedemptionRequest || 0,

@@ -13,34 +13,36 @@ const Payments = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [filterType, setFilterType] = useState('');
+    const [filterProvider, setFilterProvider] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
-    const [totalAmount, setTotalAmount] = useState(0);
+    const [totalItems, setTotalItems] = useState(0);
     const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
 
     const fetchPayments = async () => {
         try {
             setError(null);
-            const response = await api.get('/transactions/payments');
-            setPayments(response.data.data || []);
+            const params = new URLSearchParams({
+                page: String(currentPage),
+                limit: String(pageSize),
+            });
+            if (searchQuery) params.set('search', searchQuery);
+            if (filterStatus) params.set('status', filterStatus);
+            if (filterProvider) params.set('provider', filterProvider);
 
-            // Calculate total amount for paid payments
-            const total = (response.data.data || []).reduce((sum, payment) => {
-                if (payment.status === 'paid') {
-                    return sum + (payment.amount || 0);
-                }
-                return sum;
-            }, 0);
-            setTotalAmount(total);
+            const response = await api.get(`/payment?${params.toString()}`);
+            const data = response.data?.data;
+            setPayments(data?.payments || []);
+            setTotalItems(data?.pagination?.totalItems || 0);
         } catch (error) {
             console.error('Error fetching payments:', error);
             const errorMessage =
                 error.response?.data?.message ||
                 error.message ||
                 'Failed to load payments';
+            setError(errorMessage);
             toast.error(errorMessage);
         } finally {
             setLoading(false);
@@ -49,32 +51,15 @@ const Payments = () => {
 
     useEffect(() => {
         fetchPayments();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentPage, pageSize]);
 
-    // Filter payments based on search and filters
-    const filteredPayments = payments.filter(
-        (payment) =>
-            (payment.user?.email?.toLowerCase() || '').includes(
-                searchQuery.trim().toLowerCase(),
-            ) &&
-            (filterType
-                ? (payment.typeOfPurchase?.toLowerCase() || '') ===
-                  filterType.toLowerCase()
-                : true) &&
-            (filterStatus
-                ? (payment.status?.toLowerCase() || '') ===
-                  filterStatus.toLowerCase()
-                : true),
+    // Client-side filters only for search box; server handles main filtering
+    const currentPayments = payments.filter((p) =>
+        (p.user?.email || '')
+            .toLowerCase()
+            .includes(searchQuery.trim().toLowerCase()),
     );
-
-    // Pagination logic
-    const indexOfLastPayment = currentPage * pageSize;
-    const indexOfFirstPayment = indexOfLastPayment - pageSize;
-    const currentPayments = filteredPayments.slice(
-        indexOfFirstPayment,
-        indexOfLastPayment,
-    );
-    // totalPages managed by Pagination via totalItems
 
     const handlePageChange = (page) => {
         setCurrentPage(page);
@@ -82,7 +67,7 @@ const Payments = () => {
 
     const getStatusColor = (status) => {
         switch (status) {
-            case 'paid':
+            case 'captured':
                 return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
             case 'pending':
                 return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
@@ -95,16 +80,12 @@ const Payments = () => {
         }
     };
 
-    const getTypeColor = (type) => {
-        switch (type) {
-            case 'note_purchase':
+    const getProviderColor = (provider) => {
+        switch (provider) {
+            case 'PhonePe':
                 return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
-            case 'pyq_purchase':
-                return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300';
-            case 'course_purchase':
-                return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-            case 'add_points':
-                return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300';
+            case 'Razorpay':
+                return 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-300';
             default:
                 return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
         }
@@ -162,14 +143,7 @@ const Payments = () => {
                             </div>
                         </div>
 
-                        <div className='bg-green-50 dark:bg-green-900/30 px-6 py-3 rounded-lg'>
-                            <div className='text-sm text-green-600 dark:text-green-400'>
-                                Total Revenue:
-                            </div>
-                            <div className='text-2xl font-bold text-green-800 dark:text-green-300'>
-                                ₹{totalAmount.toLocaleString()}
-                            </div>
-                        </div>
+                        <div />
                     </div>
 
                     {/* Search & Filters */}
@@ -189,21 +163,15 @@ const Payments = () => {
                             </div>
 
                             <select
-                                value={filterType}
-                                onChange={(e) => setFilterType(e.target.value)}
+                                value={filterProvider}
+                                onChange={(e) =>
+                                    setFilterProvider(e.target.value)
+                                }
                                 className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
                             >
-                                <option value=''>All Types</option>
-                                <option value='note_purchase'>
-                                    Note Purchase
-                                </option>
-                                <option value='pyq_purchase'>
-                                    PYQ Purchase
-                                </option>
-                                <option value='course_purchase'>
-                                    Course Purchase
-                                </option>
-                                <option value='add_points'>Add Points</option>
+                                <option value=''>All Providers</option>
+                                <option value='PhonePe'>PhonePe</option>
+                                <option value='Razorpay'>Razorpay</option>
                             </select>
 
                             <select
@@ -214,11 +182,22 @@ const Payments = () => {
                                 className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
                             >
                                 <option value=''>All Statuses</option>
-                                <option value='paid'>Paid</option>
+                                <option value='captured'>Captured</option>
                                 <option value='pending'>Pending</option>
                                 <option value='failed'>Failed</option>
                                 <option value='refunded'>Refunded</option>
                             </select>
+                        </div>
+                        <div className='mt-4'>
+                            <button
+                                onClick={() => {
+                                    setCurrentPage(1);
+                                    fetchPayments();
+                                }}
+                                className='px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700'
+                            >
+                                Apply
+                            </button>
                         </div>
                     </div>
 
@@ -242,7 +221,7 @@ const Payments = () => {
                                                 User
                                             </th>
                                             <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                Type
+                                                Provider
                                             </th>
                                             <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                                                 Amount
@@ -280,18 +259,14 @@ const Payments = () => {
                                                 </td>
                                                 <td className='px-6 py-4 whitespace-nowrap'>
                                                     <span
-                                                        className={`px-2 py-1 text-xs font-semibold rounded-full ${getTypeColor(
-                                                            payment.typeOfPurchase,
-                                                        )}`}
+                                                        className={`px-2 py-1 text-xs font-semibold rounded-full ${getProviderColor(payment.provider)}`}
                                                     >
-                                                        {payment.typeOfPurchase?.replace(
-                                                            '_',
-                                                            ' ',
-                                                        ) || 'N/A'}
+                                                        {payment.provider ||
+                                                            'N/A'}
                                                     </span>
                                                 </td>
                                                 <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
-                                                    {payment.currency}{' '}
+                                                    {payment.currency || 'INR'}{' '}
                                                     {payment.amount || 0}
                                                 </td>
                                                 <td className='px-6 py-4 whitespace-nowrap'>
@@ -329,12 +304,12 @@ const Payments = () => {
                             </div>
 
                             {/* Pagination */}
-                            {filteredPayments.length > 0 && (
+                            {totalItems > 0 && (
                                 <div className='bg-white dark:bg-gray-800 px-4 py-3 border-t border-gray-200 dark:border-gray-700 sm:px-6'>
                                     <Pagination
                                         currentPage={currentPage}
                                         pageSize={pageSize}
-                                        totalItems={filteredPayments.length}
+                                        totalItems={totalItems}
                                         onPageChange={handlePageChange}
                                         onPageSizeChange={(size) => {
                                             setPageSize(size);

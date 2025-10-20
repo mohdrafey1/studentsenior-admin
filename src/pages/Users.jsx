@@ -249,13 +249,13 @@ const UsersPage = () => {
                                                 )}
                                             </td>
                                             <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
-                                                {u.rewardPoints || 0}
+                                                {u.wallet?.totalEarning || 0}
                                             </td>
                                             <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
-                                                {u.rewardBalance || 0}
+                                                {u.wallet?.currentBalance || 0}
                                             </td>
                                             <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
-                                                {u.rewardRedeemed || 0}
+                                                {u.wallet?.totalWithdrawal || 0}
                                             </td>
                                             <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
                                                 {u.createdAt
