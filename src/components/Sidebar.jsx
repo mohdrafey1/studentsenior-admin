@@ -20,6 +20,7 @@ import {
     GraduationCap,
     GitBranch,
     BookOpenCheck,
+    ShoppingBag,
 } from 'lucide-react';
 import { useSidebar } from '../context/SidebarContext';
 import { Link } from 'react-router-dom';
@@ -49,18 +50,25 @@ function Sidebar() {
                     colors: 'text-green-600 dark:text-green-400',
                 },
                 {
-                    id: 'redemptions',
-                    label: 'Redemptions',
-                    icon: RotateCcw,
-                    to: '/reports/redemptions',
-                    colors: 'text-purple-600 dark:text-purple-400',
-                },
-                {
                     id: 'transactions',
                     label: 'Transactions',
                     icon: DollarSign,
                     to: '/reports/transactions',
                     colors: 'text-yellow-600 dark:text-yellow-400',
+                },
+                {
+                    id: 'orders',
+                    label: 'Orders',
+                    icon: ShoppingBag,
+                    to: '/reports/orders',
+                    colors: 'text-yellow-600 dark:text-yellow-400',
+                },
+                {
+                    id: 'redemptions',
+                    label: 'Redemptions',
+                    icon: RotateCcw,
+                    to: '/reports/redemptions',
+                    colors: 'text-purple-600 dark:text-purple-400',
                 },
                 {
                     id: 'contacts',
