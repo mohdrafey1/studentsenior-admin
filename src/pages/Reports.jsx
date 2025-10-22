@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
+import DeltaBadge from '../components/DeltaBadge';
 import { useSidebarLayout } from '../hooks/useSidebarLayout';
+import { useStatsWithDelta } from '../hooks/useStatsWithDelta';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import {
@@ -25,6 +27,7 @@ const Reports = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const { mainContentMargin } = useSidebarLayout();
+    const { deltaStats, lastViewedAt, setStats } = useStatsWithDelta();
 
     const navigate = useNavigate();
 
@@ -32,7 +35,10 @@ const Reports = () => {
         try {
             setError(null);
             const response = await api.get('/stats/stats');
-            setData(response.data.data);
+            const statsData = response.data.data;
+            setData(statsData);
+            // Update the hook with current stats
+            setStats(statsData);
         } catch (error) {
             console.error('Error fetching stats:', error);
             setError('Failed to load statistics');
@@ -44,6 +50,7 @@ const Reports = () => {
 
     useEffect(() => {
         fetchReportStats();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Define stats categories for better organization
@@ -60,6 +67,7 @@ const Reports = () => {
                     textColor: 'text-green-600 dark:text-green-400',
                     iconColor: 'text-green-500 dark:text-green-300',
                     href: '/reports/payments',
+                    statKey: 'totalPayments', // Key for delta tracking
                 },
                 {
                     id: 'orders',
@@ -70,6 +78,7 @@ const Reports = () => {
                     textColor: 'text-amber-600 dark:text-amber-400',
                     iconColor: 'text-amber-500 dark:text-amber-300',
                     href: '/reports/orders',
+                    statKey: 'totalOrders',
                 },
                 {
                     id: 'redemption',
@@ -80,6 +89,7 @@ const Reports = () => {
                     textColor: 'text-purple-600 dark:text-purple-400',
                     iconColor: 'text-purple-500 dark:text-purple-300',
                     href: '/reports/redemptions',
+                    statKey: 'totalRedemptionRequest',
                 },
                 {
                     id: 'transactions',
@@ -90,6 +100,7 @@ const Reports = () => {
                     textColor: 'text-blue-600 dark:text-blue-400',
                     iconColor: 'text-blue-500 dark:text-blue-300',
                     href: '/reports/transactions',
+                    statKey: 'totalTransactions',
                 },
             ],
         },
@@ -105,6 +116,7 @@ const Reports = () => {
                     textColor: 'text-indigo-600 dark:text-indigo-400',
                     iconColor: 'text-indigo-500 dark:text-indigo-300',
                     href: '/reports/clients',
+                    statKey: 'totalClient',
                 },
                 {
                     id: 'dashboardUsers',
@@ -115,6 +127,7 @@ const Reports = () => {
                     textColor: 'text-indigo-600 dark:text-indigo-400',
                     iconColor: 'text-indigo-500 dark:text-indigo-300',
                     href: '/reports/dashboard-users',
+                    statKey: 'totalDashboardUsers',
                 },
                 {
                     id: 'contactUs',
@@ -125,6 +138,7 @@ const Reports = () => {
                     textColor: 'text-pink-600 dark:text-pink-400',
                     iconColor: 'text-pink-500 dark:text-pink-300',
                     href: '/reports/contacts',
+                    statKey: 'totalContactUs',
                 },
                 // {
                 //     id: "addPoints",
@@ -150,6 +164,7 @@ const Reports = () => {
                     textColor: 'text-cyan-600 dark:text-cyan-400',
                     iconColor: 'text-cyan-500 dark:text-cyan-300',
                     href: '/reports/subjects',
+                    statKey: 'totalSubjects',
                 },
                 {
                     id: 'branches',
@@ -160,6 +175,7 @@ const Reports = () => {
                     textColor: 'text-teal-600 dark:text-teal-400',
                     iconColor: 'text-teal-500 dark:text-teal-300',
                     href: '/reports/branches',
+                    statKey: 'totalBranch',
                 },
                 {
                     id: 'courses',
@@ -170,6 +186,7 @@ const Reports = () => {
                     textColor: 'text-emerald-600 dark:text-emerald-400',
                     iconColor: 'text-emerald-500 dark:text-emerald-300',
                     href: '/reports/courses',
+                    statKey: 'totalCourse',
                 },
                 // {
                 //     id: "affiliateProducts",
@@ -259,10 +276,28 @@ const Reports = () => {
                                                                             stat.title
                                                                         }
                                                                     </h3>
-                                                                    <div className='mt-2'>
+                                                                    <div className='mt-2 flex items-center gap-2'>
                                                                         <p className='text-3xl font-semibold text-gray-900 dark:text-white'>
                                                                             {stat.value.toLocaleString()}
                                                                         </p>
+                                                                        {stat.statKey &&
+                                                                            deltaStats[
+                                                                                stat
+                                                                                    .statKey
+                                                                            ] !==
+                                                                                undefined && (
+                                                                                <DeltaBadge
+                                                                                    value={
+                                                                                        deltaStats[
+                                                                                            stat
+                                                                                                .statKey
+                                                                                        ]
+                                                                                    }
+                                                                                    lastViewedAt={
+                                                                                        lastViewedAt
+                                                                                    }
+                                                                                />
+                                                                            )}
                                                                     </div>
                                                                 </div>
                                                                 <div
