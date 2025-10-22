@@ -14,7 +14,9 @@ import {
 } from 'lucide-react';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
+import DeltaBadge from '../components/DeltaBadge';
 import { useSidebarLayout } from '../hooks/useSidebarLayout';
+import { useStatsWithDelta } from '../hooks/useStatsWithDelta';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -27,6 +29,8 @@ const StatCard = ({
     textColor,
     iconColor,
     onClick,
+    delta,
+    lastViewedAt,
 }) => {
     return (
         <button onClick={onClick} className='block group w-full text-left'>
@@ -39,10 +43,16 @@ const StatCard = ({
                             <h3 className={`text-lg font-medium ${textColor}`}>
                                 {title}
                             </h3>
-                            <div className='mt-2'>
+                            <div className='mt-2 flex items-center gap-2'>
                                 <p className='text-3xl font-semibold text-gray-900 dark:text-white'>
                                     {value.toLocaleString()}
                                 </p>
+                                {delta !== undefined && (
+                                    <DeltaBadge
+                                        value={delta}
+                                        lastViewedAt={lastViewedAt}
+                                    />
+                                )}
                             </div>
                         </div>
                         <div
@@ -83,6 +93,8 @@ const CollegeDetail = () => {
     const [collegeData, setCollegeData] = useState(null);
     const [loading, setLoading] = useState(true);
     const { mainContentMargin } = useSidebarLayout();
+    const { deltaStats, lastViewedAt, setStats } =
+        useStatsWithDelta(collegeslug);
 
     // Fetch college data and stats
     const fetchCollegeData = async () => {
@@ -92,7 +104,10 @@ const CollegeDetail = () => {
             // Fetch college data using the existing backend endpoint
             const response = await api.get(`/college-data/${collegeslug}`);
             if (response.data.success) {
-                setCollegeData(response.data.data);
+                const data = response.data.data;
+                setCollegeData(data);
+                // Update the hook with current stats
+                setStats(data);
             } else {
                 throw new Error(
                     response.data.message || 'College data not found',
@@ -123,7 +138,9 @@ const CollegeDetail = () => {
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
                 <Sidebar />
-                <main className={`max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}>
+                <main
+                    className={`max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
+                >
                     <div className='animate-pulse'>
                         <div className='flex items-center mb-6'>
                             <div className='h-6 w-6 bg-gray-200 dark:bg-gray-700 rounded mr-3'></div>
@@ -154,7 +171,9 @@ const CollegeDetail = () => {
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
                 <Sidebar />
-                <main className={`max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}>
+                <main
+                    className={`max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
+                >
                     <div className='text-center py-12'>
                         <h2 className='text-2xl font-bold text-gray-900 dark:text-white mb-4'>
                             College Data Not Found
@@ -182,6 +201,7 @@ const CollegeDetail = () => {
             textColor: 'text-yellow-600 dark:text-yellow-400',
             iconColor: 'text-yellow-500 dark:text-yellow-300',
             href: `/${collegeslug}/pyqs`,
+            statKey: 'totalNewPyqs',
         },
         {
             id: 'notes',
@@ -192,6 +212,7 @@ const CollegeDetail = () => {
             textColor: 'text-green-600 dark:text-green-400',
             iconColor: 'text-green-500 dark:text-green-300',
             href: `/${collegeslug}/notes`,
+            statKey: 'totalNotes',
         },
         {
             id: 'products',
@@ -202,6 +223,7 @@ const CollegeDetail = () => {
             textColor: 'text-purple-600 dark:text-purple-400',
             iconColor: 'text-purple-500 dark:text-purple-300',
             href: `/${collegeslug}/products`,
+            statKey: 'totalProduct',
         },
         {
             id: 'seniors',
@@ -212,6 +234,7 @@ const CollegeDetail = () => {
             textColor: 'text-blue-600 dark:text-blue-400',
             iconColor: 'text-blue-500 dark:text-blue-300',
             href: `/${collegeslug}/seniors`,
+            statKey: 'totalSeniors',
         },
         {
             id: 'groups',
@@ -222,6 +245,7 @@ const CollegeDetail = () => {
             textColor: 'text-indigo-600 dark:text-indigo-400',
             iconColor: 'text-indigo-500 dark:text-indigo-300',
             href: `/${collegeslug}/groups`,
+            statKey: 'totalGroups',
         },
         {
             id: 'opportunities',
@@ -232,6 +256,7 @@ const CollegeDetail = () => {
             textColor: 'text-cyan-600 dark:text-cyan-400',
             iconColor: 'text-cyan-500 dark:text-cyan-300',
             href: `/${collegeslug}/opportunities`,
+            statKey: 'totalGiveOpportunity',
         },
 
         {
@@ -243,6 +268,7 @@ const CollegeDetail = () => {
             textColor: 'text-red-600 dark:text-red-400',
             iconColor: 'text-red-500 dark:text-red-300',
             href: `/${collegeslug}/lost-found`,
+            statKey: 'totalLostFound',
         },
         {
             id: 'videos',
@@ -253,6 +279,7 @@ const CollegeDetail = () => {
             textColor: 'text-teal-600 dark:text-teal-400',
             iconColor: 'text-teal-500 dark:text-teal-300',
             href: `/${collegeslug}/videos`,
+            statKey: 'totalVideos',
         },
         // {
         //     id: "pyq-requests",
@@ -263,6 +290,7 @@ const CollegeDetail = () => {
         //     textColor: "text-orange-600 dark:text-orange-400",
         //     iconColor: "text-orange-500 dark:text-orange-300",
         //     href: `/${collegeslug}/pyq-requests`,
+        //     statKey: 'totalRequestedPyqs',
         // },
     ];
 
@@ -295,13 +323,15 @@ const CollegeDetail = () => {
                             textColor={stat.textColor}
                             iconColor={stat.iconColor}
                             onClick={() => navigate(stat.href)}
+                            delta={
+                                stat.statKey
+                                    ? deltaStats[stat.statKey]
+                                    : undefined
+                            }
+                            lastViewedAt={lastViewedAt}
                         />
                     ))}
                 </div>
-
-
-
-                
             </main>
         </div>
     );
