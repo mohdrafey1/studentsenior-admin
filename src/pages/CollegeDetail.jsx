@@ -299,7 +299,9 @@ const CollegeDetail = () => {
             <Header />
             <Sidebar />
 
-            <main className='max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 md:ml-72'>
+            <main
+                className={`max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
+            >
                 {/* Back Button and Page Header */}
                 <div className='mb-8'>
                     <button

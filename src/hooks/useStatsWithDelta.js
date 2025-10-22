@@ -31,16 +31,32 @@ export const useStatsWithDelta = (collegeId = null) => {
     const fetchLastViewedStats = useCallback(async () => {
         try {
             const params = collegeId ? { collegeId } : {};
+            console.log(
+                '[Delta] Fetching last viewed stats with params:',
+                params,
+            );
+
             const response = await api.get('/admin-view-stats/last-viewed', {
                 params,
             });
 
+            console.log('[Delta] API Response:', response.data);
+
             if (response.data.success) {
                 setPreviousStats(response.data.data.lastSnapshot);
                 setLastViewedAt(response.data.data.lastViewedAt);
+                console.log(
+                    '[Delta] Previous stats set:',
+                    response.data.data.lastSnapshot,
+                );
+                console.log(
+                    '[Delta] Last viewed at:',
+                    response.data.data.lastViewedAt,
+                );
             }
         } catch (error) {
             console.error('Error fetching last viewed stats:', error);
+            console.error('[Delta] Error details:', error.response?.data);
         }
     }, [collegeId]);
 
@@ -48,12 +64,21 @@ export const useStatsWithDelta = (collegeId = null) => {
     const updateStatsSnapshot = useCallback(
         async (stats) => {
             try {
+                console.log('[Delta] Updating snapshot with stats:', stats);
+                console.log('[Delta] CollegeId:', collegeId || null);
+
                 await api.post('/admin-view-stats/update-snapshot', {
                     collegeId: collegeId || null,
                     statsSnapshot: stats,
                 });
+
+                console.log('[Delta] Snapshot updated successfully');
             } catch (error) {
                 console.error('Error updating stats snapshot:', error);
+                console.error(
+                    '[Delta] Update error details:',
+                    error.response?.data,
+                );
             }
         },
         [collegeId],
@@ -67,8 +92,20 @@ export const useStatsWithDelta = (collegeId = null) => {
     // Calculate delta when both current and previous stats are available
     useEffect(() => {
         if (currentStats && previousStats) {
+            console.log('[Delta] Calculating delta...');
+            console.log('[Delta] Current stats:', currentStats);
+            console.log('[Delta] Previous stats:', previousStats);
+
             const delta = calculateDelta(currentStats, previousStats);
+            console.log('[Delta] Calculated delta:', delta);
             setDeltaStats(delta);
+        } else {
+            console.log(
+                '[Delta] Cannot calculate - currentStats:',
+                !!currentStats,
+                'previousStats:',
+                !!previousStats,
+            );
         }
     }, [currentStats, previousStats, calculateDelta]);
 
