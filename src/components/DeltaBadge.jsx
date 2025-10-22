@@ -2,7 +2,13 @@ import React from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 const DeltaBadge = ({ value, lastViewedAt }) => {
-    if (value === undefined || value === null || value === 0) {
+    // Show badge only if there's a previous view (lastViewedAt exists)
+    if (!lastViewedAt) {
+        return null;
+    }
+
+    // If value is undefined or null, don't show
+    if (value === undefined || value === null) {
         return null;
     }
 
