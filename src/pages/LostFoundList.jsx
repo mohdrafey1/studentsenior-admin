@@ -6,7 +6,6 @@ import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import {
-    Search as SearchIcon,
     ArrowLeft,
     Loader,
     Search,
@@ -20,6 +19,12 @@ import {
     XCircle,
     Phone,
     Clock,
+    Grid3x3,
+    List,
+    Filter,
+    X,
+    SortAsc,
+    Package,
 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import ConfirmModal from '../components/ConfirmModal';
@@ -30,15 +35,45 @@ const LostFoundList = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
-    const [typeFilter, setTypeFilter] = useState('all');
-    const [statusFilter, setStatusFilter] = useState('all');
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(12);
     const [showModal, setShowModal] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     const { collegeslug } = useParams();
     const navigate = useNavigate();
     const { mainContentMargin } = useSidebarLayout();
+
+    // View mode - responsive default (small screens = grid, large screens = table)
+    const [viewMode, setViewMode] = useState(() => {
+        return window.innerWidth >= 1024 ? 'table' : 'grid';
+    });
+
+    // Filters state
+    const [showFilters, setShowFilters] = useState(false);
+    const [filters, setFilters] = useState({
+        submissionStatus: '',
+        deleted: '',
+        type: '',
+        currentStatus: '',
+    });
+    const [sortBy, setSortBy] = useState('createdAt');
+    const [sortOrder, setSortOrder] = useState('desc');
+
+    // Responsive view mode - always auto-switch based on screen size
+    useEffect(() => {
+        const handleResize = () => {
+            const newMode = window.innerWidth >= 1024 ? 'table' : 'grid';
+            setViewMode(newMode);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Toggle view mode (user can still manually switch)
+    const toggleViewMode = (mode) => {
+        setViewMode(mode);
+    };
 
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -132,40 +167,113 @@ const LostFoundList = () => {
     };
 
     const getStatusColor = (status) => {
+        switch (status) {
+            case 'approved':
+                return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+            case 'pending':
+                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+            case 'rejected':
+                return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+            default:
+                return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
+        }
+    };
+
+    const getCurrentStatusColor = (status) => {
         return status === 'open'
             ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
             : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
     };
 
     const getStatusIcon = (status) => {
-        return status === 'open' ? (
-            <Clock className='h-4 w-4' />
-        ) : (
-            <CheckCircle className='h-4 w-4' />
-        );
+        switch (status) {
+            case 'approved':
+                return <CheckCircle className='h-4 w-4' />;
+            case 'pending':
+                return <Clock className='h-4 w-4' />;
+            case 'rejected':
+                return <XCircle className='h-4 w-4' />;
+            default:
+                return <Clock className='h-4 w-4' />;
+        }
     };
 
-    // Filter items based on search, type, and status
-    const filteredItems = items.filter((item) => {
+    // Filter, sort, and paginate
+    const filtered = items.filter((item) => {
         const matchesSearch =
             item.title?.toLowerCase().includes(search.toLowerCase()) ||
             item.description?.toLowerCase().includes(search.toLowerCase()) ||
             item.location?.toLowerCase().includes(search.toLowerCase()) ||
             item.owner?.username?.toLowerCase().includes(search.toLowerCase());
 
-        const matchesType = typeFilter === 'all' || item.type === typeFilter;
-        const matchesStatus =
-            statusFilter === 'all' || item.currentStatus === statusFilter;
+        const matchesSubmissionStatus =
+            !filters.submissionStatus ||
+            item.submissionStatus === filters.submissionStatus;
+        const matchesDeleted =
+            !filters.deleted || item.deleted?.toString() === filters.deleted;
+        const matchesType = !filters.type || item.type === filters.type;
+        const matchesCurrentStatus =
+            !filters.currentStatus ||
+            item.currentStatus === filters.currentStatus;
 
-        return matchesSearch && matchesType && matchesStatus;
+        return (
+            matchesSearch &&
+            matchesSubmissionStatus &&
+            matchesDeleted &&
+            matchesType &&
+            matchesCurrentStatus
+        );
     });
 
-    // Pagination
-    const totalItems = filteredItems.length;
+    const sorted = [...filtered].sort((a, b) => {
+        const aValue = a[sortBy];
+        const bValue = b[sortBy];
+
+        if (sortBy === 'createdAt') {
+            const aDate = new Date(aValue);
+            const bDate = new Date(bValue);
+            return sortOrder === 'asc' ? aDate - bDate : bDate - aDate;
+        }
+
+        if (sortBy === 'clickCounts') {
+            const aCount = Number(aValue) || 0;
+            const bCount = Number(bValue) || 0;
+            return sortOrder === 'asc' ? aCount - bCount : bCount - aCount;
+        }
+
+        return 0;
+    });
+
+    const totalItems = sorted.length;
     const totalPages = Math.ceil(totalItems / pageSize);
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const currentItems = filteredItems.slice(startIndex, endIndex);
+    const current = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+    const uniqueStatuses = [
+        ...new Set(items.map((item) => item.submissionStatus)),
+    ].filter(Boolean);
+    const uniqueTypes = [...new Set(items.map((item) => item.type))].filter(
+        Boolean,
+    );
+    const uniqueCurrentStatuses = [
+        ...new Set(items.map((item) => item.currentStatus)),
+    ].filter(Boolean);
+
+    const resetFilters = () => {
+        setFilters({
+            submissionStatus: '',
+            deleted: '',
+            type: '',
+            currentStatus: '',
+        });
+        setSearch('');
+        setPage(1);
+    };
+
+    const activeFiltersCount =
+        (filters.submissionStatus ? 1 : 0) +
+        (filters.deleted ? 1 : 0) +
+        (filters.type ? 1 : 0) +
+        (filters.currentStatus ? 1 : 0);
 
     if (loading) {
         return (
@@ -189,7 +297,9 @@ const LostFoundList = () => {
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
                 <Sidebar />
-                <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${mainContentMargin} transition-all duration-300`}>
+                <div
+                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${mainContentMargin} transition-all duration-300`}
+                >
                     <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-8 text-center'>
                         <div className='text-red-600 dark:text-red-400 text-lg font-medium mb-2'>
                             Error Loading Items
@@ -213,292 +323,640 @@ const LostFoundList = () => {
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
             <Sidebar />
-            <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${mainContentMargin} transition-all duration-300`}>
-                {/* Header Section */}
-                <div className='mb-8'>
-                    <button
-                        onClick={() => navigate(-1)}
-                        className='flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 mb-4 transition-colors'
-                    >
-                        <ArrowLeft className='h-4 w-4 mr-2' />
-                        Back
-                    </button>
+            <main className='pt-6 pb-12'>
+                <div
+                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
+                >
+                    {/* Header */}
+                    <div className='flex items-center justify-between mb-8'>
+                        <div className='flex items-center space-x-4'>
+                            <button
+                                onClick={() => navigate(-1)}
+                                className='p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors'
+                            >
+                                <ArrowLeft className='h-5 w-5 text-gray-600 dark:text-gray-400' />
+                            </button>
+                            <div>
+                                <h1 className='text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3'>
+                                    <div className='p-2 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl'>
+                                        <Package className='h-8 w-8 text-white' />
+                                    </div>
+                                    Lost & Found
+                                </h1>
+                                <p className='text-gray-600 dark:text-gray-400 mt-1'>
+                                    Manage lost and found items for this college
+                                </p>
+                            </div>
+                        </div>
+                    </div>
 
-                    <div className='flex items-center justify-between'>
-                        <div>
-                            <h1 className='text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3'>
-                                <div className='p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl'>
-                                    <SearchIcon className='h-8 w-8 text-white' />
+                    <div className='space-y-6'>
+                        {/* Search and Controls */}
+                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4'>
+                            <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4'>
+                                {/* Search Bar */}
+                                <div className='relative flex-1 max-w-md'>
+                                    <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5' />
+                                    <input
+                                        type='text'
+                                        placeholder='Search items...'
+                                        value={search}
+                                        onChange={(e) => {
+                                            setSearch(e.target.value);
+                                            setPage(1);
+                                        }}
+                                        className='w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                    />
                                 </div>
-                                Lost & Found
-                            </h1>
-                            <p className='text-gray-600 dark:text-gray-400 mt-2'>
-                                Manage lost and found items for this college
-                            </p>
+
+                                {/* Controls */}
+                                <div className='flex items-center gap-3'>
+                                    {/* View Mode Toggle */}
+                                    <div className='flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1'>
+                                        <button
+                                            onClick={() =>
+                                                toggleViewMode('grid')
+                                            }
+                                            className={`p-2 rounded transition-colors ${
+                                                viewMode === 'grid'
+                                                    ? 'bg-white dark:bg-gray-600 text-purple-600 dark:text-purple-400 shadow-sm'
+                                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                            }`}
+                                            title='Grid View'
+                                        >
+                                            <Grid3x3 className='h-5 w-5' />
+                                        </button>
+                                        <button
+                                            onClick={() =>
+                                                toggleViewMode('table')
+                                            }
+                                            className={`p-2 rounded transition-colors ${
+                                                viewMode === 'table'
+                                                    ? 'bg-white dark:bg-gray-600 text-purple-600 dark:text-purple-400 shadow-sm'
+                                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                            }`}
+                                            title='Table View'
+                                        >
+                                            <List className='h-5 w-5' />
+                                        </button>
+                                    </div>
+
+                                    {/* Filter Toggle */}
+                                    <button
+                                        onClick={() =>
+                                            setShowFilters(!showFilters)
+                                        }
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                                            showFilters
+                                                ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300'
+                                                : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+                                        }`}
+                                    >
+                                        <Filter className='h-4 w-4' />
+                                        Filters
+                                        {activeFiltersCount > 0 && (
+                                            <span className='bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center'>
+                                                {activeFiltersCount}
+                                            </span>
+                                        )}
+                                    </button>
+
+                                    {/* Sort Dropdown */}
+                                    <select
+                                        value={`${sortBy}-${sortOrder}`}
+                                        onChange={(e) => {
+                                            const [field, order] =
+                                                e.target.value.split('-');
+                                            setSortBy(field);
+                                            setSortOrder(order);
+                                        }}
+                                        className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                    >
+                                        <option value='createdAt-desc'>
+                                            Newest First
+                                        </option>
+                                        <option value='createdAt-asc'>
+                                            Oldest First
+                                        </option>
+                                        <option value='clickCounts-desc'>
+                                            Most Views
+                                        </option>
+                                        <option value='clickCounts-asc'>
+                                            Least Views
+                                        </option>
+                                    </select>
+
+                                    {/* Clear Filters */}
+                                    {activeFiltersCount > 0 && (
+                                        <button
+                                            onClick={resetFilters}
+                                            className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors'
+                                        >
+                                            <X className='h-4 w-4' />
+                                            Clear All
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Filter Panel */}
+                            {showFilters && (
+                                <div className='mt-4 pt-4 border-t border-gray-200 dark:border-gray-700'>
+                                    <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+                                        <select
+                                            value={filters.submissionStatus}
+                                            onChange={(e) =>
+                                                setFilters({
+                                                    ...filters,
+                                                    submissionStatus:
+                                                        e.target.value,
+                                                })
+                                            }
+                                            className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                        >
+                                            <option value=''>
+                                                All Submission Statuses
+                                            </option>
+                                            {uniqueStatuses.map((status) => (
+                                                <option
+                                                    key={status}
+                                                    value={status}
+                                                >
+                                                    {status
+                                                        .charAt(0)
+                                                        .toUpperCase() +
+                                                        status.slice(1)}
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                        <select
+                                            value={filters.deleted}
+                                            onChange={(e) =>
+                                                setFilters({
+                                                    ...filters,
+                                                    deleted: e.target.value,
+                                                })
+                                            }
+                                            className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                        >
+                                            <option value=''>
+                                                All (Deleted Status)
+                                            </option>
+                                            <option value='true'>
+                                                Deleted
+                                            </option>
+                                            <option value='false'>
+                                                Not Deleted
+                                            </option>
+                                        </select>
+
+                                        <select
+                                            value={filters.type}
+                                            onChange={(e) =>
+                                                setFilters({
+                                                    ...filters,
+                                                    type: e.target.value,
+                                                })
+                                            }
+                                            className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                        >
+                                            <option value=''>All Types</option>
+                                            {uniqueTypes.map((type) => (
+                                                <option key={type} value={type}>
+                                                    {type === 'lost'
+                                                        ? 'Lost Items'
+                                                        : 'Found Items'}
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                        <select
+                                            value={filters.currentStatus}
+                                            onChange={(e) =>
+                                                setFilters({
+                                                    ...filters,
+                                                    currentStatus:
+                                                        e.target.value,
+                                                })
+                                            }
+                                            className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                        >
+                                            <option value=''>
+                                                All Current Statuses
+                                            </option>
+                                            {uniqueCurrentStatuses.map(
+                                                (status) => (
+                                                    <option
+                                                        key={status}
+                                                        value={status}
+                                                    >
+                                                        {status
+                                                            .charAt(0)
+                                                            .toUpperCase() +
+                                                            status.slice(1)}
+                                                    </option>
+                                                ),
+                                            )}
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
-                </div>
 
-                {/* Search and Filters */}
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6'>
-                    <div className='flex flex-col lg:flex-row lg:items-center gap-4'>
-                        <div className='relative flex-1 max-w-md'>
-                            <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4' />
-                            <input
-                                type='text'
-                                placeholder='Search by title, description, location...'
-                                value={search}
-                                onChange={(e) => {
-                                    setSearch(e.target.value);
-                                    setPage(1);
-                                }}
-                                className='w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                            />
+                    {error && (
+                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8'>
+                            {error}
                         </div>
+                    )}
 
-                        <div className='flex flex-col sm:flex-row gap-3'>
-                            <select
-                                value={typeFilter}
-                                onChange={(e) => {
-                                    setTypeFilter(e.target.value);
-                                    setPage(1);
-                                }}
-                                className='px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                            >
-                                <option value='all'>All Types</option>
-                                <option value='lost'>Lost Items</option>
-                                <option value='found'>Found Items</option>
-                            </select>
-
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => {
-                                    setStatusFilter(e.target.value);
-                                    setPage(1);
-                                }}
-                                className='px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                            >
-                                <option value='all'>All Status</option>
-                                <option value='open'>Open</option>
-                                <option value='closed'>Closed</option>
-                            </select>
-                        </div>
-
-                        <div className='flex items-center space-x-4 text-sm'>
-                            <div className='bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg'>
-                                <span className='text-blue-600 dark:text-blue-400 font-medium'>
-                                    Total: {items.length}
-                                </span>
-                            </div>
-                            <div className='bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-lg'>
-                                <span className='text-green-600 dark:text-green-400 font-medium'>
-                                    Showing: {currentItems.length}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Items Table */}
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                    {currentItems.length === 0 ? (
-                        <div className='p-12 text-center'>
-                            <SearchIcon className='h-12 w-12 text-gray-400 mx-auto mb-4' />
+                    {/* Empty State */}
+                    {current.length === 0 ? (
+                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center'>
+                            <Package className='h-16 w-16 text-gray-400 mx-auto mb-4' />
                             <h3 className='text-lg font-medium text-gray-900 dark:text-gray-100 mb-2'>
                                 No items found
                             </h3>
                             <p className='text-gray-600 dark:text-gray-400'>
-                                {search ||
-                                typeFilter !== 'all' ||
-                                statusFilter !== 'all'
-                                    ? 'Try adjusting your search criteria'
+                                {search || activeFiltersCount > 0
+                                    ? 'Try adjusting your search or filters'
                                     : 'No lost & found items have been submitted yet'}
                             </p>
                         </div>
                     ) : (
-                        <div className='overflow-x-auto'>
-                            <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                <thead className='bg-gray-50 dark:bg-gray-700'>
-                                    <tr>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Item
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Type & Status
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Location & Date
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Contact
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Posted By
-                                        </th>
-                                        <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                    {currentItems.map((item) => (
-                                        <tr
+                        <>
+                            {/* Table View */}
+                            {viewMode === 'table' && (
+                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                                    <div className='overflow-x-auto'>
+                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
+                                            <thead className='bg-gray-50 dark:bg-gray-700'>
+                                                <tr>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                        Item
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                        Type
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                        Submission Status
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                        Current Status
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                        Location / Posted By
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                        Views / Date
+                                                    </th>
+                                                    <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                        Actions
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
+                                                {current.map((item) => (
+                                                    <tr
+                                                        key={item._id}
+                                                        className='hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors'
+                                                        onClick={() =>
+                                                            handleView(item)
+                                                        }
+                                                    >
+                                                        <td className='px-6 py-4 whitespace-nowrap'>
+                                                            <div className='flex items-center'>
+                                                                <div className='flex-shrink-0 h-12 w-12'>
+                                                                    {item.imageUrl ? (
+                                                                        <img
+                                                                            src={
+                                                                                item.imageUrl
+                                                                            }
+                                                                            alt={
+                                                                                item.title
+                                                                            }
+                                                                            className='h-12 w-12 rounded-lg object-cover'
+                                                                        />
+                                                                    ) : (
+                                                                        <div className='h-12 w-12 rounded-lg bg-gradient-to-r from-purple-400 to-indigo-400 flex items-center justify-center'>
+                                                                            <Package className='h-6 w-6 text-white' />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className='ml-4'>
+                                                                    <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
+                                                                        {
+                                                                            item.title
+                                                                        }
+                                                                    </div>
+                                                                    <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs'>
+                                                                        {item.description ||
+                                                                            'No description'}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap'>
+                                                            <span
+                                                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(
+                                                                    item.type,
+                                                                )}`}
+                                                            >
+                                                                {item.type ===
+                                                                'lost'
+                                                                    ? 'Lost'
+                                                                    : 'Found'}
+                                                            </span>
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap'>
+                                                            <span
+                                                                className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                                                                    item.submissionStatus,
+                                                                )}`}
+                                                            >
+                                                                {getStatusIcon(
+                                                                    item.submissionStatus,
+                                                                )}
+                                                                <span className='capitalize'>
+                                                                    {
+                                                                        item.submissionStatus
+                                                                    }
+                                                                </span>
+                                                            </span>
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap'>
+                                                            <span
+                                                                className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getCurrentStatusColor(
+                                                                    item.currentStatus,
+                                                                )}`}
+                                                            >
+                                                                {item.currentStatus ===
+                                                                'open' ? (
+                                                                    <Clock className='h-4 w-4' />
+                                                                ) : (
+                                                                    <CheckCircle className='h-4 w-4' />
+                                                                )}
+                                                                <span className='capitalize'>
+                                                                    {
+                                                                        item.currentStatus
+                                                                    }
+                                                                </span>
+                                                            </span>
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap'>
+                                                            <div className='space-y-1'>
+                                                                <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
+                                                                    <MapPin className='h-4 w-4 text-blue-500 mr-2' />
+                                                                    <span className='truncate max-w-xs'>
+                                                                        {item.location ||
+                                                                            'Not specified'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
+                                                                    <User className='h-4 w-4 mr-2' />
+                                                                    {item.owner
+                                                                        ?.username ||
+                                                                        'Unknown'}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap'>
+                                                            <div className='space-y-1'>
+                                                                <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
+                                                                    <Eye className='h-4 w-4 mr-2' />
+                                                                    {item.clickCounts ||
+                                                                        0}{' '}
+                                                                    views
+                                                                </div>
+                                                                <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
+                                                                    <Calendar className='h-4 w-4 mr-2' />
+                                                                    {new Date(
+                                                                        item.createdAt,
+                                                                    ).toLocaleDateString()}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
+                                                            <div className='flex items-center justify-end space-x-2'>
+                                                                <button
+                                                                    onClick={(
+                                                                        e,
+                                                                    ) => {
+                                                                        e.stopPropagation();
+                                                                        handleEdit(
+                                                                            item,
+                                                                        );
+                                                                    }}
+                                                                    className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
+                                                                    title='Edit Item'
+                                                                >
+                                                                    <Edit2 className='h-4 w-4' />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(
+                                                                        e,
+                                                                    ) => {
+                                                                        e.stopPropagation();
+                                                                        handleDelete(
+                                                                            item,
+                                                                        );
+                                                                    }}
+                                                                    className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
+                                                                    title='Delete Item'
+                                                                >
+                                                                    <Trash2 className='h-4 w-4' />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Grid View */}
+                            {viewMode === 'grid' && (
+                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+                                    {current.map((item) => (
+                                        <div
                                             key={item._id}
-                                            className='hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors'
+                                            className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow cursor-pointer overflow-hidden'
                                             onClick={() => handleView(item)}
                                         >
-                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                <div className='flex items-center'>
-                                                    <div className='flex-shrink-0 h-12 w-12'>
-                                                        {item.imageUrl ? (
-                                                            <img
-                                                                src={
-                                                                    item.imageUrl
-                                                                }
-                                                                alt={item.title}
-                                                                className='h-12 w-12 rounded-lg object-cover'
-                                                            />
-                                                        ) : (
-                                                            <div
-                                                                className={`h-12 w-12 rounded-lg ${
-                                                                    item.type ===
+                                            {/* Header with gradient */}
+                                            <div className='bg-gradient-to-r from-purple-500 to-indigo-500 p-4'>
+                                                <div className='flex items-start justify-between'>
+                                                    <div className='flex items-center gap-3'>
+                                                        <div className='p-2 bg-white/20 backdrop-blur-sm rounded-lg'>
+                                                            <Package className='h-6 w-6 text-white' />
+                                                        </div>
+                                                        <div>
+                                                            <h3 className='text-white font-medium line-clamp-1'>
+                                                                {item.title}
+                                                            </h3>
+                                                            <div className='flex items-center gap-2 mt-1'>
+                                                                <span
+                                                                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${getTypeColor(
+                                                                        item.type,
+                                                                    )}`}
+                                                                >
+                                                                    {item.type ===
                                                                     'lost'
-                                                                        ? 'bg-gradient-to-r from-red-400 to-pink-400'
-                                                                        : 'bg-gradient-to-r from-green-400 to-teal-400'
-                                                                } flex items-center justify-center`}
-                                                            >
-                                                                <SearchIcon className='h-6 w-6 text-white' />
+                                                                        ? 'Lost'
+                                                                        : 'Found'}
+                                                                </span>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                    <div className='ml-4'>
-                                                        <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
-                                                            {item.title}
-                                                        </div>
-                                                        <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs'>
-                                                            {item.description ||
-                                                                'No description'}
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                <div className='space-y-2'>
-                                                    <span
-                                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(
-                                                            item.type,
-                                                        )}`}
-                                                    >
-                                                        {item.type === 'lost'
-                                                            ? 'Lost'
-                                                            : 'Found'}
-                                                    </span>
-                                                    <br />
-                                                    <span
-                                                        className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                                                            item.currentStatus,
-                                                        )}`}
-                                                    >
-                                                        {getStatusIcon(
-                                                            item.currentStatus,
-                                                        )}
-                                                        <span className='capitalize'>
-                                                            {item.currentStatus}
-                                                        </span>
-                                                    </span>
+                                            </div>
+
+                                            {/* Image or fallback */}
+                                            {item.imageUrl && (
+                                                <div className='w-full h-48 overflow-hidden bg-gray-100 dark:bg-gray-700'>
+                                                    <img
+                                                        src={item.imageUrl}
+                                                        alt={item.title}
+                                                        className='w-full h-full object-cover'
+                                                    />
                                                 </div>
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                <div className='space-y-1'>
-                                                    <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                        <MapPin className='h-4 w-4 text-blue-500 mr-2' />
-                                                        <span className='truncate max-w-xs'>
-                                                            {item.location ||
-                                                                'Not specified'}
-                                                        </span>
-                                                    </div>
-                                                    <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                        <Calendar className='h-4 w-4 text-gray-400 mr-2' />
-                                                        {new Date(
-                                                            item.date ||
-                                                                item.createdAt,
-                                                        ).toLocaleDateString()}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                {item.whatsapp && (
-                                                    <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                        <Phone className='h-4 w-4 text-green-500 mr-2' />
-                                                        <span className='truncate max-w-xs'>
-                                                            {item.whatsapp}
-                                                        </span>
-                                                    </div>
+                                            )}
+
+                                            {/* Content */}
+                                            <div className='p-4 space-y-3'>
+                                                {item.description && (
+                                                    <p className='text-sm text-gray-600 dark:text-gray-400 line-clamp-2'>
+                                                        {item.description}
+                                                    </p>
                                                 )}
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                    <User className='h-4 w-4 text-gray-400 mr-2' />
-                                                    {item.owner?.username ||
-                                                        'Unknown'}
+
+                                                <div className='space-y-2'>
+                                                    <div className='flex items-center justify-between'>
+                                                        <span
+                                                            className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                                                                item.submissionStatus,
+                                                            )}`}
+                                                        >
+                                                            {getStatusIcon(
+                                                                item.submissionStatus,
+                                                            )}
+                                                            <span className='capitalize'>
+                                                                {
+                                                                    item.submissionStatus
+                                                                }
+                                                            </span>
+                                                        </span>
+                                                        <span
+                                                            className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getCurrentStatusColor(
+                                                                item.currentStatus,
+                                                            )}`}
+                                                        >
+                                                            {item.currentStatus ===
+                                                            'open' ? (
+                                                                <Clock className='h-4 w-4' />
+                                                            ) : (
+                                                                <CheckCircle className='h-4 w-4' />
+                                                            )}
+                                                            <span className='capitalize'>
+                                                                {
+                                                                    item.currentStatus
+                                                                }
+                                                            </span>
+                                                        </span>
+                                                    </div>
+
+                                                    {item.location && (
+                                                        <div className='flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
+                                                            <MapPin className='h-4 w-4 text-blue-500' />
+                                                            <span className='truncate'>
+                                                                {item.location}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    {item.whatsapp && (
+                                                        <div className='flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
+                                                            <Phone className='h-4 w-4 text-green-500' />
+                                                            <span>
+                                                                {item.whatsapp}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    <div className='flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
+                                                        <User className='h-4 w-4' />
+                                                        <span>
+                                                            {item.owner
+                                                                ?.username ||
+                                                                'Unknown'}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className='flex items-center justify-between text-xs text-gray-500 dark:text-gray-400'>
+                                                        <div className='flex items-center gap-1'>
+                                                            <Eye className='h-3 w-3' />
+                                                            {item.clickCounts ||
+                                                                0}{' '}
+                                                            views
+                                                        </div>
+                                                        <div className='flex items-center gap-1'>
+                                                            <Calendar className='h-3 w-3' />
+                                                            {new Date(
+                                                                item.createdAt,
+                                                            ).toLocaleDateString()}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
-                                                <div className='flex items-center justify-end space-x-2'>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleView(item);
-                                                        }}
-                                                        className='text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors p-1 rounded'
-                                                        title='View Details'
-                                                    >
-                                                        <Eye className='h-4 w-4' />
-                                                    </button>
+
+                                                {/* Actions */}
+                                                <div className='flex items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700'>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleEdit(item);
                                                         }}
-                                                        className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
-                                                        title='Edit Item'
+                                                        className='flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-lg transition-colors'
                                                     >
                                                         <Edit2 className='h-4 w-4' />
+                                                        Edit
                                                     </button>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleDelete(item);
                                                         }}
-                                                        className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
-                                                        title='Delete Item'
+                                                        className='flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors'
                                                     >
                                                         <Trash2 className='h-4 w-4' />
+                                                        Delete
                                                     </button>
                                                 </div>
-                                            </td>
-                                        </tr>
+                                            </div>
+                                        </div>
                                     ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                </div>
+                            )}
+
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                                <div className='mt-6'>
+                                    <Pagination
+                                        currentPage={page}
+                                        totalPages={totalPages}
+                                        onPageChange={setPage}
+                                        pageSize={pageSize}
+                                        onPageSizeChange={setPageSize}
+                                        totalItems={totalItems}
+                                    />
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className='mt-6'>
-                        <Pagination
-                            currentPage={page}
-                            totalPages={totalPages}
-                            onPageChange={setPage}
-                            pageSize={pageSize}
-                            onPageSizeChange={setPageSize}
-                            totalItems={totalItems}
-                        />
-                    </div>
-                )}
-            </div>
+            </main>
 
             {/* Modals */}
             <ConfirmModal

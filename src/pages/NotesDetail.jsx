@@ -17,6 +17,7 @@ import {
     Building,
     Link,
     ExternalLink,
+    DollarSign,
 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import NotesEditModal from '../components/NotesEditModal';
@@ -300,6 +301,19 @@ const NotesDetail = () => {
                                             {note.owner?.username || 'N/A'}
                                         </dd>
                                     </div>
+                                    {note.isPaid && (
+                                        <div>
+                                            <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center'>
+                                                <DollarSign className='w-4 h-4 mr-2' />
+                                                Price
+                                            </dt>
+                                            <dd className='mt-1 text-sm text-gray-900 dark:text-white'>
+                                                {note.price
+                                                    ? `₹${note.price / 5} / ${note.price}pts`
+                                                    : 'Free'}
+                                            </dd>
+                                        </div>
+                                    )}
 
                                     <div>
                                         <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center'>

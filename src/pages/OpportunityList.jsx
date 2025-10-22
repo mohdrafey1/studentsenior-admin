@@ -21,6 +21,11 @@ import {
     XCircle,
     Clock,
     ExternalLink,
+    Grid3x3,
+    List,
+    Filter,
+    X,
+    SortAsc,
 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import ConfirmModal from '../components/ConfirmModal';
@@ -32,12 +37,26 @@ const OpportunityList = () => {
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(12);
     const [showModal, setShowModal] = useState(false);
     const [editingOpportunity, setEditingOpportunity] = useState(null);
     const { collegeslug } = useParams();
     const navigate = useNavigate();
     const { mainContentMargin } = useSidebarLayout();
+
+    // View mode - responsive default (small screens = grid, large screens = table)
+    const [viewMode, setViewMode] = useState(() => {
+        return window.innerWidth >= 1024 ? 'table' : 'grid';
+    });
+
+    // Filters state
+    const [filters, setFilters] = useState({
+        submissionStatus: '',
+        deleted: '',
+    });
+    const [sortBy, setSortBy] = useState('createdAt');
+    const [sortOrder, setSortOrder] = useState('desc');
+    const [showFilters, setShowFilters] = useState(false);
 
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -70,6 +89,17 @@ const OpportunityList = () => {
     useEffect(() => {
         fetchOpportunities();
     }, [collegeslug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Responsive view mode - always auto-switch based on screen size
+    useEffect(() => {
+        const handleResize = () => {
+            const newMode = window.innerWidth >= 1024 ? 'table' : 'grid';
+            setViewMode(newMode);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const fetchOpportunities = async () => {
         try {
@@ -124,6 +154,14 @@ const OpportunityList = () => {
         handleModalClose();
     };
 
+    // Toggle view mode (user can still manually switch)
+    const toggleViewMode = (mode) => {
+        setViewMode(mode);
+    };
+
+    // Get unique values for filters
+    const uniqueStatuses = ['pending', 'approved', 'rejected'];
+
     const getStatusColor = (status) => {
         const colors = {
             approved:
@@ -146,28 +184,60 @@ const OpportunityList = () => {
         return <Icon className='h-4 w-4' />;
     };
 
-    // Filter opportunities based on search
-    const filteredOpportunities = opportunities.filter(
-        (opportunity) =>
-            opportunity.name?.toLowerCase().includes(search.toLowerCase()) ||
-            opportunity.description
-                ?.toLowerCase()
-                .includes(search.toLowerCase()) ||
-            opportunity.email?.toLowerCase().includes(search.toLowerCase()) ||
-            opportunity.owner?.username
-                ?.toLowerCase()
-                .includes(search.toLowerCase()),
-    );
+    // Apply filters and sorting
+    const filtered = opportunities.filter((opportunity) => {
+        const q = search.trim().toLowerCase();
+        const matchesSearch =
+            !q ||
+            opportunity.name?.toLowerCase().includes(q) ||
+            opportunity.description?.toLowerCase().includes(q) ||
+            opportunity.email?.toLowerCase().includes(q) ||
+            opportunity.owner?.username?.toLowerCase().includes(q);
 
-    // Pagination
-    const totalItems = filteredOpportunities.length;
-    const totalPages = Math.ceil(totalItems / pageSize);
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const currentOpportunities = filteredOpportunities.slice(
-        startIndex,
-        endIndex,
-    );
+        const matchesStatus =
+            !filters.submissionStatus ||
+            opportunity.submissionStatus === filters.submissionStatus;
+
+        const matchesDeleted =
+            filters.deleted === '' ||
+            (filters.deleted === 'true'
+                ? opportunity.deleted
+                : !opportunity.deleted);
+
+        return matchesSearch && matchesStatus && matchesDeleted;
+    });
+
+    // Sort
+    const sorted = [...filtered].sort((a, b) => {
+        if (sortBy === 'createdAt') {
+            const dateA = new Date(a.createdAt);
+            const dateB = new Date(b.createdAt);
+            return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+        }
+        if (sortBy === 'clickCounts') {
+            const countA = a.clickCounts || 0;
+            const countB = b.clickCounts || 0;
+            return sortOrder === 'asc' ? countA - countB : countB - countA;
+        }
+        return 0;
+    });
+
+    const start = (page - 1) * pageSize;
+    const current = sorted.slice(start, start + pageSize);
+
+    const totalItems = sorted.length;
+    const totalPages = Math.ceil(totalItems / pageSize) || 1;
+
+    const resetFilters = () => {
+        setFilters({
+            submissionStatus: '',
+            deleted: '',
+        });
+        setSortBy('createdAt');
+        setSortOrder('desc');
+    };
+
+    const activeFiltersCount = Object.values(filters).filter(Boolean).length;
 
     if (loading) {
         return (
@@ -191,7 +261,9 @@ const OpportunityList = () => {
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
                 <Sidebar />
-                <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${mainContentMargin} transition-all duration-300`}>
+                <div
+                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${mainContentMargin} transition-all duration-300`}
+                >
                     <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-8 text-center'>
                         <div className='text-red-600 dark:text-red-400 text-lg font-medium mb-2'>
                             Error Loading Opportunities
@@ -215,183 +287,496 @@ const OpportunityList = () => {
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
             <Sidebar />
-            <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${mainContentMargin} transition-all duration-300`}>
-                {/* Header Section */}
-                <div className='mb-8'>
-                    <button
-                        onClick={() => navigate(-1)}
-                        className='flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 mb-4 transition-colors'
-                    >
-                        <ArrowLeft className='h-4 w-4 mr-2' />
-                        Back
-                    </button>
+            <main className='pt-6 pb-12'>
+                <div
+                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
+                >
+                    {/* Header */}
+                    <div className='flex items-center justify-between mb-8'>
+                        <div className='flex items-center space-x-4'>
+                            <button
+                                onClick={() => navigate(-1)}
+                                className='p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors'
+                            >
+                                <ArrowLeft className='h-5 w-5 text-gray-600 dark:text-gray-400' />
+                            </button>
+                            <div>
+                                <h1 className='text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3'>
+                                    <div className='p-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl'>
+                                        <Briefcase className='h-8 w-8 text-white' />
+                                    </div>
+                                    Opportunities
+                                </h1>
+                                <p className='text-gray-600 dark:text-gray-400 mt-1'>
+                                    Manage job and internship opportunities for
+                                    this college
+                                </p>
+                            </div>
+                        </div>
+                    </div>
 
-                    <div className='flex items-center justify-between'>
-                        <div>
-                            <h1 className='text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3'>
-                                <div className='p-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl'>
-                                    <Briefcase className='h-8 w-8 text-white' />
+                    <div className='space-y-6'>
+                        {/* Search and Controls */}
+                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4'>
+                            <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4'>
+                                {/* Search Bar */}
+                                <div className='relative flex-1 max-w-md'>
+                                    <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5' />
+                                    <input
+                                        type='text'
+                                        placeholder='Search opportunities...'
+                                        value={search}
+                                        onChange={(e) => {
+                                            setSearch(e.target.value);
+                                            setPage(1);
+                                        }}
+                                        className='w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                    />
                                 </div>
-                                Opportunities
-                            </h1>
-                            <p className='text-gray-600 dark:text-gray-400 mt-2'>
-                                Manage job and internship opportunities for this
-                                college
-                            </p>
+
+                                {/* Controls */}
+                                <div className='flex items-center gap-3'>
+                                    {/* View Mode Toggle */}
+                                    <div className='flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1'>
+                                        <button
+                                            onClick={() =>
+                                                toggleViewMode('grid')
+                                            }
+                                            className={`p-2 rounded transition-colors ${
+                                                viewMode === 'grid'
+                                                    ? 'bg-white dark:bg-gray-600 text-orange-600 dark:text-orange-400 shadow-sm'
+                                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                            }`}
+                                            title='Grid View'
+                                        >
+                                            <Grid3x3 className='h-5 w-5' />
+                                        </button>
+                                        <button
+                                            onClick={() =>
+                                                toggleViewMode('table')
+                                            }
+                                            className={`p-2 rounded transition-colors ${
+                                                viewMode === 'table'
+                                                    ? 'bg-white dark:bg-gray-600 text-orange-600 dark:text-orange-400 shadow-sm'
+                                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                            }`}
+                                            title='Table View'
+                                        >
+                                            <List className='h-5 w-5' />
+                                        </button>
+                                    </div>
+
+                                    {/* Filter Toggle */}
+                                    <button
+                                        onClick={() =>
+                                            setShowFilters(!showFilters)
+                                        }
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                                            showFilters
+                                                ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300'
+                                                : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+                                        }`}
+                                    >
+                                        <Filter className='h-4 w-4' />
+                                        Filters
+                                        {activeFiltersCount > 0 && (
+                                            <span className='bg-orange-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center'>
+                                                {activeFiltersCount}
+                                            </span>
+                                        )}
+                                    </button>
+
+                                    {/* Sort Dropdown */}
+                                    <select
+                                        value={`${sortBy}-${sortOrder}`}
+                                        onChange={(e) => {
+                                            const [field, order] =
+                                                e.target.value.split('-');
+                                            setSortBy(field);
+                                            setSortOrder(order);
+                                        }}
+                                        className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                    >
+                                        <option value='createdAt-desc'>
+                                            Newest First
+                                        </option>
+                                        <option value='createdAt-asc'>
+                                            Oldest First
+                                        </option>
+                                        <option value='clickCounts-desc'>
+                                            Most Views
+                                        </option>
+                                        <option value='clickCounts-asc'>
+                                            Least Views
+                                        </option>
+                                    </select>
+
+                                    {/* Clear Filters */}
+                                    {activeFiltersCount > 0 && (
+                                        <button
+                                            onClick={resetFilters}
+                                            className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors'
+                                        >
+                                            <X className='h-4 w-4' />
+                                            Clear All
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Filter Panel */}
+                            {showFilters && (
+                                <div className='mt-4 pt-4 border-t border-gray-200 dark:border-gray-700'>
+                                    <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4'>
+                                        <select
+                                            value={filters.submissionStatus}
+                                            onChange={(e) =>
+                                                setFilters({
+                                                    ...filters,
+                                                    submissionStatus:
+                                                        e.target.value,
+                                                })
+                                            }
+                                            className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                        >
+                                            <option value=''>
+                                                All Submission Statuses
+                                            </option>
+                                            {uniqueStatuses.map((status) => (
+                                                <option
+                                                    key={status}
+                                                    value={status}
+                                                >
+                                                    {status
+                                                        .charAt(0)
+                                                        .toUpperCase() +
+                                                        status.slice(1)}
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                        <select
+                                            value={filters.deleted}
+                                            onChange={(e) =>
+                                                setFilters({
+                                                    ...filters,
+                                                    deleted: e.target.value,
+                                                })
+                                            }
+                                            className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                        >
+                                            <option value=''>
+                                                All (Deleted Status)
+                                            </option>
+                                            <option value='true'>
+                                                Deleted
+                                            </option>
+                                            <option value='false'>
+                                                Not Deleted
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
-                </div>
 
-                {/* Search and Stats */}
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6'>
-                    <div className='flex flex-col md:flex-row md:items-center md:justify-between gap-4'>
-                        <div className='relative flex-1 max-w-md'>
-                            <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4' />
-                            <input
-                                type='text'
-                                placeholder='Search opportunities by name, description, email...'
-                                value={search}
-                                onChange={(e) => {
-                                    setSearch(e.target.value);
-                                    setPage(1);
-                                }}
-                                className='w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                            />
+                    {error && (
+                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8'>
+                            {error}
                         </div>
+                    )}
 
-                        <div className='flex items-center space-x-4 text-sm'>
-                            <div className='bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg'>
-                                <span className='text-blue-600 dark:text-blue-400 font-medium'>
-                                    Total: {opportunities.length}
-                                </span>
-                            </div>
-                            <div className='bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-lg'>
-                                <span className='text-green-600 dark:text-green-400 font-medium'>
-                                    Showing: {currentOpportunities.length}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Opportunities Table */}
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                    {currentOpportunities.length === 0 ? (
-                        <div className='p-12 text-center'>
-                            <Briefcase className='h-12 w-12 text-gray-400 mx-auto mb-4' />
+                    {/* Empty State */}
+                    {current.length === 0 ? (
+                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center'>
+                            <Briefcase className='h-16 w-16 text-gray-400 mx-auto mb-4' />
                             <h3 className='text-lg font-medium text-gray-900 dark:text-gray-100 mb-2'>
                                 No opportunities found
                             </h3>
                             <p className='text-gray-600 dark:text-gray-400'>
-                                {search
-                                    ? 'Try adjusting your search criteria'
+                                {search || activeFiltersCount > 0
+                                    ? 'Try adjusting your search or filters'
                                     : 'No opportunities have been submitted yet'}
                             </p>
                         </div>
                     ) : (
-                        <div className='overflow-x-auto'>
-                            <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                <thead className='bg-gray-50 dark:bg-gray-700'>
-                                    <tr>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Opportunity
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Contact
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Status
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Posted By
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Date Created
-                                        </th>
-                                        <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                    {currentOpportunities.map((opportunity) => (
-                                        <tr
+                        <>
+                            {/* Table View */}
+                            {viewMode === 'table' && (
+                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                                    <div className='overflow-x-auto'>
+                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
+                                            <thead className='bg-gray-50 dark:bg-gray-700'>
+                                                <tr>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                        Opportunity
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                        Contact
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                        Status
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                        Posted By
+                                                    </th>
+
+                                                    <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                        Actions
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
+                                                {current.map((opportunity) => (
+                                                    <tr
+                                                        key={opportunity._id}
+                                                        className='hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors'
+                                                        onClick={() =>
+                                                            handleView(
+                                                                opportunity,
+                                                            )
+                                                        }
+                                                    >
+                                                        <td className='px-6 py-4 whitespace-nowrap'>
+                                                            <div className='flex items-center'>
+                                                                <div className='flex-shrink-0 h-10 w-10'>
+                                                                    <div className='h-10 w-10 rounded-lg bg-gradient-to-r from-orange-400 to-red-400 flex items-center justify-center'>
+                                                                        <Briefcase className='h-6 w-6 text-white' />
+                                                                    </div>
+                                                                </div>
+                                                                <div className='ml-4'>
+                                                                    <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
+                                                                        {
+                                                                            opportunity.name
+                                                                        }
+                                                                    </div>
+                                                                    <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs'>
+                                                                        {opportunity.description ||
+                                                                            'No description'}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap'>
+                                                            <div className='space-y-1'>
+                                                                <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
+                                                                    <Mail className='h-4 w-4 text-blue-500 mr-2' />
+                                                                    <span className='truncate max-w-xs'>
+                                                                        {opportunity.email ||
+                                                                            'Not provided'}
+                                                                    </span>
+                                                                </div>
+                                                                {opportunity.whatsapp && (
+                                                                    <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
+                                                                        <Phone className='h-4 w-4 text-green-500 mr-2' />
+                                                                        {
+                                                                            opportunity.whatsapp
+                                                                        }
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap'>
+                                                            <span
+                                                                className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                                                                    opportunity.submissionStatus,
+                                                                )}`}
+                                                            >
+                                                                {getStatusIcon(
+                                                                    opportunity.submissionStatus,
+                                                                )}
+                                                                <span className='capitalize'>
+                                                                    {
+                                                                        opportunity.submissionStatus
+                                                                    }
+                                                                </span>
+                                                            </span>
+                                                            {opportunity.clickCounts >
+                                                                0 && (
+                                                                <div className='flex items-center gap-1 text-gray-500 dark:text-gray-400'>
+                                                                    <Eye className='w-4 h-4' />
+                                                                    <span className='text-xs'>
+                                                                        {
+                                                                            opportunity.clickCounts
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap'>
+                                                            <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
+                                                                <User className='h-4 w-4 text-gray-400 mr-2' />
+                                                                {opportunity
+                                                                    .owner
+                                                                    ?.username ||
+                                                                    'Unknown'}
+                                                            </div>
+                                                            <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
+                                                                <Calendar className='h-4 w-4 mr-2' />
+                                                                {new Date(
+                                                                    opportunity.createdAt,
+                                                                ).toLocaleDateString()}
+                                                            </div>
+                                                        </td>
+
+                                                        <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
+                                                            <div className='flex items-center justify-end space-x-2'>
+                                                                {opportunity.link && (
+                                                                    <button
+                                                                        onClick={(
+                                                                            e,
+                                                                        ) => {
+                                                                            e.stopPropagation();
+                                                                            window.open(
+                                                                                opportunity.link,
+                                                                                '_blank',
+                                                                            );
+                                                                        }}
+                                                                        className='text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors p-1 rounded'
+                                                                        title='Open External Link'
+                                                                    >
+                                                                        <ExternalLink className='h-4 w-4' />
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={(
+                                                                        e,
+                                                                    ) => {
+                                                                        e.stopPropagation();
+                                                                        handleEdit(
+                                                                            opportunity,
+                                                                        );
+                                                                    }}
+                                                                    className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
+                                                                    title='Edit Opportunity'
+                                                                >
+                                                                    <Edit2 className='h-4 w-4' />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(
+                                                                        e,
+                                                                    ) => {
+                                                                        e.stopPropagation();
+                                                                        handleDelete(
+                                                                            opportunity,
+                                                                        );
+                                                                    }}
+                                                                    className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
+                                                                    title='Delete Opportunity'
+                                                                >
+                                                                    <Trash2 className='h-4 w-4' />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Grid View */}
+                            {viewMode === 'grid' && (
+                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+                                    {current.map((opportunity) => (
+                                        <div
                                             key={opportunity._id}
-                                            className='hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors'
+                                            className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow cursor-pointer overflow-hidden'
                                             onClick={() =>
                                                 handleView(opportunity)
                                             }
                                         >
-                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                <div className='flex items-center'>
-                                                    <div className='flex-shrink-0 h-10 w-10'>
-                                                        <div className='h-10 w-10 rounded-lg bg-gradient-to-r from-orange-400 to-red-400 flex items-center justify-center'>
+                                            {/* Header with gradient */}
+                                            <div className='bg-gradient-to-r from-orange-500 to-red-500 p-4'>
+                                                <div className='flex items-start justify-between'>
+                                                    <div className='flex items-center gap-3'>
+                                                        <div className='p-2 bg-white/20 backdrop-blur-sm rounded-lg'>
                                                             <Briefcase className='h-6 w-6 text-white' />
                                                         </div>
-                                                    </div>
-                                                    <div className='ml-4'>
-                                                        <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
-                                                            {opportunity.name}
-                                                        </div>
-                                                        <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs'>
-                                                            {opportunity.description ||
-                                                                'No description'}
+                                                        <div>
+                                                            <h3 className='text-white font-medium line-clamp-1'>
+                                                                {
+                                                                    opportunity.name
+                                                                }
+                                                            </h3>
+                                                            <div className='flex items-center gap-2 mt-1'>
+                                                                <span
+                                                                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                                                                        opportunity.submissionStatus,
+                                                                    )}`}
+                                                                >
+                                                                    {
+                                                                        opportunity.submissionStatus
+                                                                    }
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                <div className='space-y-1'>
-                                                    <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                        <Mail className='h-4 w-4 text-blue-500 mr-2' />
-                                                        <span className='truncate max-w-xs'>
-                                                            {opportunity.email ||
-                                                                'Not provided'}
+                                            </div>
+
+                                            {/* Content */}
+                                            <div className='p-4 space-y-3'>
+                                                {opportunity.description && (
+                                                    <p className='text-sm text-gray-600 dark:text-gray-400 line-clamp-2'>
+                                                        {
+                                                            opportunity.description
+                                                        }
+                                                    </p>
+                                                )}
+
+                                                <div className='space-y-2'>
+                                                    {opportunity.email && (
+                                                        <div className='flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
+                                                            <Mail className='h-4 w-4 text-blue-500' />
+                                                            <span className='truncate'>
+                                                                {
+                                                                    opportunity.email
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    {opportunity.whatsapp && (
+                                                        <div className='flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
+                                                            <Phone className='h-4 w-4 text-green-500' />
+                                                            <span>
+                                                                {
+                                                                    opportunity.whatsapp
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    <div className='flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
+                                                        <User className='h-4 w-4' />
+                                                        <span>
+                                                            {opportunity.owner
+                                                                ?.username ||
+                                                                'Unknown'}
                                                         </span>
                                                     </div>
-                                                    {opportunity.whatsapp && (
-                                                        <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                            <Phone className='h-4 w-4 text-green-500 mr-2' />
-                                                            {
-                                                                opportunity.whatsapp
-                                                            }
+
+                                                    <div className='flex items-center justify-between text-xs text-gray-500 dark:text-gray-400'>
+                                                        <div className='flex items-center gap-1'>
+                                                            <Eye className='h-3 w-3' />
+                                                            {opportunity.clickCounts ||
+                                                                0}{' '}
+                                                            views
                                                         </div>
-                                                    )}
+                                                        <div className='flex items-center gap-1'>
+                                                            <Calendar className='h-3 w-3' />
+                                                            {new Date(
+                                                                opportunity.createdAt,
+                                                            ).toLocaleDateString()}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                <span
-                                                    className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                                                        opportunity.submissionStatus,
-                                                    )}`}
-                                                >
-                                                    {getStatusIcon(
-                                                        opportunity.submissionStatus,
-                                                    )}
-                                                    <span className='capitalize'>
-                                                        {
-                                                            opportunity.submissionStatus
-                                                        }
-                                                    </span>
-                                                </span>
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                    <User className='h-4 w-4 text-gray-400 mr-2' />
-                                                    {opportunity.owner
-                                                        ?.username || 'Unknown'}
-                                                </div>
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                    <Calendar className='h-4 w-4 mr-2' />
-                                                    {new Date(
-                                                        opportunity.createdAt,
-                                                    ).toLocaleDateString()}
-                                                </div>
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
-                                                <div className='flex items-center justify-end space-x-2'>
+
+                                                {/* Actions */}
+                                                <div className='flex items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700'>
                                                     {opportunity.link && (
                                                         <button
                                                             onClick={(e) => {
@@ -401,24 +786,12 @@ const OpportunityList = () => {
                                                                     '_blank',
                                                                 );
                                                             }}
-                                                            className='text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors p-1 rounded'
-                                                            title='Open External Link'
+                                                            className='flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors'
                                                         >
                                                             <ExternalLink className='h-4 w-4' />
+                                                            Visit
                                                         </button>
                                                     )}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleView(
-                                                                opportunity,
-                                                            );
-                                                        }}
-                                                        className='text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors p-1 rounded'
-                                                        title='View Details'
-                                                    >
-                                                        <Eye className='h-4 w-4' />
-                                                    </button>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -426,10 +799,10 @@ const OpportunityList = () => {
                                                                 opportunity,
                                                             );
                                                         }}
-                                                        className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
-                                                        title='Edit Opportunity'
+                                                        className='flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-lg transition-colors'
                                                     >
                                                         <Edit2 className='h-4 w-4' />
+                                                        Edit
                                                     </button>
                                                     <button
                                                         onClick={(e) => {
@@ -438,35 +811,35 @@ const OpportunityList = () => {
                                                                 opportunity,
                                                             );
                                                         }}
-                                                        className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
-                                                        title='Delete Opportunity'
+                                                        className='flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors'
                                                     >
                                                         <Trash2 className='h-4 w-4' />
+                                                        Delete
                                                     </button>
                                                 </div>
-                                            </td>
-                                        </tr>
+                                            </div>
+                                        </div>
                                     ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                </div>
+                            )}
+
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                                <div className='mt-6'>
+                                    <Pagination
+                                        currentPage={page}
+                                        totalPages={totalPages}
+                                        onPageChange={setPage}
+                                        pageSize={pageSize}
+                                        onPageSizeChange={setPageSize}
+                                        totalItems={totalItems}
+                                    />
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className='mt-6'>
-                        <Pagination
-                            currentPage={page}
-                            totalPages={totalPages}
-                            onPageChange={setPage}
-                            pageSize={pageSize}
-                            onPageSizeChange={setPageSize}
-                            totalItems={totalItems}
-                        />
-                    </div>
-                )}
-            </div>
+            </main>
 
             {/* Modals */}
             <ConfirmModal
