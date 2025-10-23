@@ -1,41 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
-import { CreditCard, Eye, Search, ArrowLeft, Loader } from 'lucide-react';
+import {
+    CreditCard,
+    Eye,
+    Search,
+    ArrowLeft,
+    Loader,
+    Grid3x3,
+    List,
+    SortAsc,
+    SortDesc,
+    User,
+    Calendar,
+} from 'lucide-react';
 import Pagination from '../components/Pagination';
 
 const Payments = () => {
     const [payments, setPayments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filterProvider, setFilterProvider] = useState('');
+    const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
-    const [totalItems, setTotalItems] = useState(0);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(12);
+
+    const [sortBy, setSortBy] = useState('createdAt');
+    const [sortOrder, setSortOrder] = useState('desc');
+    const [viewMode, setViewMode] = useState(() => {
+        return window.innerWidth >= 1024 ? 'table' : 'grid';
+    });
     const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
 
     const fetchPayments = async () => {
         try {
             setError(null);
-            const params = new URLSearchParams({
-                page: String(currentPage),
-                limit: String(pageSize),
-            });
-            if (searchQuery) params.set('search', searchQuery);
-            if (filterStatus) params.set('status', filterStatus);
-            if (filterProvider) params.set('provider', filterProvider);
-
-            const response = await api.get(`/payment?${params.toString()}`);
-            const data = response.data?.data;
-            setPayments(data?.payments || []);
-            setTotalItems(data?.pagination?.totalItems || 0);
+            setLoading(true);
+            // Fetch all payments - do client-side filtering and pagination
+            const response = await api.get(`/payment`);
+            setPayments(response?.data?.data || []);
         } catch (error) {
             console.error('Error fetching payments:', error);
             const errorMessage =
@@ -51,18 +59,65 @@ const Payments = () => {
 
     useEffect(() => {
         fetchPayments();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPage, pageSize]);
+    }, []);
 
-    // Client-side filters only for search box; server handles main filtering
-    const currentPayments = payments.filter((p) =>
-        (p.user?.email || '')
-            .toLowerCase()
-            .includes(searchQuery.trim().toLowerCase()),
+    // Responsive view mode - always auto-switch based on screen size
+    useEffect(() => {
+        const handleResize = () => {
+            const newMode = window.innerWidth >= 1024 ? 'table' : 'grid';
+            setViewMode(newMode);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Client-side filtering and sorting
+    const filteredAndSortedPayments = useMemo(() => {
+        let filtered = [...payments];
+
+        // Search filter (email or user name)
+        if (search.trim()) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(
+                (p) =>
+                    (p.user?.email || '').toLowerCase().includes(searchLower) ||
+                    (p.user?.name || '').toLowerCase().includes(searchLower),
+            );
+        }
+
+        // Status filter
+        if (filterStatus) {
+            filtered = filtered.filter((p) => p.status === filterStatus);
+        }
+
+        // Sorting
+        filtered.sort((a, b) => {
+            let aVal, bVal;
+            if (sortBy === 'createdAt') {
+                aVal = new Date(a.createdAt).getTime();
+                bVal = new Date(b.createdAt).getTime();
+            } else if (sortBy === 'amount') {
+                aVal = a.amount || 0;
+                bVal = b.amount || 0;
+            }
+            return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+        });
+
+        return filtered;
+    }, [payments, search, filterStatus, sortBy, sortOrder]);
+
+    // Pagination
+    const totalItems = filteredAndSortedPayments.length;
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const currentPayments = filteredAndSortedPayments.slice(
+        startIndex,
+        endIndex,
     );
 
-    const handlePageChange = (page) => {
-        setCurrentPage(page);
+    const handlePageChange = (newPage) => {
+        setPage(newPage);
     };
 
     const getStatusColor = (status) => {
@@ -147,39 +202,46 @@ const Payments = () => {
                     </div>
 
                     {/* Search & Filters */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8'>
-                        <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-                            <div className='relative'>
-                                <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
-                                <input
-                                    type='text'
-                                    placeholder='Search by email...'
-                                    value={searchQuery}
-                                    onChange={(e) =>
-                                        setSearchQuery(e.target.value)
-                                    }
-                                    className='w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                />
+                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6'>
+                        {/* Search Bar */}
+                        <div className='relative mb-4'>
+                            <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5' />
+                            <input
+                                type='text'
+                                placeholder='Search by email or name...'
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className='w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                            />
+                        </div>
+
+                        {/* View Toggle, Filter & Sort Controls */}
+                        <div className='flex flex-wrap gap-3 items-center'>
+                            {/* View Mode Toggle */}
+                            <div className='flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1'>
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
+                                    title='Grid view'
+                                >
+                                    <Grid3x3 className='w-4 h-4' />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('table')}
+                                    className={`p-2 rounded ${viewMode === 'table' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
+                                    title='Table view'
+                                >
+                                    <List className='w-4 h-4' />
+                                </button>
                             </div>
 
-                            <select
-                                value={filterProvider}
-                                onChange={(e) =>
-                                    setFilterProvider(e.target.value)
-                                }
-                                className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                            >
-                                <option value=''>All Providers</option>
-                                <option value='PhonePe'>PhonePe</option>
-                                <option value='Razorpay'>Razorpay</option>
-                            </select>
-
+                            {/* Status Filter */}
                             <select
                                 value={filterStatus}
                                 onChange={(e) =>
                                     setFilterStatus(e.target.value)
                                 }
-                                className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
                             >
                                 <option value=''>All Statuses</option>
                                 <option value='captured'>Captured</option>
@@ -187,16 +249,36 @@ const Payments = () => {
                                 <option value='failed'>Failed</option>
                                 <option value='refunded'>Refunded</option>
                             </select>
-                        </div>
-                        <div className='mt-4'>
-                            <button
-                                onClick={() => {
-                                    setCurrentPage(1);
-                                    fetchPayments();
-                                }}
-                                className='px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700'
+
+                            {/* Sort By */}
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
                             >
-                                Apply
+                                <option value='createdAt'>Sort by Date</option>
+                                <option value='amount'>Sort by Amount</option>
+                            </select>
+
+                            {/* Sort Order */}
+                            <button
+                                onClick={() =>
+                                    setSortOrder(
+                                        sortOrder === 'asc' ? 'desc' : 'asc',
+                                    )
+                                }
+                                className='p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
+                                title={
+                                    sortOrder === 'asc'
+                                        ? 'Ascending'
+                                        : 'Descending'
+                                }
+                            >
+                                {sortOrder === 'asc' ? (
+                                    <SortAsc className='w-4 h-4' />
+                                ) : (
+                                    <SortDesc className='w-4 h-4' />
+                                )}
                             </button>
                         </div>
                     </div>
@@ -210,115 +292,198 @@ const Payments = () => {
                         </div>
                     )}
 
-                    {/* Payments Table */}
+                    {/* Payments Display */}
                     {currentPayments.length > 0 ? (
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                            <div className='overflow-x-auto'>
-                                <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                    <thead className='bg-gray-50 dark:bg-gray-700'>
-                                        <tr>
-                                            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                User
-                                            </th>
-                                            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                Provider
-                                            </th>
-                                            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                Amount
-                                            </th>
-                                            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                Status
-                                            </th>
-                                            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                Date
-                                            </th>
-                                            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                Action
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                        {currentPayments.map((payment) => (
-                                            <tr
-                                                key={payment._id}
-                                                className='hover:bg-gray-50 dark:hover:bg-gray-700'
-                                            >
-                                                <td className='px-6 py-4 whitespace-nowrap'>
-                                                    <div>
-                                                        <div className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                            {payment.user
-                                                                ?.username ||
-                                                                'N/A'}
-                                                        </div>
-                                                        <div className='text-sm text-gray-500 dark:text-gray-400'>
-                                                            {payment.user
-                                                                ?.email ||
-                                                                'N/A'}
-                                                        </div>
+                        <>
+                            {/* Grid View */}
+                            {viewMode === 'grid' && (
+                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6'>
+                                    {currentPayments.map((payment) => (
+                                        <div
+                                            key={payment._id}
+                                            className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow'
+                                        >
+                                            {/* Status and Provider Badges */}
+                                            <div className='flex justify-between items-start mb-3'>
+                                                <span
+                                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(payment.status)}`}
+                                                >
+                                                    {payment.status}
+                                                </span>
+                                                <span
+                                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${getProviderColor(payment.provider)}`}
+                                                >
+                                                    {payment.provider || 'N/A'}
+                                                </span>
+                                            </div>
+
+                                            {/* User Info */}
+                                            <div className='flex items-start gap-2 mb-3'>
+                                                <User className='w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0' />
+                                                <div className='min-w-0 flex-1'>
+                                                    <div className='text-sm font-medium text-gray-900 dark:text-white truncate'>
+                                                        {payment.user
+                                                            ?.username || 'N/A'}
                                                     </div>
-                                                </td>
-                                                <td className='px-6 py-4 whitespace-nowrap'>
-                                                    <span
-                                                        className={`px-2 py-1 text-xs font-semibold rounded-full ${getProviderColor(payment.provider)}`}
-                                                    >
-                                                        {payment.provider ||
+                                                    <div className='text-xs text-gray-500 dark:text-gray-400 truncate'>
+                                                        {payment.user?.email ||
                                                             'N/A'}
-                                                    </span>
-                                                </td>
-                                                <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Amount */}
+                                            <div className='mb-3'>
+                                                <div className='text-2xl font-bold text-gray-900 dark:text-white'>
                                                     {payment.currency || 'INR'}{' '}
                                                     {payment.amount || 0}
-                                                </td>
-                                                <td className='px-6 py-4 whitespace-nowrap'>
-                                                    <span
-                                                        className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                                                            payment.status,
-                                                        )}`}
-                                                    >
-                                                        {payment.status}
-                                                    </span>
-                                                </td>
-                                                <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
-                                                    {payment.createdAt
-                                                        ? new Date(
-                                                              payment.createdAt,
-                                                          ).toLocaleDateString()
-                                                        : 'N/A'}
-                                                </td>
-                                                <td className='px-6 py-4 whitespace-nowrap text-sm font-medium'>
-                                                    <button
-                                                        onClick={() =>
-                                                            navigate(
-                                                                `/reports/payments/${payment._id}`,
-                                                            )
-                                                        }
-                                                        className='text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300'
-                                                    >
-                                                        <Eye className='w-4 h-4' />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Date */}
+                                            <div className='flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-4'>
+                                                <Calendar className='w-4 h-4' />
+                                                {payment.createdAt
+                                                    ? new Date(
+                                                          payment.createdAt,
+                                                      ).toLocaleDateString()
+                                                    : 'N/A'}
+                                            </div>
+
+                                            {/* View Button */}
+                                            <button
+                                                onClick={() =>
+                                                    navigate(
+                                                        `/reports/payments/${payment._id}`,
+                                                    )
+                                                }
+                                                className='w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors'
+                                            >
+                                                <Eye className='w-4 h-4' />
+                                                View Details
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Table View */}
+                            {viewMode === 'table' && (
+                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6'>
+                                    <div className='overflow-x-auto'>
+                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
+                                            <thead className='bg-gray-50 dark:bg-gray-700'>
+                                                <tr>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        User
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Provider
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Amount
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Status
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Date
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Action
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
+                                                {currentPayments.map(
+                                                    (payment) => (
+                                                        <tr
+                                                            key={payment._id}
+                                                            className='hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                        >
+                                                            <td className='px-6 py-4 whitespace-nowrap'>
+                                                                <div>
+                                                                    <div className='text-sm font-medium text-gray-900 dark:text-white'>
+                                                                        {payment
+                                                                            .user
+                                                                            ?.username ||
+                                                                            'N/A'}
+                                                                    </div>
+                                                                    <div className='text-sm text-gray-500 dark:text-gray-400'>
+                                                                        {payment
+                                                                            .user
+                                                                            ?.email ||
+                                                                            'N/A'}
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className='px-6 py-4 whitespace-nowrap'>
+                                                                <span
+                                                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${getProviderColor(payment.provider)}`}
+                                                                >
+                                                                    {payment.provider ||
+                                                                        'N/A'}
+                                                                </span>
+                                                            </td>
+                                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                                {payment.currency ||
+                                                                    'INR'}{' '}
+                                                                {payment.amount ||
+                                                                    0}
+                                                            </td>
+                                                            <td className='px-6 py-4 whitespace-nowrap'>
+                                                                <span
+                                                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(payment.status)}`}
+                                                                >
+                                                                    {
+                                                                        payment.status
+                                                                    }
+                                                                </span>
+                                                            </td>
+                                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                                {payment.createdAt
+                                                                    ? new Date(
+                                                                          payment.createdAt,
+                                                                      ).toLocaleDateString()
+                                                                    : 'N/A'}
+                                                            </td>
+                                                            <td className='px-6 py-4 whitespace-nowrap text-sm font-medium'>
+                                                                <button
+                                                                    onClick={() =>
+                                                                        navigate(
+                                                                            `/reports/payments/${payment._id}`,
+                                                                        )
+                                                                    }
+                                                                    className='text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300'
+                                                                >
+                                                                    <Eye className='w-4 h-4' />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ),
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Pagination */}
                             {totalItems > 0 && (
-                                <div className='bg-white dark:bg-gray-800 px-4 py-3 border-t border-gray-200 dark:border-gray-700 sm:px-6'>
+                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 px-4 py-3'>
                                     <Pagination
-                                        currentPage={currentPage}
+                                        currentPage={page}
                                         pageSize={pageSize}
                                         totalItems={totalItems}
                                         onPageChange={handlePageChange}
                                         onPageSizeChange={(size) => {
                                             setPageSize(size);
-                                            setCurrentPage(1);
+                                            setPage(1);
                                         }}
                                     />
                                 </div>
                             )}
-                        </div>
+                        </>
                     ) : (
                         <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-center p-12'>
                             <CreditCard className='w-16 h-16 mx-auto text-gray-400 mb-4' />

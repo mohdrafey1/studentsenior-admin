@@ -1,11 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
-import { FileText, ArrowLeft, Loader, Search } from 'lucide-react';
+import {
+    FileText,
+    ArrowLeft,
+    Loader,
+    Search,
+    Grid3x3,
+    List,
+    SortAsc,
+    SortDesc,
+    User,
+    Calendar,
+} from 'lucide-react';
 import Pagination from '../components/Pagination';
 
 const statusClass = (status) => {
@@ -47,8 +58,12 @@ export default function OrderPage() {
     const [orderType, setOrderType] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('');
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
-    const [total, setTotal] = useState(0);
+    const [pageSize, setPageSize] = useState(12);
+    const [sortBy, setSortBy] = useState('createdAt'); // createdAt | amount
+    const [sortOrder, setSortOrder] = useState('desc'); // asc | desc
+    const [viewMode, setViewMode] = useState(() =>
+        window.innerWidth >= 1024 ? 'table' : 'grid',
+    );
     const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
 
@@ -56,19 +71,9 @@ export default function OrderPage() {
         try {
             setLoading(true);
             setError(null);
-            const params = new URLSearchParams({
-                page: String(page),
-                limit: String(pageSize),
-            });
-            if (search) params.set('search', search);
-            if (status) params.set('status', status);
-            if (orderType) params.set('orderType', orderType);
-            if (paymentMethod) params.set('paymentMethod', paymentMethod);
 
-            const res = await api.get(`/order?${params.toString()}`);
-            const data = res.data?.data;
-            setItems(data?.orders || []);
-            setTotal(data?.pagination?.totalItems || 0);
+            const res = await api.get(`/order`);
+            setItems(res.data?.data);
         } catch (e) {
             console.error(e);
             const msg =
@@ -84,22 +89,76 @@ export default function OrderPage() {
 
     useEffect(() => {
         fetchOrders();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, pageSize]);
+    }, []);
 
-    const applyFilters = () => {
-        setPage(1);
-        fetchOrders();
-    };
+    // Responsive view mode - auto switch on resize
+    useEffect(() => {
+        const handleResize = () => {
+            setViewMode(window.innerWidth >= 1024 ? 'table' : 'grid');
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+    const uniqueOrderTypes = useMemo(
+        () =>
+            Array.from(new Set(items.map((o) => o.orderType))).filter(Boolean),
+        [items],
+    );
+    const uniquePaymentMethods = useMemo(
+        () =>
+            Array.from(new Set(items.map((o) => o.paymentMethod))).filter(
+                Boolean,
+            ),
+        [items],
+    );
+    const uniqueStatuses = useMemo(
+        () =>
+            Array.from(
+                new Set(items.map((o) => (o.status || '').toLowerCase())),
+            ).filter(Boolean),
+        [items],
+    );
 
-    const resetFilters = () => {
-        setSearch('');
-        setStatus('');
-        setOrderType('');
-        setPaymentMethod('');
-        setPage(1);
-        fetchOrders();
-    };
+    const filteredAndSorted = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        let list = items.filter((o) => {
+            const email = (o.user?.email || '').toLowerCase();
+            const name = (o.user?.username || o.user?.name || '').toLowerCase();
+            const id = (o._id || '').toLowerCase();
+            const matchesSearch =
+                !q || email.includes(q) || name.includes(q) || id.includes(q);
+            const matchesStatus =
+                !status || (o.status || '').toLowerCase() === status;
+            const matchesOrderType = !orderType || o.orderType === orderType;
+            const matchesMethod =
+                !paymentMethod || o.paymentMethod === paymentMethod;
+            return (
+                matchesSearch &&
+                matchesStatus &&
+                matchesOrderType &&
+                matchesMethod
+            );
+        });
+
+        list.sort((a, b) => {
+            let aVal = 0;
+            let bVal = 0;
+            if (sortBy === 'createdAt') {
+                aVal = new Date(a.createdAt || 0).getTime();
+                bVal = new Date(b.createdAt || 0).getTime();
+            } else if (sortBy === 'amount') {
+                aVal = Number(a.amount || 0);
+                bVal = Number(b.amount || 0);
+            }
+            return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+        });
+
+        return list;
+    }, [items, search, status, orderType, paymentMethod, sortBy, sortOrder]);
+
+    const totalItems = filteredAndSorted.length;
+    const start = (page - 1) * pageSize;
+    const current = filteredAndSorted.slice(start, start + pageSize);
 
     // total pages handled inside Pagination component
 
@@ -153,69 +212,122 @@ export default function OrderPage() {
                         </div>
                     </div>
 
-                    {/* Filters */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8'>
-                        <div className='grid grid-cols-1 md:grid-cols-5 gap-4'>
-                            <div className='relative md:col-span-2'>
-                                <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
-                                <input
-                                    type='text'
-                                    placeholder='Search by user email/name'
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className='w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                />
+                    {/* Search, Filters, View & Sort */}
+                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6'>
+                        {/* Search */}
+                        <div className='relative mb-4'>
+                            <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5' />
+                            <input
+                                type='text'
+                                placeholder='Search by user email/name or order id'
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className='w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                            />
+                        </div>
+
+                        <div className='flex flex-wrap items-center gap-3'>
+                            {/* View toggle */}
+                            <div className='flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1'>
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
+                                    title='Grid view'
+                                >
+                                    <Grid3x3 className='w-4 h-4' />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('table')}
+                                    className={`p-2 rounded ${viewMode === 'table' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
+                                    title='Table view'
+                                >
+                                    <List className='w-4 h-4' />
+                                </button>
                             </div>
-                            <select
-                                value={status}
-                                onChange={(e) => setStatus(e.target.value)}
-                                className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                            >
-                                <option value=''>All Status</option>
-                                <option value='pending'>Pending</option>
-                                <option value='processing'>Processing</option>
-                                <option value='completed'>Completed</option>
-                                <option value='failed'>Failed</option>
-                                <option value='cancelled'>Cancelled</option>
-                            </select>
+
+                            {/* Filters */}
                             <select
                                 value={orderType}
                                 onChange={(e) => setOrderType(e.target.value)}
-                                className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
                             >
                                 <option value=''>All Types</option>
-                                <option value='pyq_purchase'>
-                                    PYQ Purchase
-                                </option>
-                                <option value='note_purchase'>
-                                    Note Purchase
-                                </option>
-                                <option value='add_points'>Add Points</option>
+                                {uniqueOrderTypes.map((t) => (
+                                    <option
+                                        key={t}
+                                        value={t}
+                                        className='capitalize'
+                                    >
+                                        {t?.replace('_', ' ')}
+                                    </option>
+                                ))}
                             </select>
+
+                            <select
+                                value={status}
+                                onChange={(e) => setStatus(e.target.value)}
+                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
+                            >
+                                <option value=''>All Status</option>
+                                {uniqueStatuses.map((s) => (
+                                    <option
+                                        key={s}
+                                        value={s}
+                                        className='capitalize'
+                                    >
+                                        {s}
+                                    </option>
+                                ))}
+                            </select>
+
                             <select
                                 value={paymentMethod}
                                 onChange={(e) =>
                                     setPaymentMethod(e.target.value)
                                 }
-                                className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
                             >
                                 <option value=''>All Methods</option>
-                                <option value='online'>Online</option>
-                                <option value='points'>Points</option>
+                                {uniquePaymentMethods.map((m) => (
+                                    <option
+                                        key={m}
+                                        value={m}
+                                        className='capitalize'
+                                    >
+                                        {m}
+                                    </option>
+                                ))}
                             </select>
-                        </div>
-                        <div className='mt-4 flex gap-2'>
-                            <button
-                                onClick={applyFilters}
-                                className='px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700'
+
+                            {/* Sort By */}
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
                             >
-                                Apply
-                            </button>
+                                <option value='createdAt'>Sort by Date</option>
+                                <option value='amount'>Sort by Amount</option>
+                            </select>
+
+                            {/* Sort Order */}
                             <button
-                                onClick={resetFilters}
-                                className='px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                                onClick={() =>
+                                    setSortOrder(
+                                        sortOrder === 'asc' ? 'desc' : 'asc',
+                                    )
+                                }
+                                className='p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
+                                title={
+                                    sortOrder === 'asc'
+                                        ? 'Ascending'
+                                        : 'Descending'
+                                }
                             >
-                                Reset
+                                {sortOrder === 'asc' ? (
+                                    <SortAsc className='w-4 h-4' />
+                                ) : (
+                                    <SortDesc className='w-4 h-4' />
+                                )}
                             </button>
                         </div>
                     </div>
@@ -227,61 +339,28 @@ export default function OrderPage() {
                         </div>
                     )}
 
-                    {/* Table */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                        <div className='overflow-x-auto'>
-                            <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                <thead className='bg-gray-50 dark:bg-gray-700'>
-                                    <tr>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                            Order
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                            User
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                            Type
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                            Method
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                            Amount
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                            Status
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                            Created
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                    {items.map((o) => {
+                    {/* Grid/Table Views */}
+                    {current.length > 0 ? (
+                        <>
+                            {/* Grid View */}
+                            {viewMode === 'grid' && (
+                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6'>
+                                    {current.map((o) => {
                                         const amountLabel =
                                             o.paymentMethod === 'online'
                                                 ? `₹ ${o.amount}`
                                                 : `${o.amount} pts`;
                                         return (
-                                            <tr
+                                            <div
                                                 key={o._id}
-                                                className='hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow'
                                             >
-                                                <td className='px-6 py-4 whitespace-nowrap'>
-                                                    <div className='text-xs font-mono text-gray-700 dark:text-gray-300 break-all'>
-                                                        {o._id}
-                                                    </div>
-                                                </td>
-                                                <td className='px-6 py-4 whitespace-nowrap'>
-                                                    <div className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                        {o.user?.username ||
-                                                            'N/A'}
-                                                    </div>
-                                                    <div className='text-sm text-gray-500 dark:text-gray-400'>
-                                                        {o.user?.email || 'N/A'}
-                                                    </div>
-                                                </td>
-                                                <td className='px-6 py-4 whitespace-nowrap'>
+                                                <div className='flex justify-between items-start mb-3'>
+                                                    <span
+                                                        className={`px-2 py-1 text-xs font-semibold rounded-full ${statusClass(o.status)}`}
+                                                    >
+                                                        {o.status}
+                                                    </span>
                                                     <span
                                                         className={`px-2 py-1 text-xs font-semibold rounded-full ${typeClass(o.orderType)}`}
                                                     >
@@ -290,46 +369,171 @@ export default function OrderPage() {
                                                             ' ',
                                                         )}
                                                     </span>
-                                                </td>
-                                                <td className='px-6 py-4 whitespace-nowrap capitalize text-sm text-gray-900 dark:text-white'>
-                                                    {o.paymentMethod}
-                                                </td>
-                                                <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
-                                                    {amountLabel}
-                                                </td>
-                                                <td className='px-6 py-4 whitespace-nowrap'>
-                                                    <span
-                                                        className={`px-2 py-1 text-xs font-semibold rounded-full ${statusClass(o.status)}`}
-                                                    >
-                                                        {o.status}
-                                                    </span>
-                                                </td>
-                                                <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                </div>
+                                                <div className='flex items-start gap-2 mb-3'>
+                                                    <User className='w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0' />
+                                                    <div className='min-w-0'>
+                                                        <div className='text-sm font-medium text-gray-900 dark:text-white truncate'>
+                                                            {o.user?.username ||
+                                                                'N/A'}
+                                                        </div>
+                                                        <div className='text-xs text-gray-500 dark:text-gray-400 truncate'>
+                                                            {o.user?.email ||
+                                                                'N/A'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className='mb-3'>
+                                                    <div className='text-2xl font-bold text-gray-900 dark:text-white'>
+                                                        {amountLabel}
+                                                    </div>
+                                                    <div className='text-xs text-gray-500 dark:text-gray-400 capitalize'>
+                                                        Method:{' '}
+                                                        {o.paymentMethod}
+                                                    </div>
+                                                </div>
+                                                <div className='flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2'>
+                                                    <Calendar className='w-4 h-4' />
                                                     {o.createdAt
                                                         ? new Date(
                                                               o.createdAt,
                                                           ).toLocaleString()
                                                         : 'N/A'}
-                                                </td>
-                                            </tr>
+                                                </div>
+                                                <div className='text-xs text-gray-500 dark:text-gray-400 break-all'>
+                                                    Order: {o._id}
+                                                </div>
+                                            </div>
                                         );
                                     })}
-                                </tbody>
-                            </table>
+                                </div>
+                            )}
+
+                            {/* Table View */}
+                            {viewMode === 'table' && (
+                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                                    <div className='overflow-x-auto'>
+                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
+                                            <thead className='bg-gray-50 dark:bg-gray-700'>
+                                                <tr>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Order
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        User
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Type
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Method
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Amount
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Status
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Created
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
+                                                {current.map((o) => {
+                                                    const amountLabel =
+                                                        o.paymentMethod ===
+                                                        'online'
+                                                            ? `₹ ${o.amount}`
+                                                            : `${o.amount} pts`;
+                                                    return (
+                                                        <tr
+                                                            key={o._id}
+                                                            className='hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                        >
+                                                            <td className='px-6 py-4 whitespace-nowrap'>
+                                                                <div className='text-xs font-mono text-gray-700 dark:text-gray-300 break-all'>
+                                                                    {o._id}
+                                                                </div>
+                                                            </td>
+                                                            <td className='px-6 py-4 whitespace-nowrap'>
+                                                                <div className='text-sm font-medium text-gray-900 dark:text-white'>
+                                                                    {o.user
+                                                                        ?.username ||
+                                                                        'N/A'}
+                                                                </div>
+                                                                <div className='text-sm text-gray-500 dark:text-gray-400'>
+                                                                    {o.user
+                                                                        ?.email ||
+                                                                        'N/A'}
+                                                                </div>
+                                                            </td>
+                                                            <td className='px-6 py-4 whitespace-nowrap'>
+                                                                <span
+                                                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${typeClass(o.orderType)}`}
+                                                                >
+                                                                    {o.orderType?.replace(
+                                                                        '_',
+                                                                        ' ',
+                                                                    )}
+                                                                </span>
+                                                            </td>
+                                                            <td className='px-6 py-4 whitespace-nowrap capitalize text-sm text-gray-900 dark:text-white'>
+                                                                {
+                                                                    o.paymentMethod
+                                                                }
+                                                            </td>
+                                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                                {amountLabel}
+                                                            </td>
+                                                            <td className='px-6 py-4 whitespace-nowrap'>
+                                                                <span
+                                                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${statusClass(o.status)}`}
+                                                                >
+                                                                    {o.status}
+                                                                </span>
+                                                            </td>
+                                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                                {o.createdAt
+                                                                    ? new Date(
+                                                                          o.createdAt,
+                                                                      ).toLocaleString()
+                                                                    : 'N/A'}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Pagination */}
+                            <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 px-4 py-3'>
+                                <Pagination
+                                    currentPage={page}
+                                    pageSize={pageSize}
+                                    totalItems={totalItems}
+                                    onPageChange={setPage}
+                                    onPageSizeChange={(s) => {
+                                        setPageSize(s);
+                                        setPage(1);
+                                    }}
+                                />
+                            </div>
+                        </>
+                    ) : (
+                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-center p-12'>
+                            <FileText className='w-16 h-16 mx-auto text-gray-400 mb-4' />
+                            <h3 className='text-xl font-medium text-gray-900 dark:text-white mb-2'>
+                                No Orders Found
+                            </h3>
+                            <p className='text-gray-600 dark:text-gray-400'>
+                                No orders match your current filters.
+                            </p>
                         </div>
-                        <div className='px-4 py-3 border-t border-gray-200 dark:border-gray-700'>
-                            <Pagination
-                                currentPage={page}
-                                pageSize={pageSize}
-                                totalItems={total}
-                                onPageChange={setPage}
-                                onPageSizeChange={(s) => {
-                                    setPageSize(s);
-                                    setPage(1);
-                                }}
-                            />
-                        </div>
-                    </div>
+                    )}
                 </div>
             </main>
         </div>

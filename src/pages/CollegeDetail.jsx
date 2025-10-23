@@ -24,7 +24,7 @@ import toast from 'react-hot-toast';
 const StatCard = ({
     title,
     value,
-    icon: Icon,
+    icon: IconComp,
     bgColor,
     textColor,
     iconColor,
@@ -34,17 +34,19 @@ const StatCard = ({
 }) => {
     return (
         <button onClick={onClick} className='block group w-full text-left'>
-            <div className='bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1'>
+            <div className='bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg sm:rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1'>
                 <div
-                    className={`p-6 ${bgColor} bg-opacity-20 dark:bg-opacity-20`}
+                    className={`p-3 sm:p-6 ${bgColor} bg-opacity-20 dark:bg-opacity-20`}
                 >
-                    <div className='flex justify-between items-start mb-4'>
-                        <div>
-                            <h3 className={`text-lg font-medium ${textColor}`}>
+                    <div className='flex justify-between items-start mb-2 sm:mb-4'>
+                        <div className='flex-1 min-w-0'>
+                            <h3
+                                className={`text-xs sm:text-lg font-medium ${textColor} truncate`}
+                            >
                                 {title}
                             </h3>
-                            <div className='mt-2 flex items-center gap-2'>
-                                <p className='text-3xl font-semibold text-gray-900 dark:text-white'>
+                            <div className='mt-1 sm:mt-2 flex items-center gap-1 sm:gap-2'>
+                                <p className='text-lg sm:text-3xl font-semibold text-gray-900 dark:text-white'>
                                     {value.toLocaleString()}
                                 </p>
                                 {delta !== undefined && (
@@ -56,18 +58,21 @@ const StatCard = ({
                             </div>
                         </div>
                         <div
-                            className={`p-3 rounded-lg ${bgColor} bg-opacity-60 dark:bg-opacity-40 ${iconColor}`}
+                            className={`p-2 sm:p-3 rounded-lg ${bgColor} bg-opacity-60 dark:bg-opacity-40 ${iconColor} flex-shrink-0`}
                         >
-                            <Icon className='w-6 h-6' />
+                            {IconComp &&
+                                React.createElement(IconComp, {
+                                    className: 'w-4 h-4 sm:w-6 sm:h-6',
+                                })}
                         </div>
                     </div>
                 </div>
 
-                <div className='px-6 py-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700'>
-                    <div className='text-sm text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center'>
-                        <span>View details</span>
+                <div className='px-3 py-2 sm:px-6 sm:py-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700'>
+                    <div className='text-xs sm:text-sm text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center'>
+                        <span className='truncate'>View details</span>
                         <svg
-                            className='ml-1 w-4 h-4 transition-transform group-hover:translate-x-1'
+                            className='ml-1 w-3 h-3 sm:w-4 sm:h-4 transition-transform group-hover:translate-x-1 flex-shrink-0'
                             fill='none'
                             stroke='currentColor'
                             viewBox='0 0 24 24'
@@ -93,7 +98,7 @@ const CollegeDetail = () => {
     const [collegeData, setCollegeData] = useState(null);
     const [loading, setLoading] = useState(true);
     const { mainContentMargin } = useSidebarLayout();
-    const { deltaStats, lastViewedAt, setStats } =
+    const { deltaStats, lastViewedAt, setStats, acknowledgeStat } =
         useStatsWithDelta(collegeslug);
 
     // Fetch college data and stats
@@ -300,21 +305,21 @@ const CollegeDetail = () => {
             <Sidebar />
 
             <main
-                className={`max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
+                className={`max-w-7xl mx-auto px-2 py-3 sm:px-4 sm:py-4 lg:px-6 ${mainContentMargin} transition-all duration-300`}
             >
                 {/* Back Button and Page Header */}
-                <div className='mb-8'>
+                <div className='mb-4 sm:mb-8'>
                     <button
                         onClick={() => navigate('/dashboard')}
-                        className='flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-6 transition-colors'
+                        className='flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-4 sm:mb-6 transition-colors text-sm sm:text-base'
                     >
-                        <ArrowLeft className='h-5 w-5 mr-2' />
+                        <ArrowLeft className='h-4 w-4 sm:h-5 sm:w-5 mr-2' />
                         Back to Dashboard
                     </button>
                 </div>
 
                 {/* Statistics Cards Grid */}
-                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8'>
+                <div className='grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 mb-4 sm:mb-8'>
                     {statsCards.map((stat) => (
                         <StatCard
                             key={stat.id}
@@ -324,7 +329,12 @@ const CollegeDetail = () => {
                             bgColor={stat.bgColor}
                             textColor={stat.textColor}
                             iconColor={stat.iconColor}
-                            onClick={() => navigate(stat.href)}
+                            onClick={() => {
+                                if (stat.statKey) {
+                                    acknowledgeStat(stat.statKey);
+                                }
+                                navigate(stat.href);
+                            }}
                             delta={
                                 stat.statKey
                                     ? deltaStats[stat.statKey]
