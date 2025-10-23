@@ -41,6 +41,7 @@ import OpportunityDetail from './pages/OpportunityDetail';
 import LostFoundList from './pages/LostFoundList';
 import VideoList from './pages/VideoList';
 import VideoDetail from './pages/VideoDetail';
+import Analytics from './pages/Analytics';
 
 function App() {
     return (
@@ -87,6 +88,15 @@ function App() {
                             element={
                                 <ProtectedRoute>
                                     <Dashboard />
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        <Route
+                            path='/analytics'
+                            element={
+                                <ProtectedRoute>
+                                    <Analytics />
                                 </ProtectedRoute>
                             }
                         />
