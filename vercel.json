@@ -1,8 +1,37 @@
 {
-    "rewrites": [
+    "headers": [
+        {
+            "source": "/assets/(.*)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=31536000, immutable"
+                }
+            ]
+        },
+        {
+            "source": "/(.*\\.(?:js|mjs|css|svg|png|jpg|jpeg|gif|webp|ico|ttf|otf|woff|woff2))",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=31536000, immutable"
+                }
+            ]
+        },
         {
             "source": "/(.*)",
-            "destination": "/"
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "no-store, must-revalidate"
+                }
+            ]
+        }
+    ],
+    "rewrites": [
+        {
+            "source": "/((?!.*\\..*).*)",
+            "destination": "/index.html"
         }
     ]
 }
