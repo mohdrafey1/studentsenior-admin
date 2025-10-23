@@ -11,6 +11,7 @@ import {
     Home,
     Sun,
     Moon,
+    BarChart2,
 } from 'lucide-react';
 
 const Header = () => {
@@ -34,7 +35,8 @@ const Header = () => {
 
     const navigationItems = [
         { path: '/dashboard', label: 'Dashboard', icon: Home },
-        { path: '/reports', label: 'Reports', icon: BarChart3 },
+        { path: '/reports', label: 'Reports', icon: BarChart2 },
+        { path: '/analytics', label: 'Analytics', icon: BarChart3 },
     ];
 
     const getRoleColor = (role) => {
@@ -87,7 +89,7 @@ const Header = () => {
                     </div>
 
                     {/* Desktop Navigation */}
-                    <nav className='hidden md:flex items-center space-x-8'>
+                    <nav className='hidden md:flex items-center space-x-4'>
                         {navigationItems.map((item) => {
                             const Icon = item.icon;
                             return (
@@ -127,17 +129,17 @@ const Header = () => {
                                 <p className='text-sm font-medium text-gray-900 dark:text-white'>
                                     {user?.name || 'User'}
                                 </p>
-                                <p className='text-xs text-gray-500 dark:text-gray-400'>
+                                {/* <p className='text-xs text-gray-500 dark:text-gray-400'>
                                     {user?.email}
-                                </p>
+                                </p> */}
+                                <span
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(
+                                        user?.role,
+                                    )}`}
+                                >
+                                    {user?.role}
+                                </span>
                             </div>
-                            <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(
-                                    user?.role,
-                                )}`}
-                            >
-                                {user?.role}
-                            </span>
                         </div>
 
                         {/* Logout Button */}
