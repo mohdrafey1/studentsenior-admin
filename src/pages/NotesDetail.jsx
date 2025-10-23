@@ -77,7 +77,7 @@ const NotesDetail = () => {
         try {
             setPdfLoading(true);
             const response = await api.get(
-                `http://localhost:8081/api/v2/aws/signed-url?fileUrl=${encodeURIComponent(
+                `https://backend.studentsenior.com/api/v2/aws/signed-url?fileUrl=${encodeURIComponent(
                     fileUrl,
                 )}`,
             );
