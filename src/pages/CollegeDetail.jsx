@@ -24,7 +24,7 @@ import toast from 'react-hot-toast';
 const StatCard = ({
     title,
     value,
-    icon: Icon,
+    icon: IconComp,
     bgColor,
     textColor,
     iconColor,
@@ -58,7 +58,10 @@ const StatCard = ({
                         <div
                             className={`p-3 rounded-lg ${bgColor} bg-opacity-60 dark:bg-opacity-40 ${iconColor}`}
                         >
-                            <Icon className='w-6 h-6' />
+                            {IconComp &&
+                                React.createElement(IconComp, {
+                                    className: 'w-6 h-6',
+                                })}
                         </div>
                     </div>
                 </div>
@@ -93,7 +96,7 @@ const CollegeDetail = () => {
     const [collegeData, setCollegeData] = useState(null);
     const [loading, setLoading] = useState(true);
     const { mainContentMargin } = useSidebarLayout();
-    const { deltaStats, lastViewedAt, setStats } =
+    const { deltaStats, lastViewedAt, setStats, acknowledgeStat } =
         useStatsWithDelta(collegeslug);
 
     // Fetch college data and stats
@@ -324,7 +327,12 @@ const CollegeDetail = () => {
                             bgColor={stat.bgColor}
                             textColor={stat.textColor}
                             iconColor={stat.iconColor}
-                            onClick={() => navigate(stat.href)}
+                            onClick={() => {
+                                if (stat.statKey) {
+                                    acknowledgeStat(stat.statKey);
+                                }
+                                navigate(stat.href);
+                            }}
                             delta={
                                 stat.statKey
                                     ? deltaStats[stat.statKey]

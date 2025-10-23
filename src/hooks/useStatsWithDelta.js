@@ -1,12 +1,26 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
 
 export const useStatsWithDelta = (collegeSlug = null) => {
     const [currentStats, setCurrentStats] = useState(null);
     const [previousStats, setPreviousStats] = useState(null);
     const [lastViewedAt, setLastViewedAt] = useState(null);
-    const [deltaStats, setDeltaStats] = useState({});
+    // Keep raw delta for debugging or advanced use
+    const [rawDeltaStats, setRawDeltaStats] = useState({});
     const [loading, setLoading] = useState(true);
+    const storageKey = useMemo(
+        () => `admin-delta-ack:${collegeSlug || 'global'}`,
+        [collegeSlug],
+    );
+    const [ackMap, setAckMap] = useState(() => {
+        try {
+            const raw = localStorage.getItem('admin-delta-ack:global');
+            const scoped = localStorage.getItem(storageKey);
+            return scoped ? JSON.parse(scoped) : raw ? JSON.parse(raw) : {};
+        } catch {
+            return {};
+        }
+    });
 
     // Calculate delta between current and previous stats
     const calculateDelta = useCallback((current, previous) => {
@@ -60,25 +74,16 @@ export const useStatsWithDelta = (collegeSlug = null) => {
         }
     }, [collegeSlug]);
 
-    // Update stats snapshot when user leaves or page unmounts
+    // Optional: API to update a full snapshot (not auto-run anymore)
     const updateStatsSnapshot = useCallback(
         async (stats) => {
             try {
-                console.log('[Delta] Updating snapshot with stats:', stats);
-                console.log('[Delta] collegeSlug:', collegeSlug || null);
-
                 await api.post('/admin-view-stats/update-snapshot', {
                     collegeSlug: collegeSlug || null,
                     statsSnapshot: stats,
                 });
-
-                console.log('[Delta] Snapshot updated successfully');
             } catch (error) {
                 console.error('Error updating stats snapshot:', error);
-                console.error(
-                    '[Delta] Update error details:',
-                    error.response?.data,
-                );
             }
         },
         [collegeSlug],
@@ -89,7 +94,7 @@ export const useStatsWithDelta = (collegeSlug = null) => {
         fetchLastViewedStats();
     }, [fetchLastViewedStats]);
 
-    // Calculate delta when both current and previous stats are available
+    // Calculate raw delta when both current and previous stats are available
     useEffect(() => {
         if (currentStats && previousStats) {
             console.log('[Delta] Calculating delta...');
@@ -98,7 +103,7 @@ export const useStatsWithDelta = (collegeSlug = null) => {
 
             const delta = calculateDelta(currentStats, previousStats);
             console.log('[Delta] Calculated delta:', delta);
-            setDeltaStats(delta);
+            setRawDeltaStats(delta);
         } else {
             console.log(
                 '[Delta] Cannot calculate - currentStats:',
@@ -109,15 +114,14 @@ export const useStatsWithDelta = (collegeSlug = null) => {
         }
     }, [currentStats, previousStats, calculateDelta]);
 
-    // Update snapshot when component unmounts or when current stats change
+    // Persist ack map when it changes
     useEffect(() => {
-        if (!currentStats) return;
-
-        // Update snapshot on unmount
-        return () => {
-            updateStatsSnapshot(currentStats);
-        };
-    }, [currentStats, updateStatsSnapshot]);
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(ackMap));
+        } catch (e) {
+            console.warn('Failed to persist ackMap', e);
+        }
+    }, [ackMap, storageKey]);
 
     // Function to set current stats from parent component
     const setStats = useCallback((stats) => {
@@ -125,13 +129,54 @@ export const useStatsWithDelta = (collegeSlug = null) => {
         setLoading(false);
     }, []);
 
+    // Compute visible delta based on per-key acknowledgements
+    const visibleDelta = useMemo(() => {
+        if (!currentStats || !previousStats) return {};
+        const result = {};
+        for (const key of Object.keys(currentStats)) {
+            const curr = currentStats[key];
+            const prev =
+                typeof previousStats[key] === 'number'
+                    ? previousStats[key]
+                    : undefined;
+            if (typeof curr !== 'number' || typeof prev !== 'number') continue;
+            const ackBase =
+                typeof ackMap[key] === 'number' ? ackMap[key] : prev;
+            const diff = curr - ackBase;
+            if (diff !== 0) result[key] = diff;
+        }
+        return result;
+    }, [currentStats, previousStats, ackMap]);
+
+    // Acknowledge a single stat: set its baseline to the current value
+    const acknowledgeStat = useCallback(
+        (key) => {
+            if (!currentStats || typeof currentStats[key] !== 'number') return;
+            setAckMap((m) => ({ ...m, [key]: currentStats[key] }));
+        },
+        [currentStats],
+    );
+
+    // Acknowledge all stats (manual use only)
+    const acknowledgeAll = useCallback(() => {
+        if (!currentStats) return;
+        const next = {};
+        for (const [k, v] of Object.entries(currentStats)) {
+            if (typeof v === 'number') next[k] = v;
+        }
+        setAckMap(next);
+    }, [currentStats]);
+
     return {
         currentStats,
         previousStats,
-        deltaStats,
+        deltaStats: visibleDelta,
+        rawDeltaStats,
         lastViewedAt,
         loading,
         setStats,
         updateStatsSnapshot,
+        acknowledgeStat,
+        acknowledgeAll,
     };
 };

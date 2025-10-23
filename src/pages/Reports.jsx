@@ -27,7 +27,8 @@ const Reports = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const { mainContentMargin } = useSidebarLayout();
-    const { deltaStats, lastViewedAt, setStats } = useStatsWithDelta();
+    const { deltaStats, lastViewedAt, setStats, acknowledgeStat } =
+        useStatsWithDelta();
 
     const navigate = useNavigate();
 
@@ -258,9 +259,14 @@ const Reports = () => {
                                             {category.stats.map((stat) => (
                                                 <button
                                                     key={stat.id}
-                                                    onClick={() =>
-                                                        navigate(stat.href)
-                                                    }
+                                                    onClick={() => {
+                                                        if (stat.statKey) {
+                                                            acknowledgeStat(
+                                                                stat.statKey,
+                                                            );
+                                                        }
+                                                        navigate(stat.href);
+                                                    }}
                                                     className='block group w-full text-left'
                                                 >
                                                     <div className='bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1'>
