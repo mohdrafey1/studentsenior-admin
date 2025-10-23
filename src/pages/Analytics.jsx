@@ -28,12 +28,13 @@ function Analytics() {
     const [refreshing, setRefreshing] = useState(false);
     const [analyticsData, setAnalyticsData] = useState(null);
     const [collegeData, setCollegeData] = useState(null);
-    const [timeRange, setTimeRange] = useState('30'); // 7, 30, 90 days
+    const [timeRange, setTimeRange] = useState('30'); // 1, 7, 14, 30, 60, 90, 180, 365, all days
 
     const fetchAnalytics = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await api.get(`/analytics?days=${timeRange}`);
+            const daysParam = timeRange === 'all' ? '' : `days=${timeRange}`;
+            const response = await api.get(`/analytics?${daysParam}`);
             if (response.data.success) {
                 setAnalyticsData(response.data.data);
                 setCollegeData(response.data.data.totals);
@@ -295,9 +296,15 @@ function Analytics() {
                                     }
                                     className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                                 >
+                                    <option value='1'>Last 24 Hours</option>
                                     <option value='7'>Last 7 Days</option>
+                                    <option value='14'>Last 14 Days</option>
                                     <option value='30'>Last 30 Days</option>
+                                    <option value='60'>Last 60 Days</option>
                                     <option value='90'>Last 90 Days</option>
+                                    <option value='180'>Last 6 Months</option>
+                                    <option value='365'>Last Year</option>
+                                    <option value='all'>All Time</option>
                                 </select>
 
                                 {/* Refresh Button */}
