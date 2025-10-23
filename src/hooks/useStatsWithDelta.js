@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 
-export const useStatsWithDelta = (collegeId = null) => {
+export const useStatsWithDelta = (collegeSlug = null) => {
     const [currentStats, setCurrentStats] = useState(null);
     const [previousStats, setPreviousStats] = useState(null);
     const [lastViewedAt, setLastViewedAt] = useState(null);
@@ -30,7 +30,7 @@ export const useStatsWithDelta = (collegeId = null) => {
     // Fetch last viewed stats
     const fetchLastViewedStats = useCallback(async () => {
         try {
-            const params = collegeId ? { collegeId } : {};
+            const params = collegeSlug ? { collegeSlug } : {};
             console.log(
                 '[Delta] Fetching last viewed stats with params:',
                 params,
@@ -58,17 +58,17 @@ export const useStatsWithDelta = (collegeId = null) => {
             console.error('Error fetching last viewed stats:', error);
             console.error('[Delta] Error details:', error.response?.data);
         }
-    }, [collegeId]);
+    }, [collegeSlug]);
 
     // Update stats snapshot when user leaves or page unmounts
     const updateStatsSnapshot = useCallback(
         async (stats) => {
             try {
                 console.log('[Delta] Updating snapshot with stats:', stats);
-                console.log('[Delta] CollegeId:', collegeId || null);
+                console.log('[Delta] collegeSlug:', collegeSlug || null);
 
                 await api.post('/admin-view-stats/update-snapshot', {
-                    collegeId: collegeId || null,
+                    collegeSlug: collegeSlug || null,
                     statsSnapshot: stats,
                 });
 
@@ -81,7 +81,7 @@ export const useStatsWithDelta = (collegeId = null) => {
                 );
             }
         },
-        [collegeId],
+        [collegeSlug],
     );
 
     // Initialize: fetch last viewed stats
