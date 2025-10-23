@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { useSidebarLayout } from '../hooks/useSidebarLayout';
@@ -14,9 +14,15 @@ import {
     Edit2,
     Trash2,
     X,
+    Grid3x3,
+    List,
+    SortAsc,
+    SortDesc,
+    Calendar,
 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import ConfirmModal from '../components/ConfirmModal';
+import { Link } from 'react-router-dom';
 
 const Courses = () => {
     const [courses, setCourses] = useState([]);
@@ -24,7 +30,12 @@ const Courses = () => {
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(12);
+    const [sortBy, setSortBy] = useState('createdAt'); // 'createdAt' | 'name'
+    const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
+    const [viewMode, setViewMode] = useState(() =>
+        window.innerWidth >= 1024 ? 'table' : 'grid',
+    );
     const [showModal, setShowModal] = useState(false);
     const [editingCourse, setEditingCourse] = useState(null);
     const [formData, setFormData] = useState({
@@ -34,6 +45,7 @@ const Courses = () => {
     const [submitting, setSubmitting] = useState(false);
     const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
+    const location = useLocation();
 
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -76,6 +88,58 @@ const Courses = () => {
 
     useEffect(() => {
         fetchCourses();
+    }, []);
+
+    // Read URL params on mount
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const q = params.get('search') || '';
+        const p = parseInt(params.get('page') || '1', 10);
+        const ps = parseInt(params.get('pageSize') || '12', 10);
+        const sb = params.get('sortBy') || 'createdAt';
+        const so = params.get('sortOrder') || 'desc';
+        const vm =
+            params.get('view') ||
+            (window.innerWidth >= 1024 ? 'table' : 'grid');
+        setSearch(q);
+        setPage(Number.isFinite(p) && p > 0 ? p : 1);
+        setPageSize(Number.isFinite(ps) && ps > 0 ? ps : 12);
+        setSortBy(sb === 'name' ? 'name' : 'createdAt');
+        setSortOrder(so === 'asc' ? 'asc' : 'desc');
+        setViewMode(vm === 'grid' ? 'grid' : 'table');
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Persist params on changes
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        params.set('search', search || '');
+        params.set('page', String(page));
+        params.set('pageSize', String(pageSize));
+        params.set('sortBy', sortBy);
+        params.set('sortOrder', sortOrder);
+        params.set('view', viewMode);
+        const newSearch = params.toString();
+        if (newSearch !== location.search.replace(/^\?/, '')) {
+            navigate({ search: newSearch }, { replace: true });
+        }
+    }, [
+        search,
+        page,
+        pageSize,
+        sortBy,
+        sortOrder,
+        viewMode,
+        location.search,
+        navigate,
+    ]);
+
+    // Responsive view auto-switch
+    useEffect(() => {
+        const handleResize = () =>
+            setViewMode(window.innerWidth >= 1024 ? 'table' : 'grid');
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
     const handleSubmit = async (e) => {
@@ -145,17 +209,36 @@ const Courses = () => {
         setFormData({ courseName: '', courseCode: '' });
     };
 
-    const filtered = courses.filter((c) => {
+    const filteredAndSorted = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return (
-            !q ||
-            c.courseName?.toLowerCase().includes(q) ||
-            c.courseCode?.toLowerCase().includes(q)
-        );
-    });
+        const list = courses
+            .filter((c) => {
+                return (
+                    !q ||
+                    c.courseName?.toLowerCase().includes(q) ||
+                    c.courseCode?.toLowerCase().includes(q)
+                );
+            })
+            .sort((a, b) => {
+                let aVal = 0;
+                let bVal = 0;
+                if (sortBy === 'createdAt') {
+                    aVal = new Date(a.createdAt || 0).getTime();
+                    bVal = new Date(b.createdAt || 0).getTime();
+                } else {
+                    aVal = (a.courseName || '').toLowerCase();
+                    bVal = (b.courseName || '').toLowerCase();
+                    const cmp = aVal.localeCompare(bVal);
+                    return sortOrder === 'asc' ? cmp : -cmp;
+                }
+                return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+            });
+        return list;
+    }, [courses, search, sortBy, sortOrder]);
 
+    const totalItems = filteredAndSorted.length;
     const start = (page - 1) * pageSize;
-    const current = filtered.slice(start, start + pageSize);
+    const current = filteredAndSorted.slice(start, start + pageSize);
 
     if (loading) {
         return (
@@ -216,17 +299,82 @@ const Courses = () => {
                         </button>
                     </div>
 
-                    {/* Search */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8'>
-                        <div className='relative max-w-md'>
-                            <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
+                    {/* Search, View & Sort */}
+                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6'>
+                        <div className='relative mb-4 max-w-xl'>
+                            <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5' />
                             <input
                                 type='text'
                                 placeholder='Search by course name or code...'
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className='w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                className='w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
                             />
+                        </div>
+                        <div className='flex flex-wrap items-center gap-3'>
+                            {/* View toggle */}
+                            <div className='flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1'>
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
+                                    title='Grid view'
+                                >
+                                    <Grid3x3 className='w-4 h-4' />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('table')}
+                                    className={`p-2 rounded ${viewMode === 'table' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
+                                    title='Table view'
+                                >
+                                    <List className='w-4 h-4' />
+                                </button>
+                            </div>
+
+                            {/* Sort By */}
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
+                            >
+                                <option value='createdAt'>Sort by Date</option>
+                                <option value='name'>Sort by Name</option>
+                            </select>
+
+                            {/* Sort Order */}
+                            <button
+                                onClick={() =>
+                                    setSortOrder(
+                                        sortOrder === 'asc' ? 'desc' : 'asc',
+                                    )
+                                }
+                                className='p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
+                                title={
+                                    sortOrder === 'asc'
+                                        ? 'Ascending'
+                                        : 'Descending'
+                                }
+                            >
+                                {sortOrder === 'asc' ? (
+                                    <SortAsc className='w-4 h-4' />
+                                ) : (
+                                    <SortDesc className='w-4 h-4' />
+                                )}
+                            </button>
+
+                            {/* Clear Filters (shows when search active) */}
+                            {search.trim().length > 0 && (
+                                <button
+                                    onClick={() => {
+                                        setSearch('');
+                                        setPage(1);
+                                    }}
+                                    className='inline-flex items-center gap-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                    title='Clear filters'
+                                >
+                                    <X className='w-4 h-4' />
+                                    Clear
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -236,89 +384,169 @@ const Courses = () => {
                         </div>
                     )}
 
-                    {/* Courses Table */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                        <div className='overflow-x-auto'>
-                            <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                <thead className='bg-gray-50 dark:bg-gray-700'>
-                                    <tr>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                            Course Name
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                            Course Code
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                            Total Branches
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                            Created
-                                        </th>
-                                        <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
+                    {/* Grid/Table Views */}
+                    {current.length > 0 ? (
+                        <>
+                            {/* Grid View */}
+                            {viewMode === 'grid' && (
+                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6'>
                                     {current.map((course) => (
-                                        <tr
+                                        <div
                                             key={course._id}
-                                            className='hover:bg-gray-50 dark:hover:bg-gray-700'
+                                            className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow'
                                         >
-                                            <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white'>
+                                            <div className='text-sm font-semibold text-gray-900 dark:text-white mb-1'>
                                                 {course.courseName}
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
-                                                {course.courseCode}
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
-                                                {course.totalBranch || 0}
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                            </div>
+                                            <div className='text-xs text-gray-500 dark:text-gray-400 mb-2'>
+                                                Code: {course.courseCode}
+                                            </div>
+                                            <div className='text-sm text-gray-700 dark:text-gray-300 mb-3'>
+                                                Total Branches:{' '}
+                                                <Link
+                                                    to={`/reports/branches?search=&page=1&pageSize=12&course=${course._id}`}
+                                                >
+                                                    {course.totalBranch || 0}
+                                                </Link>
+                                            </div>
+                                            <div className='flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-4'>
+                                                <Calendar className='w-4 h-4' />
                                                 {course.createdAt
                                                     ? new Date(
                                                           course.createdAt,
                                                       ).toLocaleDateString()
                                                     : 'N/A'}
-                                            </td>
-                                            <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
-                                                <div className='flex items-center justify-end space-x-2'>
-                                                    <button
-                                                        onClick={() =>
-                                                            handleEdit(course)
-                                                        }
-                                                        className='text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 p-1 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded'
-                                                    >
-                                                        <Edit2 className='w-4 h-4' />
-                                                    </button>
-                                                    <button
-                                                        onClick={() =>
-                                                            handleDelete(course)
-                                                        }
-                                                        className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded'
-                                                    >
-                                                        <Trash2 className='w-4 h-4' />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                            </div>
+                                            <div className='flex gap-2 justify-end'>
+                                                <button
+                                                    onClick={() =>
+                                                        handleEdit(course)
+                                                    }
+                                                    className='inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700'
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    onClick={() =>
+                                                        handleDelete(course)
+                                                    }
+                                                    className='inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700'
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </div>
                                     ))}
-                                </tbody>
-                            </table>
+                                </div>
+                            )}
+
+                            {/* Table View */}
+                            {viewMode === 'table' && (
+                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                                    <div className='overflow-x-auto'>
+                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
+                                            <thead className='bg-gray-50 dark:bg-gray-700'>
+                                                <tr>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Course Name
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Course Code
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Total Branches
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Created
+                                                    </th>
+                                                    <th className='px-6 py-3'></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
+                                                {current.map((course) => (
+                                                    <tr
+                                                        key={course._id}
+                                                        className='hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                    >
+                                                        <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white'>
+                                                            {course.courseName}
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                            {course.courseCode}
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                            <Link
+                                                                to={`/reports/branches?search=&page=1&pageSize=12&course=${course._id}`}
+                                                                className='text-blue-500'
+                                                            >
+                                                                {course.totalBranch ||
+                                                                    0}
+                                                            </Link>
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                            {course.createdAt
+                                                                ? new Date(
+                                                                      course.createdAt,
+                                                                  ).toLocaleDateString()
+                                                                : 'N/A'}
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap text-sm text-right'>
+                                                            <div className='inline-flex gap-2'>
+                                                                <button
+                                                                    onClick={() =>
+                                                                        handleEdit(
+                                                                            course,
+                                                                        )
+                                                                    }
+                                                                    className='px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700'
+                                                                >
+                                                                    Edit
+                                                                </button>
+                                                                <button
+                                                                    onClick={() =>
+                                                                        handleDelete(
+                                                                            course,
+                                                                        )
+                                                                    }
+                                                                    className='px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700'
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Pagination */}
+                            <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 px-4 py-3'>
+                                <Pagination
+                                    currentPage={page}
+                                    pageSize={pageSize}
+                                    totalItems={totalItems}
+                                    onPageChange={setPage}
+                                    onPageSizeChange={(s) => {
+                                        setPageSize(s);
+                                        setPage(1);
+                                    }}
+                                />
+                            </div>
+                        </>
+                    ) : (
+                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-center p-12'>
+                            <GraduationCap className='w-16 h-16 mx-auto text-gray-400 mb-4' />
+                            <h3 className='text-xl font-medium text-gray-900 dark:text-white mb-2'>
+                                No Courses Found
+                            </h3>
+                            <p className='text-gray-600 dark:text-gray-400'>
+                                No courses match your current search.
+                            </p>
                         </div>
-                        <div className='px-4 py-3 border-t border-gray-200 dark:border-gray-700'>
-                            <Pagination
-                                currentPage={page}
-                                pageSize={pageSize}
-                                totalItems={filtered.length}
-                                onPageChange={setPage}
-                                onPageSizeChange={(s) => {
-                                    setPageSize(s);
-                                    setPage(1);
-                                }}
-                            />
-                        </div>
-                    </div>
+                    )}
                 </div>
             </main>
 
