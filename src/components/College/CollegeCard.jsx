@@ -1,6 +1,5 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Users, Eye, Edit, Trash2 } from 'lucide-react';
+import { MapPin, Eye, Edit, Trash2 } from 'lucide-react';
 
 const CollegeCard = ({ college, onEdit, onDelete, onView }) => {
     const navigate = useNavigate();
@@ -79,10 +78,12 @@ const CollegeCard = ({ college, onEdit, onDelete, onView }) => {
                     </span>
 
                     {/* User count (if available) */}
-                    {college.userCount !== undefined && (
+                    {college.clickCounts !== undefined && (
                         <div className='flex items-center text-gray-500 dark:text-gray-400'>
-                            <Users className='h-4 w-4 mr-1' />
-                            <span className='text-sm'>{college.userCount}</span>
+                            <Eye className='h-4 w-4 mr-1' />
+                            <span className='text-sm'>
+                                {college.clickCounts}
+                            </span>
                         </div>
                     )}
                 </div>

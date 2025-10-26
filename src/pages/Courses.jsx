@@ -484,12 +484,22 @@ const Courses = () => {
                                                             </Link>
                                                         </td>
                                                         <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
-                                                            {course.createdAt
-                                                                ? new Date(
-                                                                      course.createdAt,
-                                                                  ).toLocaleDateString()
-                                                                : 'N/A'}
+                                                            <div className='flex flex-col'>
+                                                                <span className='text-xs text-gray-500 dark:text-gray-400'>
+                                                                    {course.createdAt
+                                                                        ? new Date(
+                                                                              course.createdAt,
+                                                                          ).toLocaleDateString()
+                                                                        : 'N/A'}
+                                                                </span>
+                                                                <span className='font-medium'>
+                                                                    {course.clickCounts ||
+                                                                        0}{' '}
+                                                                    views
+                                                                </span>
+                                                            </div>
                                                         </td>
+
                                                         <td className='px-6 py-4 whitespace-nowrap text-sm text-right'>
                                                             <div className='inline-flex gap-2'>
                                                                 <button
