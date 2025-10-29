@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { useSidebarLayout } from '../hooks/useSidebarLayout';
@@ -25,22 +25,34 @@ import {
     X,
     SortAsc,
     CheckCircle,
+    Clock,
 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import ConfirmModal from '../components/ConfirmModal';
 import GroupEditModal from '../components/GroupEditModal';
 
 const GroupList = () => {
+    const location = useLocation();
+    const { collegeslug } = useParams();
+    const navigate = useNavigate();
+
+    // Read URL params
+    const params = new URLSearchParams(location.search);
+    const initialSearch = params.get('search') || '';
+    const initialTimeFilter = params.get('time') || '';
+    const initialPage = parseInt(params.get('page')) || 1;
+    const initialSubmissionStatus = params.get('submissionStatus') || '';
+    const initialDeleted = params.get('deleted') || '';
+
     const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [search, setSearch] = useState('');
-    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState(initialSearch);
+    const [page, setPage] = useState(initialPage);
     const [pageSize, setPageSize] = useState(12);
+    const [timeFilter, setTimeFilter] = useState(initialTimeFilter);
     const [showModal, setShowModal] = useState(false);
     const [editingGroup, setEditingGroup] = useState(null);
-    const { collegeslug } = useParams();
-    const navigate = useNavigate();
     const { mainContentMargin } = useSidebarLayout();
 
     // View mode - responsive default (small screens = grid, large screens = table)
@@ -50,8 +62,8 @@ const GroupList = () => {
 
     // Filters state
     const [filters, setFilters] = useState({
-        submissionStatus: '',
-        deleted: '',
+        submissionStatus: initialSubmissionStatus,
+        deleted: initialDeleted,
     });
     const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState('desc');
@@ -88,6 +100,18 @@ const GroupList = () => {
     useEffect(() => {
         fetchGroups();
     }, [collegeslug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Persist filters in URL
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        if (timeFilter) params.set('time', timeFilter);
+        if (filters.submissionStatus)
+            params.set('submissionStatus', filters.submissionStatus);
+        if (filters.deleted) params.set('deleted', filters.deleted);
+        if (page > 1) params.set('page', page.toString());
+        navigate({ search: params.toString() }, { replace: true });
+    }, [search, timeFilter, filters, page, navigate]);
 
     // Responsive view mode - always auto-switch based on screen size
     useEffect(() => {
@@ -178,7 +202,44 @@ const GroupList = () => {
             filters.deleted === '' ||
             (filters.deleted === 'true' ? group.deleted : !group.deleted);
 
-        return matchesSearch && matchesStatus && matchesDeleted;
+        // Time filter
+        const matchesTime = (() => {
+            if (!timeFilter) return true;
+            const itemDate = new Date(group.createdAt || 0);
+            const now = new Date();
+
+            switch (timeFilter) {
+                case 'last24h':
+                    return now - itemDate <= 24 * 60 * 60 * 1000;
+                case 'last7d':
+                    return now - itemDate <= 7 * 24 * 60 * 60 * 1000;
+                case 'last28d':
+                    return now - itemDate <= 28 * 24 * 60 * 60 * 1000;
+                case 'thisWeek': {
+                    const startOfWeek = new Date(now);
+                    startOfWeek.setDate(now.getDate() - now.getDay());
+                    startOfWeek.setHours(0, 0, 0, 0);
+                    return itemDate >= startOfWeek;
+                }
+                case 'thisMonth': {
+                    const startOfMonth = new Date(
+                        now.getFullYear(),
+                        now.getMonth(),
+                        1,
+                    );
+                    return itemDate >= startOfMonth;
+                }
+                case 'thisYear': {
+                    const startOfYear = new Date(now.getFullYear(), 0, 1);
+                    return itemDate >= startOfYear;
+                }
+                case 'all':
+                default:
+                    return true;
+            }
+        })();
+
+        return matchesSearch && matchesStatus && matchesDeleted && matchesTime;
     });
 
     // Sort
@@ -201,6 +262,28 @@ const GroupList = () => {
 
     const totalItems = sorted.length;
     const totalPages = Math.ceil(totalItems / pageSize) || 1;
+    const totalGroups = timeFilter ? sorted.length : 0;
+
+    const getTimeFilterLabel = () => {
+        switch (timeFilter) {
+            case 'last24h':
+                return 'Last 24 Hours';
+            case 'last7d':
+                return 'Last 7 Days';
+            case 'last28d':
+                return 'Last 28 Days';
+            case 'thisWeek':
+                return 'This Week';
+            case 'thisMonth':
+                return 'This Month';
+            case 'thisYear':
+                return 'This Year';
+            case 'all':
+                return 'All Time';
+            default:
+                return '';
+        }
+    };
 
     const resetFilters = () => {
         setFilters({
@@ -209,6 +292,13 @@ const GroupList = () => {
         });
         setSortBy('createdAt');
         setSortOrder('desc');
+    };
+
+    const clearAllFilters = () => {
+        setSearch('');
+        setTimeFilter('');
+        resetFilters();
+        setPage(1);
     };
 
     const activeFiltersCount = Object.values(filters).filter(Boolean).length;
@@ -263,6 +353,25 @@ const GroupList = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Total Groups Banner */}
+                    {timeFilter && (
+                        <div className='bg-gradient-to-r from-green-500 to-teal-500 rounded-lg shadow-lg p-6 mb-6 text-white'>
+                            <div className='flex items-center justify-between'>
+                                <div>
+                                    <p className='text-green-100 text-sm font-medium mb-1'>
+                                        {getTimeFilterLabel()}
+                                    </p>
+                                    <p className='text-3xl font-bold'>
+                                        {totalGroups} Groups
+                                    </p>
+                                </div>
+                                <div className='bg-white/20 p-3 rounded-lg'>
+                                    <MessageSquare className='w-8 h-8' />
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className='space-y-6'>
                         {/* Search and Controls */}
@@ -335,6 +444,43 @@ const GroupList = () => {
                                         )}
                                     </button>
 
+                                    {/* Time Filter */}
+                                    <div className='relative'>
+                                        <Clock className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none' />
+                                        <select
+                                            value={timeFilter}
+                                            onChange={(e) =>
+                                                setTimeFilter(e.target.value)
+                                            }
+                                            className='pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white text-sm appearance-none'
+                                        >
+                                            <option value=''>
+                                                Time Filter
+                                            </option>
+                                            <option value='last24h'>
+                                                Last 24 Hours
+                                            </option>
+                                            <option value='last7d'>
+                                                Last 7 Days
+                                            </option>
+                                            <option value='last28d'>
+                                                Last 28 Days
+                                            </option>
+                                            <option value='thisWeek'>
+                                                This Week
+                                            </option>
+                                            <option value='thisMonth'>
+                                                This Month
+                                            </option>
+                                            <option value='thisYear'>
+                                                This Year
+                                            </option>
+                                            <option value='all'>
+                                                All Time
+                                            </option>
+                                        </select>
+                                    </div>
+
                                     {/* Sort Dropdown */}
                                     <select
                                         value={`${sortBy}-${sortOrder}`}
@@ -361,9 +507,11 @@ const GroupList = () => {
                                     </select>
 
                                     {/* Clear Filters */}
-                                    {activeFiltersCount > 0 && (
+                                    {(activeFiltersCount > 0 ||
+                                        search ||
+                                        timeFilter) && (
                                         <button
-                                            onClick={resetFilters}
+                                            onClick={clearAllFilters}
                                             className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors'
                                         >
                                             <X className='h-4 w-4' />

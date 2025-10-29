@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { useSidebarLayout } from '../hooks/useSidebarLayout';
@@ -26,6 +26,7 @@ import {
     CheckCircle,
     XCircle,
     Plus,
+    Clock,
 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import ConfirmModal from '../components/ConfirmModal';
@@ -33,16 +34,28 @@ import NotesEditModal from '../components/NotesEditModal';
 import { getStatusBadge } from '../utils/getStatusColor';
 
 const NotesList = () => {
+    const location = useLocation();
+    const { collegeslug } = useParams();
+    const navigate = useNavigate();
+
+    // Read URL params
+    const params = new URLSearchParams(location.search);
+    const initialSearch = params.get('search') || '';
+    const initialTimeFilter = params.get('time') || '';
+    const initialPage = parseInt(params.get('page')) || 1;
+    const initialSubmissionStatus = params.get('submissionStatus') || '';
+    const initialIsPaid = params.get('isPaid') || '';
+    const initialDeleted = params.get('deleted') || '';
+
     const [notes, setNotes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [search, setSearch] = useState('');
-    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState(initialSearch);
+    const [page, setPage] = useState(initialPage);
     const [pageSize, setPageSize] = useState(12);
+    const [timeFilter, setTimeFilter] = useState(initialTimeFilter);
     const [showModal, setShowModal] = useState(false);
     const [editingNote, setEditingNote] = useState(null);
-    const { collegeslug } = useParams();
-    const navigate = useNavigate();
     const { mainContentMargin } = useSidebarLayout();
 
     // View mode - responsive default (small screens = grid, large screens = table)
@@ -52,9 +65,9 @@ const NotesList = () => {
 
     // Filters state
     const [filters, setFilters] = useState({
-        submissionStatus: '',
-        isPaid: '',
-        deleted: '',
+        submissionStatus: initialSubmissionStatus,
+        isPaid: initialIsPaid,
+        deleted: initialDeleted,
     });
     const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState('desc');
@@ -103,6 +116,19 @@ const NotesList = () => {
         fetchNotes();
     }, [collegeslug]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Persist filters in URL
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        if (timeFilter) params.set('time', timeFilter);
+        if (filters.submissionStatus)
+            params.set('submissionStatus', filters.submissionStatus);
+        if (filters.isPaid) params.set('isPaid', filters.isPaid);
+        if (filters.deleted) params.set('deleted', filters.deleted);
+        if (page > 1) params.set('page', page.toString());
+        navigate({ search: params.toString() }, { replace: true });
+    }, [search, timeFilter, filters, page, navigate]);
+
     // Responsive view mode - always auto-switch based on screen size
     useEffect(() => {
         const handleResize = () => {
@@ -113,6 +139,27 @@ const NotesList = () => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    const getTimeFilterLabel = () => {
+        switch (timeFilter) {
+            case 'last24h':
+                return 'Last 24 Hours';
+            case 'last7d':
+                return 'Last 7 Days';
+            case 'last28d':
+                return 'Last 28 Days';
+            case 'thisWeek':
+                return 'This Week';
+            case 'thisMonth':
+                return 'This Month';
+            case 'thisYear':
+                return 'This Year';
+            case 'all':
+                return 'All Time';
+            default:
+                return '';
+        }
+    };
 
     const handleEdit = (note) => {
         setEditingNote(note);
@@ -174,8 +221,49 @@ const NotesList = () => {
             filters.deleted === '' ||
             (filters.deleted === 'true' ? note.deleted : !note.deleted);
 
+        // Time filter
+        const matchesTime = (() => {
+            if (!timeFilter) return true;
+            const itemDate = new Date(note.createdAt || 0);
+            const now = new Date();
+
+            switch (timeFilter) {
+                case 'last24h':
+                    return now - itemDate <= 24 * 60 * 60 * 1000;
+                case 'last7d':
+                    return now - itemDate <= 7 * 24 * 60 * 60 * 1000;
+                case 'last28d':
+                    return now - itemDate <= 28 * 24 * 60 * 60 * 1000;
+                case 'thisWeek': {
+                    const startOfWeek = new Date(now);
+                    startOfWeek.setDate(now.getDate() - now.getDay());
+                    startOfWeek.setHours(0, 0, 0, 0);
+                    return itemDate >= startOfWeek;
+                }
+                case 'thisMonth': {
+                    const startOfMonth = new Date(
+                        now.getFullYear(),
+                        now.getMonth(),
+                        1,
+                    );
+                    return itemDate >= startOfMonth;
+                }
+                case 'thisYear': {
+                    const startOfYear = new Date(now.getFullYear(), 0, 1);
+                    return itemDate >= startOfYear;
+                }
+                case 'all':
+                default:
+                    return true;
+            }
+        })();
+
         return (
-            matchesSearch && matchesStatus && matchesIsPaid && matchesDeleted
+            matchesSearch &&
+            matchesStatus &&
+            matchesIsPaid &&
+            matchesDeleted &&
+            matchesTime
         );
     });
 
@@ -197,6 +285,8 @@ const NotesList = () => {
     const start = (page - 1) * pageSize;
     const current = sorted.slice(start, start + pageSize);
 
+    const totalNotes = timeFilter ? sorted.length : 0;
+
     const resetFilters = () => {
         setFilters({
             submissionStatus: '',
@@ -205,6 +295,13 @@ const NotesList = () => {
         });
         setSortBy('createdAt');
         setSortOrder('desc');
+    };
+
+    const clearAllFilters = () => {
+        setSearch('');
+        setTimeFilter('');
+        resetFilters();
+        setPage(1);
     };
 
     const activeFiltersCount = Object.values(filters).filter(Boolean).length;
@@ -262,6 +359,25 @@ const NotesList = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Total Notes Banner */}
+                    {timeFilter && (
+                        <div className='bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow-lg p-6 mb-6 text-white'>
+                            <div className='flex items-center justify-between'>
+                                <div>
+                                    <p className='text-green-100 text-sm font-medium mb-1'>
+                                        {getTimeFilterLabel()}
+                                    </p>
+                                    <p className='text-3xl font-bold'>
+                                        {totalNotes} Notes
+                                    </p>
+                                </div>
+                                <div className='bg-white/20 p-3 rounded-lg'>
+                                    <FileText className='w-8 h-8' />
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Search and Controls */}
                     <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8'>
@@ -324,6 +440,39 @@ const NotesList = () => {
                                     )}
                                 </button>
 
+                                {/* Time Filter */}
+                                <div className='relative'>
+                                    <Clock className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none' />
+                                    <select
+                                        value={timeFilter}
+                                        onChange={(e) =>
+                                            setTimeFilter(e.target.value)
+                                        }
+                                        className='pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm appearance-none'
+                                    >
+                                        <option value=''>Time Filter</option>
+                                        <option value='last24h'>
+                                            Last 24 Hours
+                                        </option>
+                                        <option value='last7d'>
+                                            Last 7 Days
+                                        </option>
+                                        <option value='last28d'>
+                                            Last 28 Days
+                                        </option>
+                                        <option value='thisWeek'>
+                                            This Week
+                                        </option>
+                                        <option value='thisMonth'>
+                                            This Month
+                                        </option>
+                                        <option value='thisYear'>
+                                            This Year
+                                        </option>
+                                        <option value='all'>All Time</option>
+                                    </select>
+                                </div>
+
                                 {/* Sort Controls */}
                                 <select
                                     value={sortBy}
@@ -362,9 +511,11 @@ const NotesList = () => {
                                 </button>
 
                                 {/* Clear Filters */}
-                                {activeFiltersCount > 0 && (
+                                {(activeFiltersCount > 0 ||
+                                    search ||
+                                    timeFilter) && (
                                     <button
-                                        onClick={resetFilters}
+                                        onClick={clearAllFilters}
                                         className='px-4 py-2 rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2'
                                     >
                                         <X className='w-4 h-4' />

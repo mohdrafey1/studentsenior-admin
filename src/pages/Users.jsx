@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { useSidebarLayout } from '../hooks/useSidebarLayout';
@@ -18,6 +18,8 @@ import {
     SortDesc,
     User as UserIcon,
     Calendar,
+    Clock,
+    X,
 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import ConfirmModal from '../components/ConfirmModal';
@@ -30,6 +32,7 @@ const UsersPage = () => {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(12);
     const [blockedFilter, setBlockedFilter] = useState(''); // '', 'true', 'false'
+    const [timeFilter, setTimeFilter] = useState('');
     const [sortBy, setSortBy] = useState('createdAt'); // 'createdAt' | 'points'
     const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
     const [viewMode, setViewMode] = useState(() =>
@@ -37,6 +40,7 @@ const UsersPage = () => {
     );
     const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
+    const location = useLocation();
 
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -123,6 +127,58 @@ const UsersPage = () => {
         fetchData();
     }, []);
 
+    // Read URL params on mount
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const q = params.get('search') || '';
+        const p = parseInt(params.get('page') || '1', 10);
+        const ps = parseInt(params.get('pageSize') || '12', 10);
+        const bf = params.get('blockedFilter') || '';
+        const tf = params.get('timeFilter') || '';
+        const sb = params.get('sortBy') || 'createdAt';
+        const so = params.get('sortOrder') || 'desc';
+        const vm =
+            params.get('view') ||
+            (window.innerWidth >= 1024 ? 'table' : 'grid');
+        setSearch(q);
+        setPage(Number.isFinite(p) && p > 0 ? p : 1);
+        setPageSize(Number.isFinite(ps) && ps > 0 ? ps : 12);
+        setBlockedFilter(bf);
+        setTimeFilter(tf);
+        setSortBy(sb === 'points' ? 'points' : 'createdAt');
+        setSortOrder(so === 'asc' ? 'asc' : 'desc');
+        setViewMode(vm === 'grid' ? 'grid' : 'table');
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Persist params on changes
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        params.set('search', search || '');
+        params.set('page', String(page));
+        params.set('pageSize', String(pageSize));
+        params.set('blockedFilter', blockedFilter || '');
+        params.set('timeFilter', timeFilter || '');
+        params.set('sortBy', sortBy);
+        params.set('sortOrder', sortOrder);
+        params.set('view', viewMode);
+        const newSearch = params.toString();
+        if (newSearch !== location.search.replace(/^\?/, '')) {
+            navigate({ search: newSearch }, { replace: true });
+        }
+    }, [
+        search,
+        page,
+        pageSize,
+        blockedFilter,
+        timeFilter,
+        sortBy,
+        sortOrder,
+        viewMode,
+        location.search,
+        navigate,
+    ]);
+
     // Responsive auto-switch for view mode
     useEffect(() => {
         const handleResize = () =>
@@ -130,6 +186,61 @@ const UsersPage = () => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    const getTimeFilterLabel = (filter) => {
+        switch (filter) {
+            case 'last24h':
+                return 'Last 24 Hours';
+            case 'last7d':
+                return 'Last 7 Days';
+            case 'last28d':
+                return 'Last 28 Days';
+            case 'thisWeek':
+                return 'This Week';
+            case 'thisMonth':
+                return 'This Month';
+            case 'thisYear':
+                return 'This Year';
+            default:
+                return 'All Time';
+        }
+    };
+
+    const filterByTime = (item, filter) => {
+        if (!filter) return true;
+        const itemDate = new Date(item.createdAt);
+        const now = new Date();
+        switch (filter) {
+            case 'last24h':
+                return (
+                    itemDate >= new Date(now.getTime() - 24 * 60 * 60 * 1000)
+                );
+            case 'last7d':
+                return (
+                    itemDate >=
+                    new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+                );
+            case 'last28d':
+                return (
+                    itemDate >=
+                    new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000)
+                );
+            case 'thisWeek': {
+                const startOfWeek = new Date(now);
+                startOfWeek.setDate(now.getDate() - now.getDay());
+                startOfWeek.setHours(0, 0, 0, 0);
+                return itemDate >= startOfWeek;
+            }
+            case 'thisMonth':
+                return (
+                    itemDate >= new Date(now.getFullYear(), now.getMonth(), 1)
+                );
+            case 'thisYear':
+                return itemDate >= new Date(now.getFullYear(), 0, 1);
+            default:
+                return true;
+        }
+    };
 
     const filteredAndSorted = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -143,7 +254,8 @@ const UsersPage = () => {
                     blockedFilter === ''
                         ? true
                         : String(!!u.blocked) === blockedFilter;
-                return matchesSearch && matchesBlocked;
+                const matchesTime = filterByTime(u, timeFilter);
+                return matchesSearch && matchesBlocked && matchesTime;
             })
             .sort((a, b) => {
                 let aVal = 0;
@@ -159,11 +271,18 @@ const UsersPage = () => {
                 return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
             });
         return list;
-    }, [items, search, blockedFilter, sortBy, sortOrder]);
+    }, [items, search, blockedFilter, timeFilter, sortBy, sortOrder]);
 
     const totalItems = filteredAndSorted.length;
     const start = (page - 1) * pageSize;
     const current = filteredAndSorted.slice(start, start + pageSize);
+
+    const totalPoints = useMemo(() => {
+        return filteredAndSorted.reduce(
+            (sum, u) => sum + (Number(u.wallet?.currentBalance) || 0),
+            0,
+        );
+    }, [filteredAndSorted]);
 
     if (loading) {
         return (
@@ -216,6 +335,23 @@ const UsersPage = () => {
 
                     {/* Search, View, Filters & Sort */}
                     <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6'>
+                        {/* Total Points Display */}
+                        {timeFilter && (
+                            <div className='mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg'>
+                                <div className='flex items-center justify-between'>
+                                    <div className='flex items-center gap-2'>
+                                        <Clock className='w-5 h-5 text-indigo-600 dark:text-indigo-400' />
+                                        <span className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+                                            Total Points (
+                                            {getTimeFilterLabel(timeFilter)}):
+                                        </span>
+                                    </div>
+                                    <span className='text-xl font-bold text-indigo-600 dark:text-indigo-400'>
+                                        {totalPoints} points
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                         <div className='relative mb-4 max-w-xl'>
                             <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5' />
                             <input
@@ -258,6 +394,24 @@ const UsersPage = () => {
                                 <option value='false'>Active</option>
                             </select>
 
+                            {/* Time filter */}
+                            <select
+                                value={timeFilter}
+                                onChange={(e) => {
+                                    setTimeFilter(e.target.value);
+                                    setPage(1);
+                                }}
+                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
+                            >
+                                <option value=''>All Time</option>
+                                <option value='last24h'>Last 24 Hours</option>
+                                <option value='last7d'>Last 7 Days</option>
+                                <option value='last28d'>Last 28 Days</option>
+                                <option value='thisWeek'>This Week</option>
+                                <option value='thisMonth'>This Month</option>
+                                <option value='thisYear'>This Year</option>
+                            </select>
+
                             {/* Sort By */}
                             <select
                                 value={sortBy}
@@ -288,6 +442,22 @@ const UsersPage = () => {
                                     <SortDesc className='w-4 h-4' />
                                 )}
                             </button>
+
+                            {/* Clear Filters */}
+                            {(search || blockedFilter || timeFilter) && (
+                                <button
+                                    onClick={() => {
+                                        setSearch('');
+                                        setBlockedFilter('');
+                                        setTimeFilter('');
+                                        setPage(1);
+                                    }}
+                                    className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium'
+                                >
+                                    <X className='w-4 h-4' />
+                                    Clear Filters
+                                </button>
+                            )}
                         </div>
                     </div>
 
