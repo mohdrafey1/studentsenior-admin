@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { useSidebarLayout } from '../hooks/useSidebarLayout';
@@ -16,24 +16,36 @@ import {
     SortDesc,
     User as UserIcon,
     Calendar,
+    Clock,
+    X,
 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 
 const DashboardUsersPage = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Read URL params
+    const params = new URLSearchParams(location.search);
+    const initialSearch = params.get('search') || '';
+    const initialRoleFilter = params.get('role') || '';
+    const initialTimeFilter = params.get('time') || '';
+    const initialPage = parseInt(params.get('page')) || 1;
+
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [search, setSearch] = useState('');
-    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState(initialSearch);
+    const [page, setPage] = useState(initialPage);
     const [pageSize, setPageSize] = useState(12);
-    const [roleFilter, setRoleFilter] = useState(''); // filter by role only
+    const [roleFilter, setRoleFilter] = useState(initialRoleFilter); // filter by role only
+    const [timeFilter, setTimeFilter] = useState(initialTimeFilter); // time filter
     const [sortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState('desc');
     const [viewMode, setViewMode] = useState(() =>
         window.innerWidth >= 1024 ? 'table' : 'grid',
     );
     const { mainContentMargin } = useSidebarLayout();
-    const navigate = useNavigate();
 
     const fetchData = async () => {
         try {
@@ -53,6 +65,16 @@ const DashboardUsersPage = () => {
         fetchData();
     }, []);
 
+    // Persist filters in URL
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        if (roleFilter) params.set('role', roleFilter);
+        if (timeFilter) params.set('time', timeFilter);
+        if (page > 1) params.set('page', page.toString());
+        navigate({ search: params.toString() }, { replace: true });
+    }, [search, roleFilter, timeFilter, page, navigate]);
+
     useEffect(() => {
         const handleResize = () =>
             setViewMode(window.innerWidth >= 1024 ? 'table' : 'grid');
@@ -60,8 +82,66 @@ const DashboardUsersPage = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    const getTimeFilterLabel = () => {
+        switch (timeFilter) {
+            case 'last24h':
+                return 'Last 24 Hours';
+            case 'last7d':
+                return 'Last 7 Days';
+            case 'last28d':
+                return 'Last 28 Days';
+            case 'thisWeek':
+                return 'This Week';
+            case 'thisMonth':
+                return 'This Month';
+            case 'thisYear':
+                return 'This Year';
+            case 'all':
+                return 'All Time';
+            default:
+                return '';
+        }
+    };
+
     const filteredAndSorted = useMemo(() => {
         const q = search.trim().toLowerCase();
+
+        const filterByTime = (item) => {
+            if (!timeFilter) return true;
+            const itemDate = new Date(item.createdAt || 0);
+            const now = new Date();
+
+            switch (timeFilter) {
+                case 'last24h':
+                    return now - itemDate <= 24 * 60 * 60 * 1000;
+                case 'last7d':
+                    return now - itemDate <= 7 * 24 * 60 * 60 * 1000;
+                case 'last28d':
+                    return now - itemDate <= 28 * 24 * 60 * 60 * 1000;
+                case 'thisWeek': {
+                    const startOfWeek = new Date(now);
+                    startOfWeek.setDate(now.getDate() - now.getDay());
+                    startOfWeek.setHours(0, 0, 0, 0);
+                    return itemDate >= startOfWeek;
+                }
+                case 'thisMonth': {
+                    const startOfMonth = new Date(
+                        now.getFullYear(),
+                        now.getMonth(),
+                        1,
+                    );
+                    return itemDate >= startOfMonth;
+                }
+                case 'thisYear': {
+                    const startOfYear = new Date(now.getFullYear(), 0, 1);
+                    return itemDate >= startOfYear;
+                }
+                case 'all':
+                default:
+                    return true;
+            }
+        };
+
         const list = items
             .filter((u) => {
                 const email = (u.email || '').toLowerCase();
@@ -74,7 +154,8 @@ const DashboardUsersPage = () => {
                     role.includes(q);
                 const matchesRole =
                     !roleFilter || role === roleFilter.toLowerCase();
-                return matchesSearch && matchesRole;
+                const matchesTime = filterByTime(u);
+                return matchesSearch && matchesRole && matchesTime;
             })
             .sort((a, b) => {
                 let aVal = 0;
@@ -86,11 +167,20 @@ const DashboardUsersPage = () => {
                 return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
             });
         return list;
-    }, [items, search, roleFilter, sortBy, sortOrder]);
+    }, [items, search, roleFilter, timeFilter, sortBy, sortOrder]);
 
     const totalItems = filteredAndSorted.length;
     const start = (page - 1) * pageSize;
     const current = filteredAndSorted.slice(start, start + pageSize);
+
+    const totalUsers = timeFilter ? filteredAndSorted.length : 0;
+
+    const clearFilters = () => {
+        setSearch('');
+        setRoleFilter('');
+        setTimeFilter('');
+        setPage(1);
+    };
 
     if (loading) {
         return (
@@ -141,6 +231,25 @@ const DashboardUsersPage = () => {
                         </div>
                     </div>
 
+                    {/* Total Users Banner */}
+                    {timeFilter && (
+                        <div className='bg-gradient-to-r from-rose-500 to-rose-600 rounded-lg shadow-lg p-6 mb-6 text-white'>
+                            <div className='flex items-center justify-between'>
+                                <div>
+                                    <p className='text-rose-100 text-sm font-medium mb-1'>
+                                        {getTimeFilterLabel()}
+                                    </p>
+                                    <p className='text-3xl font-bold'>
+                                        {totalUsers} Users
+                                    </p>
+                                </div>
+                                <div className='bg-white/20 p-3 rounded-lg'>
+                                    <UserIcon className='w-8 h-8' />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Search, View, Role Filter & Sort */}
                     <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6'>
                         <div className='relative mb-4 max-w-xl'>
@@ -185,6 +294,33 @@ const DashboardUsersPage = () => {
                                 <option value='viewer'>Viewer</option>
                             </select>
 
+                            {/* Time Filter */}
+                            <div className='relative'>
+                                <Clock className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none' />
+                                <select
+                                    value={timeFilter}
+                                    onChange={(e) =>
+                                        setTimeFilter(e.target.value)
+                                    }
+                                    className='pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm appearance-none'
+                                >
+                                    <option value=''>Time Filter</option>
+                                    <option value='last24h'>
+                                        Last 24 Hours
+                                    </option>
+                                    <option value='last7d'>Last 7 Days</option>
+                                    <option value='last28d'>
+                                        Last 28 Days
+                                    </option>
+                                    <option value='thisWeek'>This Week</option>
+                                    <option value='thisMonth'>
+                                        This Month
+                                    </option>
+                                    <option value='thisYear'>This Year</option>
+                                    <option value='all'>All Time</option>
+                                </select>
+                            </div>
+
                             {/* Sort Order (Date) */}
                             <button
                                 onClick={() =>
@@ -201,6 +337,17 @@ const DashboardUsersPage = () => {
                                     <SortDesc className='w-4 h-4' />
                                 )}
                             </button>
+
+                            {/* Clear Filters Button */}
+                            {(search || roleFilter || timeFilter) && (
+                                <button
+                                    onClick={clearFilters}
+                                    className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors text-sm font-medium'
+                                >
+                                    <X className='w-4 h-4' />
+                                    Clear Filters
+                                </button>
+                            )}
                         </div>
                     </div>
 

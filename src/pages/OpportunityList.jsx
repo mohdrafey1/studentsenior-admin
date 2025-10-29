@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { useSidebarLayout } from '../hooks/useSidebarLayout';
@@ -32,16 +32,27 @@ import ConfirmModal from '../components/ConfirmModal';
 import OpportunityEditModal from '../components/OpportunityEditModal';
 
 const OpportunityList = () => {
+    const location = useLocation();
+    const { collegeslug } = useParams();
+    const navigate = useNavigate();
+
+    // Read URL params
+    const params = new URLSearchParams(location.search);
+    const initialSearch = params.get('search') || '';
+    const initialTimeFilter = params.get('time') || '';
+    const initialPage = parseInt(params.get('page')) || 1;
+    const initialSubmissionStatus = params.get('submissionStatus') || '';
+    const initialDeleted = params.get('deleted') || '';
+
     const [opportunities, setOpportunities] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [search, setSearch] = useState('');
-    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState(initialSearch);
+    const [page, setPage] = useState(initialPage);
     const [pageSize, setPageSize] = useState(12);
+    const [timeFilter, setTimeFilter] = useState(initialTimeFilter);
     const [showModal, setShowModal] = useState(false);
     const [editingOpportunity, setEditingOpportunity] = useState(null);
-    const { collegeslug } = useParams();
-    const navigate = useNavigate();
     const { mainContentMargin } = useSidebarLayout();
 
     // View mode - responsive default (small screens = grid, large screens = table)
@@ -51,8 +62,8 @@ const OpportunityList = () => {
 
     // Filters state
     const [filters, setFilters] = useState({
-        submissionStatus: '',
-        deleted: '',
+        submissionStatus: initialSubmissionStatus,
+        deleted: initialDeleted,
     });
     const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState('desc');
@@ -89,6 +100,18 @@ const OpportunityList = () => {
     useEffect(() => {
         fetchOpportunities();
     }, [collegeslug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Persist filters in URL
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        if (timeFilter) params.set('time', timeFilter);
+        if (filters.submissionStatus)
+            params.set('submissionStatus', filters.submissionStatus);
+        if (filters.deleted) params.set('deleted', filters.deleted);
+        if (page > 1) params.set('page', page.toString());
+        navigate({ search: params.toString() }, { replace: true });
+    }, [search, timeFilter, filters, page, navigate]);
 
     // Responsive view mode - always auto-switch based on screen size
     useEffect(() => {
@@ -185,29 +208,62 @@ const OpportunityList = () => {
     };
 
     // Apply filters and sorting
-    const filtered = opportunities.filter((opportunity) => {
+    const filtered = opportunities.filter((opp) => {
         const q = search.trim().toLowerCase();
         const matchesSearch =
             !q ||
-            opportunity.name?.toLowerCase().includes(q) ||
-            opportunity.description?.toLowerCase().includes(q) ||
-            opportunity.email?.toLowerCase().includes(q) ||
-            opportunity.owner?.username?.toLowerCase().includes(q);
+            opp.title?.toLowerCase().includes(q) ||
+            opp.company?.toLowerCase().includes(q) ||
+            opp.description?.toLowerCase().includes(q) ||
+            opp.location?.toLowerCase().includes(q) ||
+            opp.submissionStatus?.toLowerCase().includes(q);
 
         const matchesStatus =
             !filters.submissionStatus ||
-            opportunity.submissionStatus === filters.submissionStatus;
-
+            opp.submissionStatus === filters.submissionStatus;
         const matchesDeleted =
             filters.deleted === '' ||
-            (filters.deleted === 'true'
-                ? opportunity.deleted
-                : !opportunity.deleted);
+            (filters.deleted === 'true' ? opp.deleted : !opp.deleted);
 
-        return matchesSearch && matchesStatus && matchesDeleted;
-    });
+        // Time filter
+        const matchesTime = (() => {
+            if (!timeFilter) return true;
+            const itemDate = new Date(opp.createdAt || 0);
+            const now = new Date();
 
-    // Sort
+            switch (timeFilter) {
+                case 'last24h':
+                    return now - itemDate <= 24 * 60 * 60 * 1000;
+                case 'last7d':
+                    return now - itemDate <= 7 * 24 * 60 * 60 * 1000;
+                case 'last28d':
+                    return now - itemDate <= 28 * 24 * 60 * 60 * 1000;
+                case 'thisWeek': {
+                    const startOfWeek = new Date(now);
+                    startOfWeek.setDate(now.getDate() - now.getDay());
+                    startOfWeek.setHours(0, 0, 0, 0);
+                    return itemDate >= startOfWeek;
+                }
+                case 'thisMonth': {
+                    const startOfMonth = new Date(
+                        now.getFullYear(),
+                        now.getMonth(),
+                        1,
+                    );
+                    return itemDate >= startOfMonth;
+                }
+                case 'thisYear': {
+                    const startOfYear = new Date(now.getFullYear(), 0, 1);
+                    return itemDate >= startOfYear;
+                }
+                case 'all':
+                default:
+                    return true;
+            }
+        })();
+
+        return matchesSearch && matchesStatus && matchesDeleted && matchesTime;
+    }); // Sort
     const sorted = [...filtered].sort((a, b) => {
         if (sortBy === 'createdAt') {
             const dateA = new Date(a.createdAt);
@@ -225,8 +281,30 @@ const OpportunityList = () => {
     const start = (page - 1) * pageSize;
     const current = sorted.slice(start, start + pageSize);
 
+    const totalOpportunities = timeFilter ? sorted.length : 0;
     const totalItems = sorted.length;
     const totalPages = Math.ceil(totalItems / pageSize) || 1;
+
+    const getTimeFilterLabel = () => {
+        switch (timeFilter) {
+            case 'last24h':
+                return 'Last 24 Hours';
+            case 'last7d':
+                return 'Last 7 Days';
+            case 'last28d':
+                return 'Last 28 Days';
+            case 'thisWeek':
+                return 'This Week';
+            case 'thisMonth':
+                return 'This Month';
+            case 'thisYear':
+                return 'This Year';
+            case 'all':
+                return 'All Time';
+            default:
+                return '';
+        }
+    };
 
     const resetFilters = () => {
         setFilters({
@@ -235,6 +313,13 @@ const OpportunityList = () => {
         });
         setSortBy('createdAt');
         setSortOrder('desc');
+    };
+
+    const clearAllFilters = () => {
+        setSearch('');
+        setTimeFilter('');
+        resetFilters();
+        setPage(1);
     };
 
     const activeFiltersCount = Object.values(filters).filter(Boolean).length;
@@ -315,6 +400,25 @@ const OpportunityList = () => {
                         </div>
                     </div>
 
+                    {/* Total Opportunities Banner */}
+                    {timeFilter && (
+                        <div className='bg-gradient-to-r from-orange-500 to-red-500 rounded-lg shadow-lg p-6 mb-6 text-white'>
+                            <div className='flex items-center justify-between'>
+                                <div>
+                                    <p className='text-orange-100 text-sm font-medium mb-1'>
+                                        {getTimeFilterLabel()}
+                                    </p>
+                                    <p className='text-3xl font-bold'>
+                                        {totalOpportunities} Opportunities
+                                    </p>
+                                </div>
+                                <div className='bg-white/20 p-3 rounded-lg'>
+                                    <Briefcase className='w-8 h-8' />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className='space-y-6'>
                         {/* Search and Controls */}
                         <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4'>
@@ -386,6 +490,43 @@ const OpportunityList = () => {
                                         )}
                                     </button>
 
+                                    {/* Time Filter */}
+                                    <div className='relative'>
+                                        <Clock className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none' />
+                                        <select
+                                            value={timeFilter}
+                                            onChange={(e) =>
+                                                setTimeFilter(e.target.value)
+                                            }
+                                            className='pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:text-white text-sm appearance-none'
+                                        >
+                                            <option value=''>
+                                                Time Filter
+                                            </option>
+                                            <option value='last24h'>
+                                                Last 24 Hours
+                                            </option>
+                                            <option value='last7d'>
+                                                Last 7 Days
+                                            </option>
+                                            <option value='last28d'>
+                                                Last 28 Days
+                                            </option>
+                                            <option value='thisWeek'>
+                                                This Week
+                                            </option>
+                                            <option value='thisMonth'>
+                                                This Month
+                                            </option>
+                                            <option value='thisYear'>
+                                                This Year
+                                            </option>
+                                            <option value='all'>
+                                                All Time
+                                            </option>
+                                        </select>
+                                    </div>
+
                                     {/* Sort Dropdown */}
                                     <select
                                         value={`${sortBy}-${sortOrder}`}
@@ -412,9 +553,11 @@ const OpportunityList = () => {
                                     </select>
 
                                     {/* Clear Filters */}
-                                    {activeFiltersCount > 0 && (
+                                    {(activeFiltersCount > 0 ||
+                                        search ||
+                                        timeFilter) && (
                                         <button
-                                            onClick={resetFilters}
+                                            onClick={clearAllFilters}
                                             className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors'
                                         >
                                             <X className='h-4 w-4' />

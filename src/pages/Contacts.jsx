@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { useSidebarLayout } from '../hooks/useSidebarLayout';
@@ -21,17 +21,29 @@ import {
     SortAsc,
     SortDesc,
     User,
+    Clock,
+    X,
 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import ConfirmModal from '../components/ConfirmModal';
 
 const Contacts = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Read URL params
+    const params = new URLSearchParams(location.search);
+    const initialSearch = params.get('search') || '';
+    const initialTimeFilter = params.get('time') || '';
+    const initialPage = parseInt(params.get('page')) || 1;
+
     const [contacts, setContacts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
+    const [searchQuery, setSearchQuery] = useState(initialSearch);
+    const [currentPage, setCurrentPage] = useState(initialPage);
     const [pageSize, setPageSize] = useState(12);
+    const [timeFilter, setTimeFilter] = useState(initialTimeFilter); // time filter
     const [sortBy, setSortBy] = useState('createdAt'); // createdAt | name | email
     const [sortOrder, setSortOrder] = useState('desc'); // asc | desc
     const [viewMode, setViewMode] = useState(() =>
@@ -39,7 +51,6 @@ const Contacts = () => {
     );
     const [expandedItems, setExpandedItems] = useState(new Set());
     const { mainContentMargin } = useSidebarLayout();
-    const navigate = useNavigate();
 
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -102,6 +113,15 @@ const Contacts = () => {
         fetchContacts();
     }, []);
 
+    // Persist filters in URL
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (searchQuery) params.set('search', searchQuery);
+        if (timeFilter) params.set('time', timeFilter);
+        if (currentPage > 1) params.set('page', currentPage.toString());
+        navigate({ search: params.toString() }, { replace: true });
+    }, [searchQuery, timeFilter, currentPage, navigate]);
+
     // Auto switch view mode on resize
     useEffect(() => {
         const handleResize = () =>
@@ -109,6 +129,27 @@ const Contacts = () => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    const getTimeFilterLabel = () => {
+        switch (timeFilter) {
+            case 'last24h':
+                return 'Last 24 Hours';
+            case 'last7d':
+                return 'Last 7 Days';
+            case 'last28d':
+                return 'Last 28 Days';
+            case 'thisWeek':
+                return 'This Week';
+            case 'thisMonth':
+                return 'This Month';
+            case 'thisYear':
+                return 'This Year';
+            case 'all':
+                return 'All Time';
+            default:
+                return '';
+        }
+    };
 
     const handleDelete = async (contactId) => {
         const ok = await showConfirm({
@@ -140,12 +181,50 @@ const Contacts = () => {
             const message = (contact.description || contact.message || '')
                 .toString()
                 .toLowerCase();
-            return (
+            const matchesSearch =
                 !q ||
                 name.includes(q) ||
                 email.includes(q) ||
-                message.includes(q)
-            );
+                message.includes(q);
+
+            // Time filter
+            const matchesTime = (() => {
+                if (!timeFilter) return true;
+                const itemDate = new Date(contact.createdAt || 0);
+                const now = new Date();
+
+                switch (timeFilter) {
+                    case 'last24h':
+                        return now - itemDate <= 24 * 60 * 60 * 1000;
+                    case 'last7d':
+                        return now - itemDate <= 7 * 24 * 60 * 60 * 1000;
+                    case 'last28d':
+                        return now - itemDate <= 28 * 24 * 60 * 60 * 1000;
+                    case 'thisWeek': {
+                        const startOfWeek = new Date(now);
+                        startOfWeek.setDate(now.getDate() - now.getDay());
+                        startOfWeek.setHours(0, 0, 0, 0);
+                        return itemDate >= startOfWeek;
+                    }
+                    case 'thisMonth': {
+                        const startOfMonth = new Date(
+                            now.getFullYear(),
+                            now.getMonth(),
+                            1,
+                        );
+                        return itemDate >= startOfMonth;
+                    }
+                    case 'thisYear': {
+                        const startOfYear = new Date(now.getFullYear(), 0, 1);
+                        return itemDate >= startOfYear;
+                    }
+                    case 'all':
+                    default:
+                        return true;
+                }
+            })();
+
+            return matchesSearch && matchesTime;
         })
         .sort((a, b) => {
             let aVal = 0;
@@ -174,6 +253,14 @@ const Contacts = () => {
         indexOfFirstContact,
         indexOfLastContact,
     );
+
+    const totalContacts = timeFilter ? filteredAndSorted.length : 0;
+
+    const clearFilters = () => {
+        setSearchQuery('');
+        setTimeFilter('');
+        setCurrentPage(1);
+    };
 
     if (loading) {
         return (
@@ -237,6 +324,25 @@ const Contacts = () => {
                         </div>
                     </div>
 
+                    {/* Total Contacts Banner */}
+                    {timeFilter && (
+                        <div className='bg-gradient-to-r from-pink-500 to-pink-600 rounded-lg shadow-lg p-6 mb-6 text-white'>
+                            <div className='flex items-center justify-between'>
+                                <div>
+                                    <p className='text-pink-100 text-sm font-medium mb-1'>
+                                        {getTimeFilterLabel()}
+                                    </p>
+                                    <p className='text-3xl font-bold'>
+                                        {totalContacts} Requests
+                                    </p>
+                                </div>
+                                <div className='bg-white/20 p-3 rounded-lg'>
+                                    <PhoneCall className='w-8 h-8' />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Search, View, Sort */}
                     <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6'>
                         <div className='relative mb-4 max-w-xl'>
@@ -279,6 +385,33 @@ const Contacts = () => {
                                 <option value='email'>Sort by Email</option>
                             </select>
 
+                            {/* Time Filter */}
+                            <div className='relative'>
+                                <Clock className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none' />
+                                <select
+                                    value={timeFilter}
+                                    onChange={(e) =>
+                                        setTimeFilter(e.target.value)
+                                    }
+                                    className='pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm appearance-none'
+                                >
+                                    <option value=''>Time Filter</option>
+                                    <option value='last24h'>
+                                        Last 24 Hours
+                                    </option>
+                                    <option value='last7d'>Last 7 Days</option>
+                                    <option value='last28d'>
+                                        Last 28 Days
+                                    </option>
+                                    <option value='thisWeek'>This Week</option>
+                                    <option value='thisMonth'>
+                                        This Month
+                                    </option>
+                                    <option value='thisYear'>This Year</option>
+                                    <option value='all'>All Time</option>
+                                </select>
+                            </div>
+
                             {/* Sort Order */}
                             <button
                                 onClick={() =>
@@ -299,6 +432,17 @@ const Contacts = () => {
                                     <SortDesc className='w-4 h-4' />
                                 )}
                             </button>
+
+                            {/* Clear Filters Button */}
+                            {(searchQuery || timeFilter) && (
+                                <button
+                                    onClick={clearFilters}
+                                    className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors text-sm font-medium'
+                                >
+                                    <X className='w-4 h-4' />
+                                    Clear Filters
+                                </button>
+                            )}
                         </div>
                     </div>
 

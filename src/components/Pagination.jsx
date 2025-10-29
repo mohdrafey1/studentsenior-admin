@@ -84,7 +84,7 @@ const Pagination = ({
                 </p>
             )}
 
-            <div className='flex items-center gap-3'>
+            <div className='flex flex-col sm:flex-row items-center gap-3'>
                 {onPageSizeChange && (
                     <div className='flex items-center gap-2'>
                         <span className='text-sm text-gray-600 dark:text-gray-300'>
