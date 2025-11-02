@@ -21,6 +21,7 @@ import {
     GitBranch,
     BookOpenCheck,
     ShoppingBag,
+    BookMarked,
 } from 'lucide-react';
 import { useSidebar } from '../context/SidebarContext';
 import { Link } from 'react-router-dom';
@@ -132,6 +133,7 @@ function Sidebar() {
                 to: `${base}/notes`,
                 colors: 'text-green-600 dark:text-green-400',
             },
+
             {
                 id: 'products',
                 label: 'Store Products',
@@ -173,6 +175,13 @@ function Sidebar() {
                 icon: FileText,
                 to: `${base}/videos`,
                 colors: 'text-teal-600 dark:text-teal-400',
+            },
+            {
+                id: 'syllabus',
+                label: 'Syllabus',
+                icon: BookMarked,
+                to: `${base}/syllabus`,
+                colors: 'text-orange-600 dark:text-orange-400',
             },
         ];
     }, [collegeslug, isReportsSection]);

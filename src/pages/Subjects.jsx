@@ -19,9 +19,11 @@ import {
     SortAsc,
     SortDesc,
     Calendar,
+    BookMarked,
 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import ConfirmModal from '../components/ConfirmModal';
+import SyllabusModal from '../components/SyllabusModal';
 
 const Subjects = () => {
     const [subjects, setSubjects] = useState([]);
@@ -42,6 +44,25 @@ const Subjects = () => {
     );
     const [showModal, setShowModal] = useState(false);
     const [editingSubject, setEditingSubject] = useState(null);
+    const [showSyllabusModal, setShowSyllabusModal] = useState(false);
+    const [selectedSubjectForSyllabus, setSelectedSubjectForSyllabus] =
+        useState(null);
+    const [syllabusFormData, setSyllabusFormData] = useState({
+        subjectCode: '',
+        collegeSlug: 'integral-university',
+        year: 1,
+        semester: 1,
+        units: [
+            {
+                unitNumber: 1,
+                title: '',
+                content: '',
+            },
+        ],
+        referenceBooks: '',
+        description: '',
+    });
+    const [submittingSyllabus, setSubmittingSyllabus] = useState(false);
     const [formData, setFormData] = useState({
         subjectName: '',
         subjectCode: '',
@@ -252,6 +273,104 @@ const Subjects = () => {
 
     const handleCourseChange = (courseId) => {
         setFormData({ ...formData, course: courseId, branch: '' }); // Reset branch when course changes
+    };
+
+    // Syllabus handlers
+    const handleAddSyllabus = (subject) => {
+        setSelectedSubjectForSyllabus(subject);
+        setSyllabusFormData({
+            subjectCode: subject.subjectCode,
+            collegeSlug: 'integral-university',
+            year: Math.ceil(subject.semester / 2) || 1,
+            semester: subject.semester,
+            units: [
+                {
+                    unitNumber: 1,
+                    title: '',
+                    content: '',
+                },
+            ],
+            referenceBooks: '',
+            description: '',
+        });
+        setShowSyllabusModal(true);
+    };
+
+    const handleSyllabusFormChange = (field, value) => {
+        setSyllabusFormData({ ...syllabusFormData, [field]: value });
+    };
+
+    const handleUnitChange = (index, field, value) => {
+        const newUnits = [...syllabusFormData.units];
+        newUnits[index][field] = value;
+        setSyllabusFormData({ ...syllabusFormData, units: newUnits });
+    };
+
+    const addArrayItem = (arrayName) => {
+        if (arrayName === 'units') {
+            setSyllabusFormData({
+                ...syllabusFormData,
+                units: [
+                    ...syllabusFormData.units,
+                    {
+                        unitNumber: syllabusFormData.units.length + 1,
+                        title: '',
+                        content: '',
+                    },
+                ],
+            });
+        } else {
+            setSyllabusFormData({
+                ...syllabusFormData,
+                [arrayName]: [...syllabusFormData[arrayName], ''],
+            });
+        }
+    };
+
+    const removeArrayItem = (arrayName, index) => {
+        const newArray = syllabusFormData[arrayName].filter(
+            (_, i) => i !== index,
+        );
+        setSyllabusFormData({ ...syllabusFormData, [arrayName]: newArray });
+    };
+
+    const handleCloseSyllabusModal = () => {
+        setShowSyllabusModal(false);
+        setSelectedSubjectForSyllabus(null);
+        setSyllabusFormData({
+            subjectCode: '',
+            collegeSlug: '',
+            year: 1,
+            semester: 1,
+            units: [
+                {
+                    unitNumber: 1,
+                    title: '',
+                    content: '',
+                },
+            ],
+            referenceBooks: '',
+            description: '',
+        });
+    };
+
+    const handleSubmitSyllabus = async (e) => {
+        e.preventDefault();
+
+        setSubmittingSyllabus(true);
+        try {
+            await api.post(`/syllabus/create`, syllabusFormData);
+            toast.success('Syllabus created successfully');
+            handleCloseSyllabusModal();
+            fetchData(); // Refresh to get updated data
+        } catch (e) {
+            console.error(e);
+            toast.error(
+                e.response?.data?.message || 'Failed to create syllabus',
+            );
+        } finally {
+            setSubmittingSyllabus(false);
+        }
     };
 
     const filteredAndSorted = useMemo(() => {
@@ -558,6 +677,23 @@ const Subjects = () => {
                                                     : 'N/A'}
                                             </div>
                                             <div className='flex gap-2 justify-end'>
+                                                {/* Only show Add Syllabus button if subject doesn't have syllabus */}
+                                                {(!subject.syllabi ||
+                                                    subject.syllabi.length ===
+                                                        0) && (
+                                                    <button
+                                                        onClick={() =>
+                                                            handleAddSyllabus(
+                                                                subject,
+                                                            )
+                                                        }
+                                                        className='inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-green-600 text-white hover:bg-green-700'
+                                                        title='Add Syllabus'
+                                                    >
+                                                        <BookMarked className='w-3 h-3' />
+                                                        Syllabus
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() =>
                                                         handleEdit(subject)
@@ -648,6 +784,25 @@ const Subjects = () => {
                                                         </td>
                                                         <td className='px-6 py-4 whitespace-nowrap text-sm text-right'>
                                                             <div className='inline-flex gap-2'>
+                                                                {/* Only show Add Syllabus button if subject doesn't have syllabus */}
+                                                                {(!subject.syllabi ||
+                                                                    subject
+                                                                        .syllabi
+                                                                        .length ===
+                                                                        0) && (
+                                                                    <button
+                                                                        onClick={() =>
+                                                                            handleAddSyllabus(
+                                                                                subject,
+                                                                            )
+                                                                        }
+                                                                        className='px-3 py-1.5 rounded-md text-xs font-medium bg-green-600 text-white hover:bg-green-700 inline-flex items-center gap-1'
+                                                                        title='Add Syllabus'
+                                                                    >
+                                                                        <BookMarked className='w-3 h-3' />
+                                                                        Syllabus
+                                                                    </button>
+                                                                )}
                                                                 <button
                                                                     onClick={() =>
                                                                         handleEdit(
@@ -895,6 +1050,20 @@ const Subjects = () => {
                     </div>
                 </div>
             )}
+
+            {/* Syllabus Modal */}
+            <SyllabusModal
+                showModal={showSyllabusModal}
+                selectedSubject={selectedSubjectForSyllabus}
+                formData={syllabusFormData}
+                submitting={submittingSyllabus}
+                onClose={handleCloseSyllabusModal}
+                onSubmit={handleSubmitSyllabus}
+                onFormChange={handleSyllabusFormChange}
+                onUnitChange={handleUnitChange}
+                onAddArrayItem={addArrayItem}
+                onRemoveArrayItem={removeArrayItem}
+            />
 
             {/* Confirmation Modal */}
             <ConfirmModal
