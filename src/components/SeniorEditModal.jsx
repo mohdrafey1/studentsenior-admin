@@ -240,7 +240,7 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
 
     return (
         <div className='fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
-            <div className='bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto'>
+            <div className='bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full lg:max-w-6xl xl:max-w-7xl max-h-[95vh] overflow-auto'>
                 <div className='flex-shrink-0 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white p-6'>
                     <div className='flex items-center justify-between'>
                         <div className='flex items-center space-x-3'>

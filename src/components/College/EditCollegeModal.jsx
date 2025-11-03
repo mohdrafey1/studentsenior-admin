@@ -131,7 +131,7 @@ const EditCollegeModal = ({
                 </span>
 
                 {/* Modal */}
-                <div className='relative inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full'>
+                <div className='relative inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-auto shadow-xl transform transition-all sm:my-8 sm:align-middle sm:w-full lg:max-w-6xl xl:max-w-7xl max-h-[95vh]'>
                     {/* Header */}
                     <div className='bg-white dark:bg-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-700'>
                         <div className='flex items-center justify-between'>

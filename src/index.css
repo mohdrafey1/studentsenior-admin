@@ -2,6 +2,12 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Prevent horizontal overflow on small screens */
+html, body, #root {
+    width: 100%;
+    overflow-x: hidden;
+}
+
 /* Custom Animations */
 @keyframes fade-in {
     from {
