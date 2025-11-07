@@ -247,7 +247,7 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
         <div className='fixed inset-0 z-50 overflow-y-auto'>
             <div className='flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0'>
                 <div
-                    className='fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75'
+                    className='fixed inset-0 bg-black/60 backdrop-blur-sm'
                     onClick={onClose}
                 ></div>
                 <span
@@ -291,6 +291,87 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
                             className='flex-1 flex flex-col overflow-hidden'
                         >
                             <div className='flex-1 overflow-y-auto p-6 space-y-6'>
+                                  {/* Status Management Section */}
+                                <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
+                                    <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
+                                        <CheckCircle2 className='h-5 w-5 text-blue-500' />
+                                        Status Management
+                                    </h3>
+
+                                    <div className='space-y-4'>
+                                        <FormField
+                                            label='Approval Status'
+                                            icon={getCurrentStatus()?.icon}
+                                            required
+                                            description='Current approval status of this product'
+                                            error={errors.submissionStatus}
+                                        >
+                                            <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
+                                                {statusOptions.map((option) => (
+                                                    <button
+                                                        key={option.value}
+                                                        type='button'
+                                                        onClick={() =>
+                                                            handleStatusChange(
+                                                                option.value,
+                                                            )
+                                                        }
+                                                        className={`p-4 rounded-lg border-2 transition-all text-left ${
+                                                            formData.submissionStatus ===
+                                                            option.value
+                                                                ? option.color ===
+                                                                  'green'
+                                                                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                                                                    : option.color ===
+                                                                        'amber'
+                                                                      ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                                                                      : 'border-red-500 bg-red-50 dark:bg-red-900/20'
+                                                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                                        }`}
+                                                    >
+                                                        <div className='flex items-center gap-2 mb-1'>
+                                                            {option.icon}
+                                                            <span className='font-medium text-gray-900 dark:text-gray-100'>
+                                                                {option.label}
+                                                            </span>
+                                                        </div>
+                                                        <p className='text-xs text-gray-500 dark:text-gray-400'>
+                                                            {option.description}
+                                                        </p>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </FormField>
+
+                                        {formData.submissionStatus ===
+                                            'rejected' && (
+                                            <FormField
+                                                label='Rejection Reason'
+                                                icon={
+                                                    <AlertTriangle className='h-4 w-4 text-red-500' />
+                                                }
+                                                required
+                                                description='Explain why this product was rejected'
+                                                error={errors.rejectionReason}
+                                            >
+                                                <textarea
+                                                    name='rejectionReason'
+                                                    value={
+                                                        formData.rejectionReason
+                                                    }
+                                                    onChange={handleInputChange}
+                                                    rows={3}
+                                                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-colors resize-none ${
+                                                        errors.rejectionReason
+                                                            ? 'border-red-300 dark:border-red-600'
+                                                            : 'border-gray-300 dark:border-gray-600'
+                                                    } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                                    placeholder='Enter the reason for rejection...'
+                                                />
+                                            </FormField>
+                                        )}
+                                    </div>
+                                </div>
                                 {/* Basic Information Section */}
                                 <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
                                     <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
@@ -431,87 +512,7 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
                                     </div>
                                 </div>
 
-                                {/* Status Management Section */}
-                                <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
-                                    <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                        <CheckCircle2 className='h-5 w-5 text-blue-500' />
-                                        Status Management
-                                    </h3>
-
-                                    <div className='space-y-4'>
-                                        <FormField
-                                            label='Approval Status'
-                                            icon={getCurrentStatus()?.icon}
-                                            required
-                                            description='Current approval status of this product'
-                                            error={errors.submissionStatus}
-                                        >
-                                            <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
-                                                {statusOptions.map((option) => (
-                                                    <button
-                                                        key={option.value}
-                                                        type='button'
-                                                        onClick={() =>
-                                                            handleStatusChange(
-                                                                option.value,
-                                                            )
-                                                        }
-                                                        className={`p-4 rounded-lg border-2 transition-all text-left ${
-                                                            formData.submissionStatus ===
-                                                            option.value
-                                                                ? option.color ===
-                                                                  'green'
-                                                                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                                                                    : option.color ===
-                                                                        'amber'
-                                                                      ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
-                                                                      : 'border-red-500 bg-red-50 dark:bg-red-900/20'
-                                                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                                                        }`}
-                                                    >
-                                                        <div className='flex items-center gap-2 mb-1'>
-                                                            {option.icon}
-                                                            <span className='font-medium text-gray-900 dark:text-gray-100'>
-                                                                {option.label}
-                                                            </span>
-                                                        </div>
-                                                        <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                                            {option.description}
-                                                        </p>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </FormField>
-
-                                        {formData.submissionStatus ===
-                                            'rejected' && (
-                                            <FormField
-                                                label='Rejection Reason'
-                                                icon={
-                                                    <AlertTriangle className='h-4 w-4 text-red-500' />
-                                                }
-                                                required
-                                                description='Explain why this product was rejected'
-                                                error={errors.rejectionReason}
-                                            >
-                                                <textarea
-                                                    name='rejectionReason'
-                                                    value={
-                                                        formData.rejectionReason
-                                                    }
-                                                    onChange={handleInputChange}
-                                                    rows={3}
-                                                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-colors resize-none ${
-                                                        errors.rejectionReason
-                                                            ? 'border-red-300 dark:border-red-600'
-                                                            : 'border-gray-300 dark:border-gray-600'
-                                                    } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                                    placeholder='Enter the reason for rejection...'
-                                                />
-                                            </FormField>
-                                        )}
-                                    </div>
-                                </div>
+                              
 
                                 {/* Product Information */}
                                 {product && (

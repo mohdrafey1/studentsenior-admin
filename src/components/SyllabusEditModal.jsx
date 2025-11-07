@@ -15,7 +15,7 @@ const SyllabusEditModal = ({
         <div className='fixed inset-0 z-50 overflow-y-auto'>
             <div className='flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0'>
                 <div
-                    className='fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75'
+                    className='fixed inset-0 bg-black/60 backdrop-blur-sm'
                     onClick={onClose}
                 ></div>
                 <span
@@ -26,6 +26,7 @@ const SyllabusEditModal = ({
                 </span>
                 <div className='inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full relative z-10'>
                     <form onSubmit={onSubmit}>
+                        
                         <div className='bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4'>
                             <div className='flex items-center justify-between mb-4'>
                                 <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
@@ -39,6 +40,25 @@ const SyllabusEditModal = ({
                                     <X className='w-5 h-5' />
                                 </button>
                             </div>
+                              {/* Status */}
+                                <div>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Status
+                                    </label>
+                                    <select
+                                        value={formData.isActive}
+                                        onChange={(e) =>
+                                            onFormChange(
+                                                'isActive',
+                                                e.target.value === 'true',
+                                            )
+                                        }
+                                        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                    >
+                                        <option value='true'>Active</option>
+                                        <option value='false'>Inactive</option>
+                                    </select>
+                                </div>
                             <div className='space-y-4 max-h-[70vh] overflow-y-auto'>
                                 {/* Subject Code (Read-only) */}
                                 <div>
@@ -202,25 +222,7 @@ const SyllabusEditModal = ({
                                     />
                                 </div>
 
-                                {/* Status */}
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Status
-                                    </label>
-                                    <select
-                                        value={formData.isActive}
-                                        onChange={(e) =>
-                                            onFormChange(
-                                                'isActive',
-                                                e.target.value === 'true',
-                                            )
-                                        }
-                                        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                    >
-                                        <option value='true'>Active</option>
-                                        <option value='false'>Inactive</option>
-                                    </select>
-                                </div>
+                              
                             </div>
                         </div>
                         <div className='bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse'>

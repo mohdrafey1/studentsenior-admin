@@ -225,7 +225,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
         <div className='fixed inset-0 z-50 overflow-y-auto'>
             <div className='flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0'>
                 <div
-                    className='fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75'
+                    className='fixed inset-0 bg-black/60 backdrop-blur-sm'
                     onClick={onClose}
                 ></div>
                 <span
@@ -264,83 +264,8 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                         </div>
 
                         <form onSubmit={handleSubmit} className='p-6 space-y-6'>
-                            {/* Basic Information Section */}
-                            <div className='space-y-4'>
-                                <h4 className='text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700 pb-2'>
-                                    Basic Information
-                                </h4>
 
-                                <FormField
-                                    label='Title'
-                                    icon={
-                                        <Type className='h-4 w-4 text-gray-500' />
-                                    }
-                                    required
-                                    description='Clear and descriptive title for the note'
-                                    error={errors.title}
-                                >
-                                    <input
-                                        type='text'
-                                        name='title'
-                                        value={formData.title}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                            errors.title
-                                                ? 'border-red-300 dark:border-red-600'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                        placeholder='Enter note title...'
-                                    />
-                                </FormField>
-
-                                <FormField
-                                    label='Description'
-                                    icon={
-                                        <FileText className='h-4 w-4 text-gray-500' />
-                                    }
-                                    required
-                                    description='Detailed description of the note content'
-                                    error={errors.description}
-                                >
-                                    <textarea
-                                        name='description'
-                                        value={formData.description}
-                                        onChange={handleInputChange}
-                                        rows={4}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${
-                                            errors.description
-                                                ? 'border-red-300 dark:border-red-600'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                        placeholder='Enter note description...'
-                                    />
-                                </FormField>
-
-                                <FormField
-                                    label='URL Slug'
-                                    icon={
-                                        <Link className='h-4 w-4 text-gray-500' />
-                                    }
-                                    description='Custom URL identifier (optional)'
-                                    error={errors.slug}
-                                >
-                                    <input
-                                        type='text'
-                                        name='slug'
-                                        value={formData.slug}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                            errors.slug
-                                                ? 'border-red-300 dark:border-red-600'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                        placeholder='e.g., calculus-chapter-1'
-                                    />
-                                </FormField>
-                            </div>
-
-                            {/* Status Section */}
-                            <div className='space-y-4'>
+                             <div className='space-y-4'>
                                 <h4 className='text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700 pb-2'>
                                     Status Management
                                 </h4>
@@ -442,6 +367,83 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                                     </FormField>
                                 )}
                             </div>
+                            {/* Basic Information Section */}
+                            <div className='space-y-4'>
+                                <h4 className='text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700 pb-2'>
+                                    Basic Information
+                                </h4>
+
+                                <FormField
+                                    label='Title'
+                                    icon={
+                                        <Type className='h-4 w-4 text-gray-500' />
+                                    }
+                                    required
+                                    
+                                    error={errors.title}
+                                >
+                                    <input
+                                        type='text'
+                                        name='title'
+                                        value={formData.title}
+                                        onChange={handleInputChange}
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                            errors.title
+                                                ? 'border-red-300 dark:border-red-600'
+                                                : 'border-gray-300 dark:border-gray-600'
+                                        } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                        placeholder='Enter note title...'
+                                    />
+                                </FormField>
+
+                                <FormField
+                                    label='Description'
+                                    icon={
+                                        <FileText className='h-4 w-4 text-gray-500' />
+                                    }
+                                    required
+                                    description='Detailed description of the note content'
+                                    error={errors.description}
+                                >
+                                    <textarea
+                                        name='description'
+                                        value={formData.description}
+                                        onChange={handleInputChange}
+                                        rows={4}
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${
+                                            errors.description
+                                                ? 'border-red-300 dark:border-red-600'
+                                                : 'border-gray-300 dark:border-gray-600'
+                                        } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                        placeholder='Enter note description...'
+                                    />
+                                </FormField>
+
+                                <FormField
+                                    label='URL Slug'
+                                    icon={
+                                        <Link className='h-4 w-4 text-gray-500' />
+                                    }
+                                    description='Custom URL identifier (optional)'
+                                    error={errors.slug}
+                                >
+                                    <input
+                                        type='text'
+                                        name='slug'
+                                        value={formData.slug}
+                                        onChange={handleInputChange}
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                            errors.slug
+                                                ? 'border-red-300 dark:border-red-600'
+                                                : 'border-gray-300 dark:border-gray-600'
+                                        } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                        placeholder='e.g., calculus-chapter-1'
+                                    />
+                                </FormField>
+                            </div>
+
+                            {/* Status Section */}
+                           
 
                             {/* Pricing Section */}
                             <div className='space-y-4'>
