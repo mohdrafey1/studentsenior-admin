@@ -29,6 +29,8 @@ import PyqList from './pages/PyqList';
 import PyqDetail from './pages/PyqDetail';
 import NotesList from './pages/NotesList';
 import NotesDetail from './pages/NotesDetail';
+import SyllabusList from './pages/SyllabusList';
+import SyllabusDetail from './pages/SyllabusDetail';
 import ProductList from './pages/ProductList';
 import ProductDetail from './pages/ProductDetail';
 import SeniorList from './pages/SeniorList';
@@ -232,6 +234,24 @@ function App() {
                             element={
                                 <ProtectedRoute>
                                     <NotesDetail />
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        {/* Syllabus routes */}
+                        <Route
+                            path='/:collegeslug/syllabus'
+                            element={
+                                <ProtectedRoute>
+                                    <SyllabusList />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path='/:collegeslug/syllabus/:syllabusid'
+                            element={
+                                <ProtectedRoute>
+                                    <SyllabusDetail />
                                 </ProtectedRoute>
                             }
                         />
