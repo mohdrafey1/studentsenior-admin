@@ -247,7 +247,7 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
         <div className='fixed inset-0 z-50 overflow-y-auto'>
             <div className='flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0'>
                 <div
-                    className='fixed inset-0 transition-opacity bg-black/60 backdrop-blur-sm bg-opacity-75'
+                    className='fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75'
                     onClick={onClose}
                 ></div>
                 <span
@@ -256,8 +256,8 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
                 >
                     &#8203;
                 </span>
-                <div className='inline-block align-bottom bg-white dark:bg-gray-900 rounded-lg text-left overflow-auto shadow-xl transform transition-all sm:my-8 sm:align-middle sm:w-full lg:max-w-6xl xl:max-w-7xl relative z-10'>
-                    <div className='flex flex-col h-full max-h-[90vh] lg:max-h-[95vh]'>
+                <div className='inline-block align-bottom bg-white dark:bg-gray-900 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full relative z-10'>
+                    <div className='flex flex-col h-full max-h-[90vh]'>
                         {/* Header */}
                         <div className='flex-shrink-0 bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 text-white p-6'>
                             <div className='flex items-center justify-between'>

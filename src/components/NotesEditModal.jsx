@@ -225,7 +225,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
         <div className='fixed inset-0 z-50 overflow-y-auto'>
             <div className='flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0'>
                 <div
-                    className='fixed inset-0 transition-opacity bg-black/60 backdrop-blur-sm bg-opacity-75'
+                    className='fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75'
                     onClick={onClose}
                 ></div>
                 <span
@@ -234,10 +234,10 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                 >
                     &#8203;
                 </span>
-                <div className='inline-block align-bottom bg-white dark:bg-gray-900 rounded-lg text-left overflow-auto shadow-xl transform transition-all sm:my-8 sm:align-middle sm:w-full lg:max-w-6xl xl:max-w-7xl relative z-10'>
-                    <div className='flex flex-col h-full max-h-[90vh] lg:max-h-[95vh]'>
+                <div className='inline-block align-bottom bg-white dark:bg-gray-900 rounded-lg text-left overflow-auto shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full relative z-10'>
+                    <div className='flex flex-col h-full max-h-[90vh]'>
                         {/* Header with gradient */}
-                        <div className='flex-shrink-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 text-white p-4 lg:p-5'>
+                        <div className='flex-shrink-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 text-white p-6'>
                             <div className='flex items-center justify-between'>
                                 <div className='flex items-center space-x-3'>
                                     <div className='flex-shrink-0'>
@@ -263,92 +263,84 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                             </div>
                         </div>
 
-                        <form onSubmit={handleSubmit} className='p-4 sm:p-5 lg:p-6 space-y-4 lg:space-y-5 xl:space-y-6'>
-                            {/* Top responsive grid: 1 col on small, 2 on lg, 3 on xl */}
-                            <div className='grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5'>
-                                {/* Basic Information Section */}
-                                <div className='space-y-3 lg:space-y-3'>
-                                    <h4 className='text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700 pb-2'>
-                                        Basic Information
-                                    </h4>
+                        <form onSubmit={handleSubmit} className='p-6 space-y-6'>
+                            {/* Basic Information Section */}
+                            <div className='space-y-4'>
+                                <h4 className='text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700 pb-2'>
+                                    Basic Information
+                                </h4>
 
-                                    {/* Title & Description stacked vertically for better spacing */}
-                                    <div className='space-y-4'>
-                                        <FormField
-                                            label='Title'
-                                            icon={
-                                                <Type className='h-4 w-4 text-gray-500' />
-                                            }
-                                            required
-                                            description='Clear and descriptive title for the note'
-                                            error={errors.title}
-                                        >
-                                            <input
-                                                type='text'
-                                                name='title'
-                                                value={formData.title}
-                                                onChange={handleInputChange}
-                                                className={`w-full px-3 py-2 lg:px-4 lg:py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                                    errors.title
-                                                        ? 'border-red-300 dark:border-red-600'
-                                                        : 'border-gray-300 dark:border-gray-600'
-                                                } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                                placeholder='Enter note title...'
-                                            />
-                                        </FormField>
+                                <FormField
+                                    label='Title'
+                                    icon={
+                                        <Type className='h-4 w-4 text-gray-500' />
+                                    }
+                                    required
+                                    description='Clear and descriptive title for the note'
+                                    error={errors.title}
+                                >
+                                    <input
+                                        type='text'
+                                        name='title'
+                                        value={formData.title}
+                                        onChange={handleInputChange}
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                            errors.title
+                                                ? 'border-red-300 dark:border-red-600'
+                                                : 'border-gray-300 dark:border-gray-600'
+                                        } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                        placeholder='Enter note title...'
+                                    />
+                                </FormField>
 
-                                        <FormField
-                                            label='Description'
-                                            icon={
-                                                <FileText className='h-4 w-4 text-gray-500' />
-                                            }
-                                            required
-                                            description='Detailed description of the note content'
-                                            error={errors.description}
-                                        >
-                                            <textarea
-                                                name='description'
-                                                value={formData.description}
-                                                onChange={handleInputChange}
-                                                rows={3}
-                                                className={`w-full px-3 py-2 lg:px-4 lg:py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${
-                                                    errors.description
-                                                        ? 'border-red-300 dark:border-red-600'
-                                                        : 'border-gray-300 dark:border-gray-600'
-                                                } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                                placeholder='Enter note description...'
-                                            />
-                                        </FormField>
+                                <FormField
+                                    label='Description'
+                                    icon={
+                                        <FileText className='h-4 w-4 text-gray-500' />
+                                    }
+                                    required
+                                    description='Detailed description of the note content'
+                                    error={errors.description}
+                                >
+                                    <textarea
+                                        name='description'
+                                        value={formData.description}
+                                        onChange={handleInputChange}
+                                        rows={4}
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${
+                                            errors.description
+                                                ? 'border-red-300 dark:border-red-600'
+                                                : 'border-gray-300 dark:border-gray-600'
+                                        } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                        placeholder='Enter note description...'
+                                    />
+                                </FormField>
 
-                                        {/* URL Slug under Description */}
-                                        <div>
-                                            <FormField
-                                                label='URL Slug'
-                                                icon={
-                                                    <Link className='h-4 w-4 text-gray-500' />
-                                                }
-                                                description='Custom URL identifier (optional)'
-                                                error={errors.slug}
-                                            >
-                                                <input
-                                                    type='text'
-                                                    name='slug'
-                                                    value={formData.slug}
-                                                    onChange={handleInputChange}
-                                                    className={`w-full px-3 py-2 lg:px-4 lg:py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                                        errors.slug
-                                                            ? 'border-red-300 dark:border-red-600'
-                                                            : 'border-gray-300 dark:border-gray-600'
-                                                    } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                                    placeholder='e.g., calculus-chapter-1'
-                                                />
-                                            </FormField>
-                                        </div>
-                                    </div>
-                                </div>
+                                <FormField
+                                    label='URL Slug'
+                                    icon={
+                                        <Link className='h-4 w-4 text-gray-500' />
+                                    }
+                                    description='Custom URL identifier (optional)'
+                                    error={errors.slug}
+                                >
+                                    <input
+                                        type='text'
+                                        name='slug'
+                                        value={formData.slug}
+                                        onChange={handleInputChange}
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                            errors.slug
+                                                ? 'border-red-300 dark:border-red-600'
+                                                : 'border-gray-300 dark:border-gray-600'
+                                        } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                        placeholder='e.g., calculus-chapter-1'
+                                    />
+                                </FormField>
+                            </div>
 
-                                {/* Status Section */}
-                                <div className='space-y-3 lg:space-y-3'>
+                            {/* Status Section */}
+                            <div className='space-y-4'>
                                 <h4 className='text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700 pb-2'>
                                     Status Management
                                 </h4>
@@ -358,11 +350,11 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                                     icon={getCurrentStatus()?.icon}
                                     description='Current status of the note'
                                 >
-                                    <div className='grid grid-cols-1 gap-2 lg:gap-2.5'>
+                                    <div className='grid grid-cols-1 gap-3'>
                                         {statusOptions.map((option) => (
                                             <label
                                                 key={option.value}
-                                                className={`relative flex cursor-pointer rounded-lg border p-3 lg:p-3.5 focus:outline-none transition-all ${
+                                                className={`relative flex cursor-pointer rounded-lg border p-4 focus:outline-none transition-all ${
                                                     formData.submissionStatus ===
                                                     option.value
                                                         ? `border-${option.color}-500 bg-${option.color}-50 dark:bg-${option.color}-900/20`
@@ -439,8 +431,8 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                                             name='rejectionReason'
                                             value={formData.rejectionReason}
                                             onChange={handleInputChange}
-                                            rows={2}
-                                            className={`w-full px-3 py-2 lg:px-4 lg:py-2.5 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-colors resize-none ${
+                                            rows={3}
+                                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-colors resize-none ${
                                                 errors.rejectionReason
                                                     ? 'border-red-300 dark:border-red-600'
                                                     : 'border-gray-300 dark:border-gray-600'
@@ -449,82 +441,79 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                                         />
                                     </FormField>
                                 )}
-                                </div>
+                            </div>
 
-                                {/* Pricing Section (third column on xl) */}
-                                <div className='space-y-3 lg:space-y-3'>
-                                    <h4 className='text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700 pb-2'>
-                                        Pricing Options
-                                    </h4>
+                            {/* Pricing Section */}
+                            <div className='space-y-4'>
+                                <h4 className='text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700 pb-2'>
+                                    Pricing Options
+                                </h4>
 
-                                    <div className='grid grid-cols-1 gap-3 lg:gap-4'>
-                                        <div className='space-y-2'>
-                                            <label className='flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100'>
-                                                <CreditCard className='h-4 w-4' />
-                                                Paid Resource
-                                            </label>
-                                            <div className='flex items-center'>
-                                                <button
-                                                    type='button'
-                                                    onClick={() =>
-                                                        handleToggleChange('isPaid')
-                                                    }
-                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ease-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
-                                                        formData.isPaid
-                                                            ? 'bg-indigo-600'
-                                                            : 'bg-gray-200 dark:bg-gray-700'
-                                                    }`}
-                                                >
-                                                    <span
-                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 ease-out ${
-                                                            formData.isPaid
-                                                                ? 'translate-x-6'
-                                                                : 'translate-x-1'
-                                                        }`}
-                                                    />
-                                                </button>
-                                                <span className='ml-3 text-sm text-gray-700 dark:text-gray-300'>
-                                                    {formData.isPaid
-                                                        ? 'Paid'
-                                                        : 'Free'}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {formData.isPaid && (
-                                            <FormField
-                                                label='Price (₹)'
-                                                icon={
-                                                    <DollarSign className='h-4 w-4 text-gray-500' />
+                                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                                    <div className='space-y-2'>
+                                        <label className='flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100'>
+                                            <CreditCard className='h-4 w-4' />
+                                            Paid Resource
+                                        </label>
+                                        <div className='flex items-center'>
+                                            <button
+                                                type='button'
+                                                onClick={() =>
+                                                    handleToggleChange('isPaid')
                                                 }
-                                                required={formData.isPaid}
-                                                description='Price students will pay for this note'
-                                                error={errors.price}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                                                    formData.isPaid
+                                                        ? 'bg-indigo-600'
+                                                        : 'bg-gray-200 dark:bg-gray-700'
+                                                }`}
                                             >
-                                                <input
-                                                    type='number'
-                                                    name='price'
-                                                    value={formData.price}
-                                                    onChange={handleInputChange}
-                                                    min='0'
-                                                    max='1000'
-                                                    className={`w-full px-3 py-2 lg:px-4 lg:py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                                        errors.price
-                                                            ? 'border-red-300 dark:border-red-600'
-                                                            : 'border-gray-300 dark:border-gray-600'
-                                                    } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                                    placeholder='0'
+                                                <span
+                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                        formData.isPaid
+                                                            ? 'translate-x-6'
+                                                            : 'translate-x-1'
+                                                    }`}
                                                 />
-                                            </FormField>
-                                        )}
+                                            </button>
+                                            <span className='ml-3 text-sm text-gray-700 dark:text-gray-300'>
+                                                {formData.isPaid
+                                                    ? 'Paid'
+                                                    : 'Free'}
+                                            </span>
+                                        </div>
                                     </div>
+
+                                    {formData.isPaid && (
+                                        <FormField
+                                            label='Price (₹)'
+                                            icon={
+                                                <DollarSign className='h-4 w-4 text-gray-500' />
+                                            }
+                                            required={formData.isPaid}
+                                            description='Price students will pay for this note'
+                                            error={errors.price}
+                                        >
+                                            <input
+                                                type='number'
+                                                name='price'
+                                                value={formData.price}
+                                                onChange={handleInputChange}
+                                                min='0'
+                                                max='1000'
+                                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                                    errors.price
+                                                        ? 'border-red-300 dark:border-red-600'
+                                                        : 'border-gray-300 dark:border-gray-600'
+                                                } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                                placeholder='0'
+                                            />
+                                        </FormField>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* End of top grid */}
-
                             {/* Summary */}
-                            <div className='bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 lg:p-3.5 border border-blue-200 dark:border-blue-800'>
+                            <div className='bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800'>
                                 <div className='flex items-start gap-3'>
                                     <Info className='h-5 w-5 text-blue-500 mt-0.5' />
                                     <div className='text-sm text-blue-700 dark:text-blue-300'>
@@ -552,12 +541,12 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
 
                             {/* Note Information */}
                             {note && (
-                                <div className='space-y-3 lg:space-y-3'>
+                                <div className='space-y-4'>
                                     <h4 className='text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700 pb-2'>
                                         Note Information
                                     </h4>
 
-                                    <div className='grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4 text-sm'>
+                                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4 text-sm'>
                                         <div className='space-y-2'>
                                             <label className='text-gray-500 dark:text-gray-400'>
                                                 Subject
@@ -588,7 +577,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                             )}
 
                             {/* Actions */}
-                            <div className='flex items-center justify-end space-x-3 pt-4 lg:pt-5 border-t border-gray-200 dark:border-gray-700'>
+                            <div className='flex items-center justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700'>
                                 <button
                                     type='button'
                                     onClick={onClose}

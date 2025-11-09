@@ -323,7 +323,7 @@ const GroupList = () => {
     console.log('Rendered GroupList with groups:', groups);
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900 overflow-x-hidden'>
+        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
             <Sidebar />
             <main className='pt-6 pb-12'>
