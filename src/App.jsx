@@ -10,7 +10,7 @@ import { SidebarProvider } from './context/SidebarContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import OfflineIndicator from './components/OfflineIndicator';
 import Login from './pages/Login';
-import Signup from './pages/Signup';
+// import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Reports from './pages/Reports';
 import Payments from './pages/Payments';
@@ -81,7 +81,7 @@ function App() {
                     <Routes>
                         {/* Public routes */}
                         <Route path='/login' element={<Login />} />
-                        <Route path='/signup' element={<Signup />} />
+                        {/* <Route path='/signup' element={<Signup />} /> */}
 
                         {/* Protected routes */}
                         <Route
