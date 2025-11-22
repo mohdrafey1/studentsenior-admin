@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { X, Save, User, FileText, Building, GraduationCap } from 'lucide-react';
+import { X, Loader, AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import SearchableSelect from './SearchableSelect';
@@ -32,7 +32,6 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
 
     const [branches, setBranches] = useState([]);
 
-    // Update local branches when hook branches change
     useEffect(() => {
         setBranches(hookBranches);
     }, [hookBranches]);
@@ -73,7 +72,6 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
             });
             setErrors({});
 
-            // If we have both course and branch, ensure the current branch is in the options
             if (
                 courseId &&
                 branchId &&
@@ -87,11 +85,8 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
                     })`,
                 };
                 setBranches([currentBranchOption]);
-
-                // Then fetch all branches for the course
                 fetchBranches(courseId);
             } else if (courseId) {
-                // If we only have course ID, fetch branches immediately
                 fetchBranches(courseId);
             }
         }
@@ -105,8 +100,6 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
 
     useEffect(() => {
         if (formData.course && !senior) {
-            // Only fetch branches on course change for new entries
-            // For existing entries, branches are fetched in the first useEffect
             fetchBranches(formData.course);
         }
     }, [formData.course, fetchBranches, senior]);
@@ -144,10 +137,24 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
+        
+        setFormData((prev) => {
+            const newData = { ...prev, [name]: value };
+
+            // Automatically manage slug suffix based on submission status
+            if (name === 'submissionStatus') {
+                const currentSlug = prev.slug || '';
+                const baseSlug = currentSlug.replace(/-rejected$/, '');
+                
+                if (value === 'rejected') {
+                    newData.slug = baseSlug + '-rejected';
+                } else {
+                    newData.slug = baseSlug;
+                }
+            }
+
+            return newData;
+        });
 
         if (errors[name]) {
             setErrors((prev) => ({
@@ -239,167 +246,151 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
     if (!isOpen) return null;
 
     return (
-        <div className='fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
-            <div className='bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto'>
-                <div className='flex-shrink-0 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white p-6'>
-                    <div className='flex items-center justify-between'>
-                        <div className='flex items-center space-x-3'>
-                            <div className='flex-shrink-0'>
-                                <div className='w-10 h-10 bg-white/20 rounded-full flex items-center justify-center'>
-                                    <User className='w-5 h-5 text-white' />
-                                </div>
-                            </div>
-                            <div>
-                                <h3 className='text-lg font-semibold text-white'>
-                                    Edit Senior Profile
-                                </h3>
-                                <p className='text-sm text-purple-100'>
-                                    Update senior student information
-                                </p>
-                            </div>
+        <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
+            <div className='flex items-center justify-center min-h-screen p-4'>
+                <div
+                    className='fixed inset-0'
+                    onClick={onClose}
+                ></div>
+                
+                <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
+                    {/* Header */}
+                    <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
+                        <div>
+                            <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
+                                Edit Senior Profile
+                            </h2>
+                            <p className='text-sm text-gray-500 dark:text-gray-400'>
+                                {senior?.owner?.username || 'Senior'}
+                            </p>
                         </div>
                         <button
                             onClick={onClose}
-                            className='text-white/80 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full'
+                            className='p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded'
+                            disabled={isSubmitting}
                         >
-                            <X className='w-5 h-5' />
+                            <X className='h-5 w-5' />
                         </button>
                     </div>
-                </div>
 
-                <form
-                    onSubmit={handleSubmit}
-                    className='flex-1 flex flex-col overflow-auto'
-                >
-
-                      <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                <GraduationCap className='h-5 w-5 text-blue-500' />
-                                Status Management
-                            </h3>
-
-                            <div className='grid md:grid-cols-2 gap-6'>
+                    <form onSubmit={handleSubmit}>
+                        <div className='p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto'>
+                            {/* Status and Slug */}
+                            <div className='grid grid-cols-2 gap-4'>
                                 <div>
-                                    <label className='block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2'>
-                                        Submission Status
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Status <span className='text-red-500'>*</span>
                                     </label>
                                     <select
                                         name='submissionStatus'
                                         value={formData.submissionStatus}
                                         onChange={handleInputChange}
-                                        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
                                     >
                                         <option value='pending'>Pending</option>
-                                        <option value='approved'>
-                                            Approved
-                                        </option>
-                                        <option value='rejected'>
-                                            Rejected
-                                        </option>
+                                        <option value='approved'>Approved</option>
+                                        <option value='rejected'>Rejected</option>
                                     </select>
                                 </div>
 
                                 <div>
-                                    <label className='block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2'>
-                                        Slug
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        URL Slug
                                     </label>
                                     <input
                                         type='text'
                                         name='slug'
                                         value={formData.slug}
                                         onChange={handleInputChange}
-                                        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                        placeholder='e.g., john-doe-cse-2024'
+                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                        placeholder='john-doe-cse-2024'
                                     />
                                 </div>
                             </div>
 
+                            {/* Rejection Reason */}
                             {formData.submissionStatus === 'rejected' && (
-                                <div className='mt-6'>
-                                    <label className='block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2'>
-                                        Rejection Reason{' '}
-                                        <span className='text-red-500'>*</span>
+                                <div>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Rejection Reason <span className='text-red-500'>*</span>
                                     </label>
                                     <textarea
                                         name='rejectionReason'
                                         value={formData.rejectionReason}
                                         onChange={handleInputChange}
-                                        rows={3}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${
+                                        rows={2}
+                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 dark:text-white resize-none ${
                                             errors.rejectionReason
-                                                ? 'border-red-300 dark:border-red-600'
+                                                ? 'border-red-300'
                                                 : 'border-gray-300 dark:border-gray-600'
-                                        } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                        placeholder='Please provide a reason for rejection...'
+                                        }`}
+                                        placeholder='Provide rejection reason...'
                                     />
                                     {errors.rejectionReason && (
-                                        <p className='text-sm text-red-600 dark:text-red-400 mt-1'>
+                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                            <AlertTriangle className='h-3 w-3' />
                                             {errors.rejectionReason}
                                         </p>
                                     )}
                                 </div>
                             )}
-                        </div>
-                    <div className='flex-1 overflow-y-auto p-6 space-y-6'>
-                        <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                <User className='h-5 w-5 text-purple-500' />
-                                Basic Information
-                            </h3>
 
-                            <div className='grid md:grid-cols-2 gap-6'>
+                            {/* Name and Year */}
+                            <div className='grid grid-cols-2 gap-4'>
                                 <div>
-                                    <label className='block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2'>
-                                        Full Name{' '}
-                                        <span className='text-red-500'>*</span>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Full Name <span className='text-red-500'>*</span>
                                     </label>
                                     <input
                                         type='text'
                                         name='name'
                                         value={formData.name}
                                         onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
                                             errors.name
-                                                ? 'border-red-300 dark:border-red-600'
+                                                ? 'border-red-300'
                                                 : 'border-gray-300 dark:border-gray-600'
-                                        } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                                        }`}
                                         placeholder='Enter full name...'
                                     />
                                     {errors.name && (
-                                        <p className='text-sm text-red-600 dark:text-red-400 mt-1'>
+                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                            <AlertTriangle className='h-3 w-3' />
                                             {errors.name}
                                         </p>
                                     )}
                                 </div>
 
                                 <div>
-                                    <label className='block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2'>
-                                        Year{' '}
-                                        <span className='text-red-500'>*</span>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Year <span className='text-red-500'>*</span>
                                     </label>
                                     <input
                                         type='text'
                                         name='year'
                                         value={formData.year}
                                         onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
                                             errors.year
-                                                ? 'border-red-300 dark:border-red-600'
+                                                ? 'border-red-300'
                                                 : 'border-gray-300 dark:border-gray-600'
-                                        } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                        placeholder='e.g., 2024, Final Year, etc.'
+                                        }`}
+                                        placeholder='e.g., 2024'
                                     />
                                     {errors.year && (
-                                        <p className='text-sm text-red-600 dark:text-red-400 mt-1'>
+                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                            <AlertTriangle className='h-3 w-3' />
                                             {errors.year}
                                         </p>
                                     )}
                                 </div>
+                            </div>
 
+                            {/* Course and Branch */}
+                            <div className='grid grid-cols-2 gap-4'>
                                 <div>
-                                    <label className='block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2'>
-                                        Course{' '}
-                                        <span className='text-red-500'>*</span>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Course <span className='text-red-500'>*</span>
                                     </label>
                                     <SearchableSelect
                                         options={courses}
@@ -411,7 +402,7 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
                                                     typeof value === 'string'
                                                         ? value
                                                         : '',
-                                                branch: '', // Reset branch when course changes
+                                                branch: '',
                                             }));
                                             if (value) {
                                                 fetchBranches(value);
@@ -422,16 +413,16 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
                                         errorState={!!errors.course}
                                     />
                                     {errors.course && (
-                                        <p className='text-sm text-red-600 dark:text-red-400 mt-1'>
+                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                            <AlertTriangle className='h-3 w-3' />
                                             {errors.course}
                                         </p>
                                     )}
                                 </div>
 
                                 <div>
-                                    <label className='block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2'>
-                                        Branch{' '}
-                                        <span className='text-red-500'>*</span>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Branch <span className='text-red-500'>*</span>
                                     </label>
                                     <SearchableSelect
                                         options={branches}
@@ -451,14 +442,18 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
                                         disabled={!formData.course}
                                     />
                                     {errors.branch && (
-                                        <p className='text-sm text-red-600 dark:text-red-400 mt-1'>
+                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                            <AlertTriangle className='h-3 w-3' />
                                             {errors.branch}
                                         </p>
                                     )}
                                 </div>
+                            </div>
 
+                            {/* Domain and Profile Picture */}
+                            <div className='grid grid-cols-2 gap-4'>
                                 <div>
-                                    <label className='block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2'>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                                         Domain
                                     </label>
                                     <input
@@ -466,13 +461,13 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
                                         name='domain'
                                         value={formData.domain}
                                         onChange={handleInputChange}
-                                        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                        placeholder='e.g., Web Development, Data Science, etc.'
+                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                        placeholder='e.g., Web Development'
                                     />
                                 </div>
 
                                 <div>
-                                    <label className='block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2'>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                                         Profile Picture URL
                                     </label>
                                     <input
@@ -480,191 +475,119 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
                                         name='profilePicture'
                                         value={formData.profilePicture}
                                         onChange={handleInputChange}
-                                        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                        placeholder='https://example.com/profile.jpg'
+                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                        placeholder='https://...'
                                     />
                                 </div>
                             </div>
-                        </div>
 
-                        <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                <FileText className='h-5 w-5 text-green-500' />
-                                Description
-                            </h3>
+                            {/* Description */}
                             <div>
-                                <label className='block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2'>
+                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                                     Description
                                 </label>
                                 <textarea
                                     name='description'
                                     value={formData.description}
                                     onChange={handleInputChange}
-                                    rows={4}
-                                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                    rows={3}
+                                    className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none border-gray-300 dark:border-gray-600'
                                     placeholder='Tell us about yourself...'
                                 />
                             </div>
-                        </div>
 
-                        <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
-                            {senior.whatsapp && (
-                                <div>
-                                    For Temporary Add it below - whatsapp:-
-                                    {senior.whatsapp}
-                                </div>
-                            )}
-                            {senior.telegram && (
-                                <div>
-                                    For Temporary Add it below - telegram:-
-                                    {senior.telegram}
-                                </div>
-                            )}
-                            <div className='flex items-center justify-between mb-4'>
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2'>
-                                    <Building className='h-5 w-5 text-blue-500' />
-                                    Social Media Links
-                                </h3>
-                                <button
-                                    type='button'
-                                    onClick={addSocialMediaLink}
-                                    className='px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm'
-                                >
-                                    Add Link
-                                </button>
-                            </div>
-                            {formData.socialMediaLinks.map((link, index) => (
-                                <div key={index} className='flex gap-3 mb-3'>
-                                    <select
-                                        value={link.platform}
-                                        onChange={(e) =>
-                                            updateSocialMediaLink(
-                                                index,
-                                                'platform',
-                                                e.target.value,
-                                            )
-                                        }
-                                        className='px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                    >
-                                        <option value='whatsapp'>
-                                            WhatsApp
-                                        </option>
-                                        <option value='linkedin'>
-                                            LinkedIn
-                                        </option>
-                                        <option value='github'>GitHub</option>
-                                        <option value='twitter'>Twitter</option>
-                                        <option value='instagram'>
-                                            Instagram
-                                        </option>
-                                        <option value='facebook'>
-                                            Facebook
-                                        </option>
-                                        <option value='youtube'>YouTube</option>
-                                        <option value='telegram'>
-                                            Telegram
-                                        </option>
-                                        <option value='other'>Other</option>
-                                    </select>
-                                    <input
-                                        type='text'
-                                        value={link.url}
-                                        onChange={(e) =>
-                                            updateSocialMediaLink(
-                                                index,
-                                                'url',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder='https://...'
-                                        className='flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                    />
+                            {/* Social Media Links */}
+                            <div>
+                                <div className='flex items-center justify-between mb-2'>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300'>
+                                        Social Media Links
+                                    </label>
                                     <button
                                         type='button'
-                                        onClick={() =>
-                                            removeSocialMediaLink(index)
-                                        }
-                                        className='px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors'
+                                        onClick={addSocialMediaLink}
+                                        className='text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1'
                                     >
-                                        Remove
+                                        <Plus className='h-4 w-4' />
+                                        Add Link
                                     </button>
                                 </div>
-                            ))}
-                        </div>
-
-                      
-
-                        {senior && (
-                            <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                    <User className='h-5 w-5 text-purple-500' />
-                                    Profile Information
-                                </h3>
-                                <div className='grid md:grid-cols-2 gap-6'>
-                                    <div className='space-y-2'>
-                                        <label className='text-gray-500 dark:text-gray-400'>
-                                            Profile ID
-                                        </label>
-                                        <div className='text-gray-900 dark:text-gray-100 font-mono text-sm'>
-                                            {senior._id}
+                                <div className='space-y-2'>
+                                    {formData.socialMediaLinks.map((link, index) => (
+                                        <div key={index} className='flex gap-2'>
+                                            <select
+                                                value={link.platform}
+                                                onChange={(e) =>
+                                                    updateSocialMediaLink(
+                                                        index,
+                                                        'platform',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className='px-3 py-2 border rounded-lg dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                            >
+                                                <option value='whatsapp'>WhatsApp</option>
+                                                <option value='linkedin'>LinkedIn</option>
+                                                <option value='github'>GitHub</option>
+                                                <option value='twitter'>Twitter</option>
+                                                <option value='instagram'>Instagram</option>
+                                                <option value='telegram'>Telegram</option>
+                                                <option value='other'>Other</option>
+                                            </select>
+                                            <input
+                                                type='text'
+                                                value={link.url}
+                                                onChange={(e) =>
+                                                    updateSocialMediaLink(
+                                                        index,
+                                                        'url',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder='https://...'
+                                                className='flex-1 px-3 py-2 border rounded-lg dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                            />
+                                            <button
+                                                type='button'
+                                                onClick={() =>
+                                                    removeSocialMediaLink(index)
+                                                }
+                                                className='p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg'
+                                            >
+                                                <Trash2 className='h-4 w-4' />
+                                            </button>
                                         </div>
-                                    </div>
-                                    <div className='space-y-2'>
-                                        <label className='text-gray-500 dark:text-gray-400'>
-                                            Created By
-                                        </label>
-                                        <div className='flex items-center space-x-2'>
-                                            <User className='h-4 w-4 text-gray-400' />
-                                            <span className='text-gray-900 dark:text-gray-100'>
-                                                {senior.owner?.username ||
-                                                    'N/A'}
-                                            </span>
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
                             </div>
-                        )}
-                    </div>
-
-                    <div className='flex-shrink-0 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-6 py-4'>
-                        <div className='flex items-center justify-between'>
-                            <div className='text-sm text-gray-500 dark:text-gray-400'>
-                                Last updated:{' '}
-                                {senior &&
-                                    new Date(
-                                        senior.updatedAt || senior.createdAt,
-                                    ).toLocaleString()}
-                            </div>
-                            <div className='flex gap-3'>
-                                <button
-                                    type='button'
-                                    onClick={onClose}
-                                    disabled={isSubmitting}
-                                    className='px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed'
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type='submit'
-                                    disabled={isSubmitting}
-                                    className='px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-sm font-medium hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
-                                >
-                                    {isSubmitting ? (
-                                        <>
-                                            <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' />
-                                            Updating...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save className='h-4 w-4' />
-                                            Update Profile
-                                        </>
-                                    )}
-                                </button>
-                            </div>
                         </div>
-                    </div>
-                </form>
+
+                        {/* Footer */}
+                        <div className='flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700'>
+                            <button
+                                type='button'
+                                onClick={onClose}
+                                disabled={isSubmitting}
+                                className='px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg disabled:opacity-50'
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type='submit'
+                                disabled={isSubmitting}
+                                className='px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 flex items-center gap-2'
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader className='h-4 w-4 animate-spin' />
+                                        Updating...
+                                    </>
+                                ) : (
+                                    'Update Profile'
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     );
