@@ -10,16 +10,14 @@ import {
     Edit2,
     Trash2,
     Mail,
-    Phone,
-    Building,
-    GraduationCap,
+    Linkedin,
+    Github,
+    Instagram,
+    MapPin,
     Calendar,
     Briefcase,
-    ExternalLink,
+    GraduationCap,
     AlertTriangle,
-    Award,
-    MapPin,
-    Globe,
 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import SeniorEditModal from '../components/SeniorEditModal';
@@ -27,14 +25,13 @@ import SeniorEditModal from '../components/SeniorEditModal';
 const SeniorDetail = () => {
     const [senior, setSenior] = useState(null);
     const [loading, setLoading] = useState(true);
-
     const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [showRawData, setShowRawData] = useState(false);
+
     const { collegeslug, seniorid } = useParams();
     const navigate = useNavigate();
 
-    // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
         isOpen: false,
         title: '',
@@ -87,19 +84,19 @@ const SeniorDetail = () => {
 
     const handleDelete = async () => {
         const confirmed = await showConfirm({
-            title: 'Delete Senior Profile',
-            message: `Are you sure you want to delete "${senior.name}"'s profile? This action cannot be undone.`,
+            title: 'Delete Senior',
+            message: `Are you sure you want to delete "${senior.name}"? This action cannot be undone.`,
             variant: 'danger',
         });
 
         if (confirmed) {
             try {
                 await api.delete(`/senior/delete/${senior._id}`);
-                toast.success('Senior profile deleted successfully');
+                toast.success('Senior deleted successfully');
                 navigate(`/${collegeslug}/seniors`);
             } catch (error) {
                 console.error('Error deleting senior:', error);
-                toast.error('Failed to delete senior profile');
+                toast.error('Failed to delete senior');
             }
         }
     };
@@ -118,12 +115,7 @@ const SeniorDetail = () => {
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
                 <div className='flex items-center justify-center min-h-[60vh]'>
-                    <div className='text-center'>
-                        <Loader className='h-8 w-8 animate-spin text-blue-600 mx-auto mb-4' />
-                        <p className='text-gray-600 dark:text-gray-400'>
-                            Loading senior profile...
-                        </p>
-                    </div>
+                    <Loader className='h-8 w-8 animate-spin text-blue-600' />
                 </div>
             </div>
         );
@@ -133,36 +125,24 @@ const SeniorDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
                     <button
                         onClick={() => navigate(-1)}
-                        className='flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 mb-6 transition-colors'
+                        className='flex items-center text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 mb-8 transition-colors'
                     >
                         <ArrowLeft className='h-4 w-4 mr-2' />
-                        Back
+                        Back to Seniors
                     </button>
-
-                    <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12'>
-                        <div className='text-center'>
-                            <div className='w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4'>
-                                <AlertTriangle className='h-8 w-8 text-red-600 dark:text-red-400' />
-                            </div>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2'>
-                                Senior Profile Not Found
-                            </h3>
-                            <p className='text-gray-600 dark:text-gray-400 mb-4'>
-                                {error ||
-                                    'The requested senior profile could not be found.'}
-                            </p>
-                            <button
-                                onClick={() =>
-                                    navigate(`/${collegeslug}/seniors`)
-                                }
-                                className='bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors'
-                            >
-                                Back to Seniors
-                            </button>
+                    <div className='text-center py-12'>
+                        <div className='w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4'>
+                            <AlertTriangle className='h-8 w-8 text-red-600 dark:text-red-400' />
                         </div>
+                        <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2'>
+                            Senior Not Found
+                        </h3>
+                        <p className='text-gray-500 dark:text-gray-400'>
+                            {error || 'The requested senior could not be found.'}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -170,211 +150,200 @@ const SeniorDetail = () => {
     }
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
+        <div className='min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans'>
             <Header />
-            <div className='max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-                {/* Navigation */}
-                <div className='mb-6'>
-                    <button
-                        onClick={() => navigate(-1)}
-                        className='flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors'
-                    >
-                        <ArrowLeft className='h-4 w-4 mr-2' />
-                        Back to Seniors
-                    </button>
-                </div>
-
-                {/* Senior Header */}
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6'>
-                    <div className='bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 px-6 py-8'>
-                        <div className='flex items-center justify-between'>
-                            <div className='flex items-center space-x-6'>
-                                <div className='relative'>
-                                    {senior.profilePicture ? (
-                                        <img
-                                            src={senior.profilePicture}
-                                            alt={senior.name}
-                                            className='w-24 h-24 rounded-full object-cover border-4 border-white/20'
-                                        />
-                                    ) : (
-                                        <div className='w-24 h-24 bg-white/20 rounded-full flex items-center justify-center'>
-                                            <User className='h-12 w-12 text-white' />
-                                        </div>
-                                    )}
-                                    <div className='absolute -bottom-2 -right-2 bg-green-500 rounded-full p-2'>
-                                        <GraduationCap className='h-4 w-4 text-white' />
-                                    </div>
-                                </div>
-                                <div>
-                                    <h1 className='text-3xl font-bold text-white mb-2'>
-                                        {senior.name}
-                                    </h1>
-                                    <div className='flex items-center space-x-4 text-white/90'>
-                                        <div className='flex items-center space-x-1'>
-                                            <Building className='h-4 w-4' />
-                                            <span>
-                                                {senior.domain ||
-                                                    'Unknown Branch'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className='flex space-x-2'>
-                                <button
-                                    onClick={handleEdit}
-                                    className='p-3 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white'
-                                    title='Edit Profile'
-                                >
-                                    <Edit2 className='h-5 w-5' />
-                                </button>
-                                <button
-                                    onClick={handleDelete}
-                                    className='p-3 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white'
-                                    title='Delete Profile'
-                                >
-                                    <Trash2 className='h-5 w-5' />
-                                </button>
-                            </div>
+            <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+                {/* Top Navigation & Actions */}
+                <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8'>
+                    <div className='flex items-center gap-4'>
+                        <button
+                            onClick={() => navigate(-1)}
+                            className='p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors'
+                        >
+                            <ArrowLeft className='h-5 w-5' />
+                        </button>
+                        <div>
+                            <h1 className='text-2xl font-bold flex items-center gap-3'>
+                                {senior.name}
+                            </h1>
+                            <p className='text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2'>
+                                <span className='font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded'>
+                                    ID: {senior._id}
+                                </span>
+                            </p>
                         </div>
+                    </div>
+                    <div className='flex items-center gap-2'>
+                        <button
+                            onClick={handleEdit}
+                            className='flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium'
+                        >
+                            <Edit2 className='h-4 w-4' />
+                            Edit
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium'
+                        >
+                            <Trash2 className='h-4 w-4' />
+                            Delete
+                        </button>
                     </div>
                 </div>
 
-                <div className='grid lg:grid-cols-3 gap-6'>
-                    {/* Main Content */}
-                    <div className='lg:col-span-2 space-y-6'>
-                        {/* About Section */}
-                        {senior.description && (
-                            <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4'>
-                                    About
-                                </h3>
-                                <p className='text-gray-600 dark:text-gray-400 leading-relaxed'>
-                                    {senior.description}
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Academic Information */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                <GraduationCap className='h-5 w-5 text-green-500' />
-                                Academic Information
-                            </h3>
-                            <div className='grid md:grid-cols-2 gap-4'>
-                                <div className='space-y-3'>
-                                    <div>
-                                        <label className='text-sm font-medium text-gray-500 dark:text-gray-400'>
-                                            Branch/Department
-                                        </label>
-                                        <p className='text-gray-900 dark:text-gray-100'>
-                                            {senior.branch?.branchName ||
-                                                'Not specified'}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <label className='text-sm font-medium text-gray-500 dark:text-gray-400'>
-                                            Graduation Year
-                                        </label>
-                                        <p className='text-gray-900 dark:text-gray-100'>
-                                            {senior.year || 'Not specified'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Sidebar */}
-                    <div className='space-y-6'>
-                        {/* Contact Information */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4'>
-                                Contact Information
-                            </h3>
-                            <div className='space-y-3'>
-                                {senior.socialMediaLinks.map((link, index) => (
-                                    <div
-                                        key={index}
-                                        className='flex items-center space-x-3'
-                                    >
-                                        <Globe className='h-4 w-4 text-gray-400' />
-                                        <div className='flex-1 min-w-0'>
-                                            <p className='text-sm text-gray-600 dark:text-gray-400'>
-                                                {link.platform}
-                                            </p>
-                                            <a
-                                                href={link.url}
-                                                target='_blank'
-                                                rel='noopener noreferrer'
-                                                className='text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1'
-                                            >
-                                                {link.url}
-                                                <ExternalLink className='h-3 w-3' />
-                                            </a>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Profile Statistics */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4'>
-                                Profile Details
-                            </h3>
-                            <div className='space-y-3'>
-                                <div className='flex justify-between'>
-                                    <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                        Joined:
-                                    </span>
-                                    <span className='text-sm text-gray-900 dark:text-gray-100'>
-                                        {new Date(
-                                            senior.createdAt,
-                                        ).toLocaleString()}
-                                    </span>
-                                </div>
-
-                                <div className='flex justify-between'>
-                                    <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                        Last Updated:
-                                    </span>
-                                    <span className='text-sm text-gray-900 dark:text-gray-100'>
-                                        {new Date(
-                                            senior.updatedAt ||
-                                                senior.createdAt,
-                                        ).toLocaleString()}
-                                    </span>
-                                </div>
-                                {senior.owner && (
-                                    <div className='flex justify-between'>
-                                        <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                            Added by:
-                                        </span>
-                                        <span className='text-sm text-gray-900 dark:text-gray-100'>
-                                            {senior.owner.username}
-                                        </span>
+                <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
+                    {/* Left Column: Profile & About */}
+                    <div className='lg:col-span-2 space-y-8'>
+                        {/* Profile Header Card */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 flex flex-col md:flex-row items-center md:items-start gap-8'>
+                            <div className='flex-shrink-0'>
+                                {senior.profilePicture ? (
+                                    <img
+                                        src={senior.profilePicture}
+                                        alt={senior.name}
+                                        className='h-32 w-32 rounded-full object-cover ring-4 ring-gray-50 dark:ring-gray-700'
+                                    />
+                                ) : (
+                                    <div className='h-32 w-32 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center ring-4 ring-gray-50 dark:ring-gray-700'>
+                                        <User className='h-12 w-12 text-gray-400' />
                                     </div>
                                 )}
                             </div>
+                            <div className='text-center md:text-left flex-1'>
+                                <h2 className='text-2xl font-bold mb-2'>{senior.name}</h2>
+                                <div className='flex flex-wrap items-center justify-center md:justify-start gap-3 mb-4'>
+                                    <span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'>
+                                        <Briefcase className='h-3.5 w-3.5' />
+                                        {senior.domain || 'N/A'}
+                                    </span>
+                                    {senior.year && (
+                                        <span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'>
+                                            <GraduationCap className='h-3.5 w-3.5' />
+                                            {senior.year}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className='flex items-center justify-center md:justify-start gap-4'>
+                                    {senior.linkedin && (
+                                        <a
+                                            href={senior.linkedin}
+                                            target='_blank'
+                                            rel='noopener noreferrer'
+                                            className='text-gray-400 hover:text-[#0077b5] transition-colors'
+                                        >
+                                            <Linkedin className='h-6 w-6' />
+                                        </a>
+                                    )}
+                                    {senior.github && (
+                                        <a
+                                            href={senior.github}
+                                            target='_blank'
+                                            rel='noopener noreferrer'
+                                            className='text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors'
+                                        >
+                                            <Github className='h-6 w-6' />
+                                        </a>
+                                    )}
+                                    {senior.instagram && (
+                                        <a
+                                            href={senior.instagram}
+                                            target='_blank'
+                                            rel='noopener noreferrer'
+                                            className='text-gray-400 hover:text-[#E4405F] transition-colors'
+                                        >
+                                            <Instagram className='h-6 w-6' />
+                                        </a>
+                                    )}
+                                    {senior.email && (
+                                        <a
+                                            href={`mailto:${senior.email}`}
+                                            className='text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors'
+                                        >
+                                            <Mail className='h-6 w-6' />
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Description Card */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
+                            <h2 className='text-lg font-semibold mb-4'>About</h2>
+                            <div className='prose prose-sm dark:prose-invert max-w-none text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed'>
+                                {senior.description || 'No description provided.'}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Metadata & Details */}
+                    <div className='space-y-8'>
+                        {/* Info Card */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
+                            <h2 className='text-lg font-semibold mb-6 flex items-center gap-2'>
+                                <User className='h-5 w-5 text-gray-400' />
+                                Senior Details
+                            </h2>
+                            <dl className='space-y-4'>
+                                <div>
+                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                        Branch
+                                    </dt>
+                                    <dd className='font-medium'>
+                                        {senior.branch?.branchName || senior.branch || 'N/A'}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                        Created By
+                                    </dt>
+                                    <dd className='flex items-center gap-2 text-sm'>
+                                        <div className='h-6 w-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400'>
+                                            <User className='h-3.5 w-3.5' />
+                                        </div>
+                                        {senior.owner?.username || 'Unknown'}
+                                    </dd>
+                                </div>
+
+                                <div className='pt-4 border-t border-gray-100 dark:border-gray-700'>
+                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                        Timestamps
+                                    </dt>
+                                    <dd className='space-y-2 text-sm'>
+                                        <div className='flex justify-between'>
+                                            <span className='text-gray-500'>Created</span>
+                                            <span className='font-mono'>
+                                                {new Date(senior.createdAt).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                        <div className='flex justify-between'>
+                                            <span className='text-gray-500'>Updated</span>
+                                            <span className='font-mono'>
+                                                {new Date(
+                                                    senior.updatedAt || senior.createdAt,
+                                                ).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    </dd>
+                                </div>
+                            </dl>
                         </div>
 
                         {/* Raw Data Toggle */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
                             <button
                                 onClick={() => setShowRawData(!showRawData)}
-                                className='flex items-center justify-between w-full text-left'
+                                className='w-full flex items-center justify-between px-6 py-4 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors'
                             >
-                                <span className='text-sm font-medium text-gray-900 dark:text-white'>
+                                <span className='text-gray-900 dark:text-white'>
                                     Raw Data
                                 </span>
-                                <span className='text-xs text-blue-600 dark:text-blue-400 hover:underline'>
-                                    {showRawData ? 'Hide JSON' : 'Show JSON'}
+                                <span className='text-blue-600 dark:text-blue-400'>
+                                    {showRawData ? 'Hide' : 'Show'}
                                 </span>
                             </button>
                             {showRawData && (
-                                <div className='mt-4'>
-                                    <pre className='bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-x-auto text-xs font-mono text-gray-700 dark:text-gray-300'>
+                                <div className='border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 overflow-x-auto'>
+                                    <pre className='text-xs font-mono text-gray-600 dark:text-gray-400'>
                                         {JSON.stringify(senior, null, 2)}
                                     </pre>
                                 </div>
@@ -382,24 +351,24 @@ const SeniorDetail = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Modals */}
+                <ConfirmModal
+                    isOpen={confirmModal.isOpen}
+                    onClose={handleCloseConfirm}
+                    onConfirm={confirmModal.onConfirm}
+                    title={confirmModal.title}
+                    message={confirmModal.message}
+                    variant={confirmModal.variant}
+                />
+
+                <SeniorEditModal
+                    isOpen={showModal}
+                    onClose={handleModalClose}
+                    senior={senior}
+                    onSuccess={handleModalSuccess}
+                />
             </div>
-
-            {/* Modals */}
-            <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={handleCloseConfirm}
-                onConfirm={confirmModal.onConfirm}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                variant={confirmModal.variant}
-            />
-
-            <SeniorEditModal
-                isOpen={showModal}
-                onClose={handleModalClose}
-                senior={senior}
-                onSuccess={handleModalSuccess}
-            />
         </div>
     );
 };

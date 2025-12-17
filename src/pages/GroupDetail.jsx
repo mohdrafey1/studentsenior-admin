@@ -9,19 +9,14 @@ import {
     Edit2,
     Trash2,
     MessageCircle,
-    Users,
     ExternalLink,
     AlertTriangle,
-    Hash,
-    Calendar,
-    BookOpen,
     GraduationCap,
     Clock,
     User,
-    Shield,
-    Code,
     CheckCircle,
     XCircle,
+    Calendar,
 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import GroupEditModal from '../components/GroupEditModal';
@@ -32,6 +27,7 @@ const GroupDetail = () => {
     const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [showRawData, setShowRawData] = useState(false);
+
     const { collegeslug, groupid } = useParams();
     const navigate = useNavigate();
 
@@ -122,25 +118,29 @@ const GroupDetail = () => {
         handleModalClose();
     };
 
-    const getStatusColor = (status) => {
+    const getStatusBadge = (status) => {
         switch (status) {
             case 'approved':
-                return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+                return (
+                    <span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'>
+                        <CheckCircle className='h-4 w-4' />
+                        Approved
+                    </span>
+                );
             case 'rejected':
-                return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+                return (
+                    <span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'>
+                        <XCircle className='h-4 w-4' />
+                        Rejected
+                    </span>
+                );
             default:
-                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
-        }
-    };
-
-    const getStatusIcon = (status) => {
-        switch (status) {
-            case 'approved':
-                return <CheckCircle className='h-4 w-4' />;
-            case 'rejected':
-                return <XCircle className='h-4 w-4' />;
-            default:
-                return <Clock className='h-4 w-4' />;
+                return (
+                    <span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800'>
+                        <Clock className='h-4 w-4' />
+                        Pending
+                    </span>
+                );
         }
     };
 
@@ -149,12 +149,7 @@ const GroupDetail = () => {
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
                 <div className='flex items-center justify-center min-h-[60vh]'>
-                    <div className='text-center'>
-                        <Loader className='h-8 w-8 animate-spin text-blue-600 mx-auto mb-4' />
-                        <p className='text-gray-600 dark:text-gray-400'>
-                            Loading group details...
-                        </p>
-                    </div>
+                    <Loader className='h-8 w-8 animate-spin text-blue-600' />
                 </div>
             </div>
         );
@@ -164,36 +159,24 @@ const GroupDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
                     <button
                         onClick={() => navigate(-1)}
-                        className='flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 mb-6 transition-colors'
+                        className='flex items-center text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 mb-8 transition-colors'
                     >
                         <ArrowLeft className='h-4 w-4 mr-2' />
-                        Back
+                        Back to Groups
                     </button>
-
-                    <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12'>
-                        <div className='text-center'>
-                            <div className='w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4'>
-                                <AlertTriangle className='h-8 w-8 text-red-600 dark:text-red-400' />
-                            </div>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2'>
-                                Group Not Found
-                            </h3>
-                            <p className='text-gray-600 dark:text-gray-400 mb-4'>
-                                {error ||
-                                    'The requested group could not be found.'}
-                            </p>
-                            <button
-                                onClick={() =>
-                                    navigate(`/${collegeslug}/groups`)
-                                }
-                                className='bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors'
-                            >
-                                Back to Groups
-                            </button>
+                    <div className='text-center py-12'>
+                        <div className='w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4'>
+                            <AlertTriangle className='h-8 w-8 text-red-600 dark:text-red-400' />
                         </div>
+                        <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2'>
+                            Group Not Found
+                        </h3>
+                        <p className='text-gray-500 dark:text-gray-400'>
+                            {error || 'The requested group could not be found.'}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -201,86 +184,51 @@ const GroupDetail = () => {
     }
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
+        <div className='min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans'>
             <Header />
-            <div className='max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-                {/* Navigation */}
-                <div className='mb-6'>
-                    <button
-                        onClick={() => navigate(-1)}
-                        className='flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors'
-                    >
-                        <ArrowLeft className='h-4 w-4 mr-2' />
-                        Back to Groups
-                    </button>
-                </div>
-
-                {/* Group Header */}
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6'>
-                    <div className='bg-gradient-to-r from-green-600 via-teal-600 to-blue-600 px-6 py-8'>
-                        <div className='flex items-center justify-between'>
-                            <div className='flex items-center space-x-6'>
-                                <div className='w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center'>
-                                    <MessageCircle className='h-12 w-12 text-white' />
-                                </div>
-                                <div>
-                                    <div className='flex items-center space-x-3 mb-2'>
-                                        <h1 className='text-3xl font-bold text-white'>
-                                            {group.title}
-                                        </h1>
-                                        <span
-                                            className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                                                group.submissionStatus,
-                                            )} bg-white/20 text-white`}
-                                        >
-                                            {getStatusIcon(group.submissionStatus)}
-                                            <span className='capitalize'>
-                                                {group.submissionStatus}
-                                            </span>
-                                        </span>
-                                    </div>
-                                    <div className='flex items-center space-x-4 text-white/90'>
-                                        <div className='flex items-center space-x-1'>
-                                            <GraduationCap className='h-4 w-4' />
-                                            <span>
-                                                {group.domain || 'All Domains'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className='flex space-x-2'>
-                                <button
-                                    onClick={handleJoinGroup}
-                                    className='flex items-center space-x-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg transition-colors text-white font-medium'
-                                >
-                                    <MessageCircle className='h-4 w-4' />
-                                    <span>Join Group</span>
-                                    <ExternalLink className='h-4 w-4' />
-                                </button>
-                                <button
-                                    onClick={handleEdit}
-                                    className='p-3 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white'
-                                    title='Edit Group'
-                                >
-                                    <Edit2 className='h-5 w-5' />
-                                </button>
-                                <button
-                                    onClick={handleDelete}
-                                    className='p-3 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white'
-                                    title='Delete Group'
-                                >
-                                    <Trash2 className='h-5 w-5' />
-                                </button>
-                            </div>
+            <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+                {/* Top Navigation & Actions */}
+                <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8'>
+                    <div className='flex items-center gap-4'>
+                        <button
+                            onClick={() => navigate(-1)}
+                            className='p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors'
+                        >
+                            <ArrowLeft className='h-5 w-5' />
+                        </button>
+                        <div>
+                            <h1 className='text-2xl font-bold flex items-center gap-3'>
+                                {group.title}
+                                {getStatusBadge(group.submissionStatus)}
+                            </h1>
+                            <p className='text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2'>
+                                <span className='font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded'>
+                                    ID: {group._id}
+                                </span>
+                            </p>
                         </div>
+                    </div>
+                    <div className='flex items-center gap-2'>
+                        <button
+                            onClick={handleEdit}
+                            className='flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium'
+                        >
+                            <Edit2 className='h-4 w-4' />
+                            Edit
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium'
+                        >
+                            <Trash2 className='h-4 w-4' />
+                            Delete
+                        </button>
                     </div>
                 </div>
 
-                <div className='grid lg:grid-cols-3 gap-6'>
-                    {/* Main Content */}
-                    <div className='lg:col-span-2 space-y-6'>
-                        
+                <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
+                    {/* Left Column: Group Info */}
+                    <div className='lg:col-span-2 space-y-8'>
                         {/* Status Alert - Only if rejected */}
                         {group.submissionStatus === 'rejected' && (
                             <div className='bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg'>
@@ -300,175 +248,158 @@ const GroupDetail = () => {
                             </div>
                         )}
 
-                        {/* Description Section */}
-                        {group.info && (
-                            <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4'>
-                                    About This Group
-                                </h3>
-                                <p className='text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap'>
-                                    {group.info}
-                                </p>
+                        {/* Main Group Card */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 flex flex-col md:flex-row items-center md:items-start gap-8'>
+                            <div className='flex-shrink-0'>
+                                <div className='h-32 w-32 rounded-2xl bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center shadow-lg'>
+                                    <MessageCircle className='h-16 w-16 text-white' />
+                                </div>
                             </div>
-                        )}
+                            <div className='text-center md:text-left flex-1'>
+                                <h2 className='text-2xl font-bold mb-2'>{group.title}</h2>
+                                <div className='flex flex-wrap items-center justify-center md:justify-start gap-3 mb-6'>
+                                    <span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'>
+                                        <GraduationCap className='h-3.5 w-3.5' />
+                                        {group.domain || 'All Domains'}
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={handleJoinGroup}
+                                    className='inline-flex items-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-sm'
+                                >
+                                    <MessageCircle className='h-5 w-5' />
+                                    Join Group
+                                    <ExternalLink className='h-4 w-4' />
+                                </button>
+                            </div>
+                        </div>
 
-                        {/* Group Details */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                <GraduationCap className='h-5 w-5 text-blue-500' />
+                        {/* Description Card */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
+                            <h2 className='text-lg font-semibold mb-4'>About This Group</h2>
+                            <div className='prose prose-sm dark:prose-invert max-w-none text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed'>
+                                {group.info || 'No information provided.'}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Metadata & Details */}
+                    <div className='space-y-8'>
+                        {/* Info Card */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
+                            <h2 className='text-lg font-semibold mb-6 flex items-center gap-2'>
+                                <MessageCircle className='h-5 w-5 text-gray-400' />
                                 Group Details
-                            </h3>
-                            <div className='grid md:grid-cols-2 gap-4'>
-                                <div className='space-y-3'>
+                            </h2>
+                            <dl className='space-y-4'>
+                                <div>
+                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                        Group Link
+                                    </dt>
+                                    <dd className='text-sm break-all'>
+                                        {group.link ? (
+                                            <a
+                                                href={group.link}
+                                                target='_blank'
+                                                rel='noopener noreferrer'
+                                                className='text-blue-600 dark:text-blue-400 hover:underline'
+                                            >
+                                                {group.link}
+                                            </a>
+                                        ) : (
+                                            <span className='text-gray-500 dark:text-gray-400'>
+                                                N/A
+                                            </span>
+                                        )}
+                                    </dd>
+                                </div>
+                                {group.rejectionReason && (
                                     <div>
-                                        <label className='text-sm font-medium text-gray-500 dark:text-gray-400'>
-                                            Domain
-                                        </label>
-                                        <p className='text-gray-900 dark:text-gray-100'>
-                                            {group.domain || 'N/A'}
-                                        </p>
+                                        <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                            Rejection Reason
+                                        </dt>
+                                        <dd className='text-sm text-red-600 dark:text-red-400'>
+                                            {group.rejectionReason}
+                                        </dd>
                                     </div>
-                                    <div>
-                                        <label className='text-sm font-medium text-gray-500 dark:text-gray-400'>
-                                            Submission Status
-                                        </label>
-                                        <div className='mt-1'>
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(group.submissionStatus)}`}>
-                                                {group.submissionStatus}
+                                )}
+                                <div>
+                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                        Created By
+                                    </dt>
+                                    <dd className='flex items-center gap-2 text-sm'>
+                                        <div className='h-6 w-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400'>
+                                            <User className='h-3.5 w-3.5' />
+                                        </div>
+                                        {group.owner?.username || 'Unknown'}
+                                    </dd>
+                                </div>
+
+                                <div className='pt-4 border-t border-gray-100 dark:border-gray-700'>
+                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                        Timestamps
+                                    </dt>
+                                    <dd className='space-y-2 text-sm'>
+                                        <div className='flex justify-between'>
+                                            <span className='text-gray-500'>Created</span>
+                                            <span className='font-mono'>
+                                                {new Date(group.createdAt).toLocaleDateString()}
                                             </span>
                                         </div>
-                                    </div>
-                                </div>
-                                <div className='space-y-3'>
-                                    <div>
-                                        <label className='text-sm font-medium text-gray-500 dark:text-gray-400'>
-                                            Group Link
-                                        </label>
-                                        <p className='text-gray-900 dark:text-gray-100 truncate'>
-                                            {group.link ? (
-                                                <a href={group.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                                    {group.link}
-                                                </a>
-                                            ) : 'N/A'}
-                                        </p>
-                                    </div>
-                                    {group.rejectionReason && (
-                                        <div>
-                                            <label className='text-sm font-medium text-gray-500 dark:text-gray-400'>
-                                                Rejection Reason
-                                            </label>
-                                            <p className='text-red-600 dark:text-red-400'>
-                                                {group.rejectionReason}
-                                            </p>
+                                        <div className='flex justify-between'>
+                                            <span className='text-gray-500'>Updated</span>
+                                            <span className='font-mono'>
+                                                {new Date(
+                                                    group.updatedAt || group.createdAt,
+                                                ).toLocaleDateString()}
+                                            </span>
                                         </div>
-                                    )}
+                                    </dd>
                                 </div>
-                            </div>
+                            </dl>
                         </div>
 
                         {/* Raw Data Toggle */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <div className='flex items-center justify-between mb-4'>
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2'>
-                                    <Code className='h-5 w-5 text-gray-500' />
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                            <button
+                                onClick={() => setShowRawData(!showRawData)}
+                                className='w-full flex items-center justify-between px-6 py-4 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors'
+                            >
+                                <span className='text-gray-900 dark:text-white'>
                                     Raw Data
-                                </h3>
-                                <button
-                                    onClick={() => setShowRawData(!showRawData)}
-                                    className='px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors text-gray-700 dark:text-gray-300'
-                                >
-                                    {showRawData ? 'Hide JSON' : 'Show JSON'}
-                                </button>
-                            </div>
-                            
+                                </span>
+                                <span className='text-blue-600 dark:text-blue-400'>
+                                    {showRawData ? 'Hide' : 'Show'}
+                                </span>
+                            </button>
                             {showRawData && (
-                                <div className='bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs font-mono'>
-                                    <pre>{JSON.stringify(group, null, 2)}</pre>
+                                <div className='border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 overflow-x-auto'>
+                                    <pre className='text-xs font-mono text-gray-600 dark:text-gray-400'>
+                                        {JSON.stringify(group, null, 2)}
+                                    </pre>
                                 </div>
                             )}
                         </div>
-
-                    </div>
-
-                    {/* Sidebar */}
-                    <div className='space-y-6'>
-                        
-                        {/* Group Information */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4'>
-                                Meta Information
-                            </h3>
-                            <div className='space-y-3'>
-                                <div className='flex justify-between'>
-                                    <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                        Group ID:
-                                    </span>
-                                    <span className='text-sm font-mono text-gray-900 dark:text-gray-100'>
-                                        {group._id.slice(-6)}
-                                    </span>
-                                </div>
-                                <div className='flex justify-between'>
-                                    <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                        Created:
-                                    </span>
-                                    <span className='text-sm text-gray-900 dark:text-gray-100'>
-                                        {new Date(
-                                            group.createdAt,
-                                        ).toLocaleDateString()}
-                                    </span>
-                                </div>
-                                <div className='flex justify-between'>
-                                    <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                        Last Updated:
-                                    </span>
-                                    <span className='text-sm text-gray-900 dark:text-gray-100'>
-                                        {new Date(
-                                            group.updatedAt || group.createdAt,
-                                        ).toLocaleDateString()}
-                                    </span>
-                                </div>
-                                <div className='flex justify-between'>
-                                    <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                        College:
-                                    </span>
-                                    <span className='text-sm text-gray-900 dark:text-gray-100'>
-                                        {group.college?.slug ||
-                                            'Unknown'}
-                                    </span>
-                                </div>
-                                {group.owner && (
-                                    <div className='flex justify-between'>
-                                        <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                            Created by:
-                                        </span>
-                                        <span className='text-sm text-gray-900 dark:text-gray-100'>
-                                            {group.owner.username}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
                     </div>
                 </div>
+
+                {/* Modals */}
+                <ConfirmModal
+                    isOpen={confirmModal.isOpen}
+                    onClose={handleCloseConfirm}
+                    onConfirm={confirmModal.onConfirm}
+                    title={confirmModal.title}
+                    message={confirmModal.message}
+                    variant={confirmModal.variant}
+                />
+
+                <GroupEditModal
+                    isOpen={showModal}
+                    onClose={handleModalClose}
+                    group={group}
+                    onSuccess={handleModalSuccess}
+                />
             </div>
-
-            {/* Modals */}
-            <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={handleCloseConfirm}
-                onConfirm={confirmModal.onConfirm}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                variant={confirmModal.variant}
-            />
-
-            <GroupEditModal
-                isOpen={showModal}
-                onClose={handleModalClose}
-                group={group}
-                onSuccess={handleModalSuccess}
-            />
         </div>
     );
 };

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
+import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import {
@@ -19,44 +21,29 @@ import {
     AlertTriangle,
     CheckCircle,
     XCircle,
+    Code,
+    Video,
+    Tag,
 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import VideoEditModal from '../components/VideoEditModal';
 
 const VideoDetail = () => {
+    const { collegeslug, videoid } = useParams();
+    const navigate = useNavigate();
+    const { mainContentMargin } = useSidebarLayout();
+
     const [video, setVideo] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [showModal, setShowModal] = useState(false);
-    const [showRawData, setShowRawData] = useState(false);
-    const { collegeslug, videoid } = useParams();
-    const navigate = useNavigate();
+    const [viewMode, setViewMode] = useState('formatted'); // 'formatted' or 'raw'
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
-    // Confirmation modal state
-    const [confirmModal, setConfirmModal] = useState({
-        isOpen: false,
-        title: '',
-        message: '',
-        onConfirm: null,
-        variant: 'danger',
-    });
-
-    const showConfirm = (config) => {
-        return new Promise((resolve) => {
-            setConfirmModal({
-                ...config,
-                isOpen: true,
-                onConfirm: () => {
-                    setConfirmModal({ ...confirmModal, isOpen: false });
-                    resolve(true);
-                },
-            });
-        });
-    };
-
-    const closeConfirm = () => {
-        setConfirmModal({ ...confirmModal, isOpen: false });
-    };
+    useEffect(() => {
+        fetchVideo();
+    }, [videoid]);
 
     const fetchVideo = async () => {
         try {
@@ -66,7 +53,7 @@ const VideoDetail = () => {
             setError(null);
         } catch (err) {
             setError(
-                err.response?.data?.message || 'Failed to fetch video details',
+                err.response?.data?.message || 'Failed to fetch video details'
             );
             toast.error('Failed to fetch video details');
         } finally {
@@ -74,32 +61,41 @@ const VideoDetail = () => {
         }
     };
 
-    useEffect(() => {
-        fetchVideo();
-    }, [videoid]); // eslint-disable-line react-hooks/exhaustive-deps
-
     const handleEdit = () => {
-        setShowModal(true);
+        setIsEditModalOpen(true);
     };
 
-    const handleDelete = async () => {
-        const confirmed = await showConfirm({
-            title: 'Delete Video',
-            message: `Are you sure you want to delete "${video.title}"? This action cannot be undone.`,
-            variant: 'danger',
-        });
+    const handleVideoUpdate = (updatedVideo) => {
+        setVideo(updatedVideo);
+        setIsEditModalOpen(false);
+        fetchVideo(); // Refresh
+    };
 
-        if (confirmed) {
-            try {
-                await api.delete(`/video/delete/${video._id}`);
-                toast.success('Video deleted successfully');
-                navigate(`/${collegeslug}/videos`);
-            } catch (err) {
-                toast.error(
-                    err.response?.data?.message || 'Failed to delete video',
-                );
-            }
+    const handleDelete = () => {
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        setIsDeleting(true);
+        try {
+            await api.delete(`/video/delete/${video._id}`);
+            toast.success('Video deleted successfully');
+            navigate(`/${collegeslug}/videos`);
+        } catch (err) {
+            toast.error(
+                err.response?.data?.message || 'Failed to delete video'
+            );
+            setIsDeleting(false);
+            setIsDeleteModalOpen(false);
         }
+    };
+
+    const extractVideoId = (url) => {
+        if (!url) return null;
+        const regex =
+            /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/;
+        const match = url.match(regex);
+        return match ? match[1] : null;
     };
 
     const formatNumber = (num) => {
@@ -108,78 +104,46 @@ const VideoDetail = () => {
         return num?.toString() || '0';
     };
 
-    const extractVideoId = (url) => {
-        const regex =
-            /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/;
-        const match = url.match(regex);
-        return match ? match[1] : null;
-    };
-
-    const handleModalSuccess = (updatedVideo) => {
-        setVideo(updatedVideo);
-        setVideo(updatedVideo);
-        setShowModal(false);
-    };
-
-    const getStatusColor = (status) => {
-        const colors = {
-            approved:
-                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-            pending:
-                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-            rejected:
-                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-        };
-        return colors[status] || colors.pending;
-    };
-
-    const getStatusIcon = (status) => {
-        const icons = {
-            approved: CheckCircle,
-            pending: Clock,
-            rejected: XCircle,
-        };
-        const Icon = icons[status] || Clock;
-        return <Icon className='h-4 w-4' />;
-    };
-
     if (loading) {
         return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
                 <Header />
-                <div className='flex items-center justify-center h-96'>
-                    <div className='flex items-center space-x-2'>
-                        <Loader className='h-6 w-6 animate-spin text-red-600' />
-                        <span className='text-gray-600 dark:text-gray-400'>
-                            Loading video details...
-                        </span>
+                <Sidebar />
+                <main
+                    className={`max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
+                >
+                    <div className="flex items-center justify-center h-96">
+                        <div className="text-center">
+                            <Loader className="w-12 h-12 animate-spin mx-auto text-indigo-600 dark:text-indigo-400" />
+                            <p className="mt-4 text-gray-600 dark:text-gray-400">
+                                Loading video details...
+                            </p>
+                        </div>
                     </div>
-                </div>
+                </main>
             </div>
         );
     }
 
     if (error || !video) {
         return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
                 <Header />
-                <div className='flex flex-col items-center justify-center h-96 space-y-4'>
-                    <div className='text-red-500 text-6xl'>😞</div>
-                    <h2 className='text-2xl font-bold text-gray-800 dark:text-gray-200'>
-                        Video Not Found
-                    </h2>
-                    <p className='text-gray-600 dark:text-gray-400 text-center max-w-md'>
-                        {error ||
-                            "The video you're looking for doesn't exist or may have been deleted."}
-                    </p>
+                <Sidebar />
+                <main
+                    className={`max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
+                >
+                    <div className="bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg">
+                        {error || 'Video not found'}
+                    </div>
                     <button
                         onClick={() => navigate(`/${collegeslug}/videos`)}
-                        className='mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2'
+                        className="mt-4 flex items-center text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
                     >
-                        <ArrowLeft className='h-4 w-4' />
-                        <span>Back to Videos</span>
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Back to Videos
                     </button>
-                </div>
+                </main>
             </div>
         );
     }
@@ -187,250 +151,320 @@ const VideoDetail = () => {
     const videoId = extractVideoId(video.videoUrl);
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans">
             <Header />
-            <div className='p-6'>
-                {/* Header */}
-                <div className='flex items-center justify-between mb-6'>
-                    <div className='flex items-center space-x-4'>
-                        <button
-                            onClick={() => navigate(`/${collegeslug}/videos`)}
-                            className='p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors'
-                        >
-                            <ArrowLeft className='h-5 w-5 text-gray-600 dark:text-gray-400' />
-                        </button>
-                        <div>
-                            <h1 className='text-2xl font-bold text-gray-800 dark:text-gray-200'>
-                                Video Details
-                            </h1>
-                            <p className='text-gray-600 dark:text-gray-400'>
-                                {video.title}
-                            </p>
-                        </div>
-                    </div>
-                    <div className='flex items-center space-x-3'>
-                        <button
-                            onClick={handleEdit}
-                            className='bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2'
-                        >
-                            <Edit2 className='h-4 w-4' />
-                            <span>Edit</span>
-                        </button>
-                        <button
-                            onClick={handleDelete}
-                            className='bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2'
-                        >
-                            <Trash2 className='h-4 w-4' />
-                            <span>Delete</span>
-                        </button>
-                    </div>
-                </div>
-
-                {/* Rejection Alert */}
-                {video.submissionStatus === 'rejected' &&
-                    video.rejectionReason && (
-                        <div className='bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg'>
-                            <div className='flex items-start'>
-                                <div className='flex-shrink-0'>
-                                    <AlertTriangle className='h-5 w-5 text-red-500' />
+            <Sidebar />
+            <main
+                className={`py-8 ${mainContentMargin} transition-all duration-300`}
+            >
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    {/* Navigation */}
+                    <nav className="flex mb-8" aria-label="Breadcrumb">
+                        <ol className="flex items-center space-x-4">
+                            <li>
+                                <div>
+                                    <button
+                                        onClick={() =>
+                                            navigate(`/${collegeslug}/videos`)
+                                        }
+                                        className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                                    >
+                                        <ArrowLeft
+                                            className="flex-shrink-0 h-5 w-5"
+                                            aria-hidden="true"
+                                        />
+                                        <span className="sr-only">Back</span>
+                                    </button>
                                 </div>
-                                <div className='ml-3'>
-                                    <h3 className='text-sm font-medium text-red-800 dark:text-red-300'>
-                                        Submission Rejected
-                                    </h3>
-                                    <div className='mt-2 text-sm text-red-700 dark:text-red-200'>
-                                        <p>{video.rejectionReason}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                            </li>
+                        </ol>
+                    </nav>
 
-                {/* Main Content */}
-                <div className='grid lg:grid-cols-3 gap-6'>
-                    {/* Video Content */}
-                    <div className='lg:col-span-2 space-y-6'>
-                        {/* Video Player */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                            <div className='aspect-video bg-gray-900 relative'>
-                                {videoId ? (
-                                    <iframe
-                                        src={`https://www.youtube.com/embed/${videoId}`}
-                                        title={video.title}
-                                        className='w-full h-full'
-                                        allowFullScreen
-                                    />
-                                ) : (
-                                    <div className='flex items-center justify-center h-full'>
-                                        <div className='text-center text-white'>
-                                            <Play className='h-16 w-16 mx-auto mb-4 opacity-60' />
-                                            <p className='text-lg opacity-80'>
-                                                Video Preview Not Available
-                                            </p>
-                                            <a
-                                                href={video.videoUrl}
-                                                target='_blank'
-                                                rel='noopener noreferrer'
-                                                className='inline-flex items-center space-x-2 mt-4 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors'
-                                            >
-                                                <ExternalLink className='h-4 w-4' />
-                                                <span>Open Video</span>
-                                            </a>
-                                        </div>
-                                    </div>
-                                )}
+                    {/* Header */}
+                    <div className="md:flex md:items-center md:justify-between mb-8">
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center">
+                                <span
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mr-3 ${
+                                        video.submissionStatus === 'approved'
+                                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                            : video.submissionStatus ===
+                                              'rejected'
+                                            ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                                    }`}
+                                >
+                                    {video.submissionStatus &&
+                                        video.submissionStatus
+                                            .charAt(0)
+                                            .toUpperCase() +
+                                            video.submissionStatus.slice(1)}
+                                </span>
+                                <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                    <Eye className="w-3 h-3" />
+                                    {formatNumber(video.clickCounts || 0)} views
+                                </span>
                             </div>
-                        </div>
-
-                        {/* Video Info */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <h2 className='text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4'>
+                            <h2 className="mt-2 text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl sm:truncate">
                                 {video.title}
                             </h2>
-                            {video.description && (
-                                <p className='text-gray-600 dark:text-gray-400 mb-4 leading-relaxed'>
-                                    {video.description}
-                                </p>
-                            )}
-
-                            {/* Video Stats */}
-                            <div className='grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700'>
-                                <div className='flex items-center space-x-2'>
-                                    <Eye className='h-4 w-4 text-gray-400' />
-                                    <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                        {formatNumber(video.clickCounts || 0)}{' '}
-                                        views
-                                    </span>
-                                </div>
-                                <div className='flex items-center space-x-2'>
-                                    <Clock className='h-4 w-4 text-gray-400' />
-                                    <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                        {video.duration || 'N/A'}
-                                    </span>
-                                </div>
-                                <div className='flex items-center space-x-2'>
-                                    <Calendar className='h-4 w-4 text-gray-400' />
-                                    <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                        {new Date(
-                                            video.createdAt,
-                                        ).toLocaleDateString()}
-                                    </span>
-                                </div>
-                            </div>
+                        </div>
+                        <div className="mt-4 flex-shrink-0 flex md:mt-0 md:ml-4 space-x-3">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setViewMode(
+                                        viewMode === 'formatted'
+                                            ? 'raw'
+                                            : 'formatted'
+                                    )
+                                }
+                                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                            >
+                                {viewMode === 'formatted' ? (
+                                    <>
+                                        <Code className="-ml-1 mr-2 h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        Raw Data
+                                    </>
+                                ) : (
+                                    <>
+                                        <Eye className="-ml-1 mr-2 h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        Formatted View
+                                    </>
+                                )}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleEdit}
+                                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                            >
+                                <Edit2 className="-ml-1 mr-2 h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                Edit
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDelete}
+                                className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                            >
+                                <Trash2 className="-ml-1 mr-2 h-4 w-4" />
+                                Delete
+                            </button>
                         </div>
                     </div>
 
-                    {/* Sidebar */}
-                    <div className='space-y-6'>
-                        {/* Details Card */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <h3 className='text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4'>
-                                Details
-                            </h3>
-                            <div className='space-y-3'>
-                                <div className='flex items-center space-x-3'>
-                                    <BookOpen className='h-4 w-4 text-blue-500' />
-                                    <div>
-                                        <p className='text-sm text-gray-600 dark:text-gray-400'>
-                                            Subject
-                                        </p>
-                                        <p className='font-medium text-gray-800 dark:text-gray-200'>
-                                            {video.subject?.subjectName ||
-                                                'N/A'}
-                                        </p>
+                    {/* Rejection Alert */}
+                    {video.submissionStatus === 'rejected' &&
+                        video.rejectionReason && (
+                            <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg">
+                                <div className="flex items-start">
+                                    <div className="flex-shrink-0">
+                                        <AlertTriangle className="h-5 w-5 text-red-500" />
                                     </div>
-                                </div>
-                                <div className='flex items-center space-x-3'>
-                                    <User className='h-4 w-4 text-green-500' />
-                                    <div>
-                                        <p className='text-sm text-gray-600 dark:text-gray-400'>
-                                            Created by
-                                        </p>
-                                        <p className='font-medium text-gray-800 dark:text-gray-200'>
-                                            {video.owner?.username || 'Unknown'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className='flex items-center space-x-3'>
-                                    <ExternalLink className='h-4 w-4 text-purple-500' />
-                                    <div>
-                                        <p className='text-sm text-gray-600 dark:text-gray-400'>
-                                            Video URL
-                                        </p>
-                                        <a
-                                            href={video.videoUrl}
-                                            target='_blank'
-                                            rel='noopener noreferrer'
-                                            className='text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors text-sm'
-                                        >
-                                            Open Original Video
-                                        </a>
-                                    </div>
-                                </div>
-                                <div className='flex items-center space-x-3'>
-                                    <div className='flex-1'>
-                                        <p className='text-sm text-gray-600 dark:text-gray-400 mb-1'>
-                                            Status
-                                        </p>
-                                        <span
-                                            className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                                                video.submissionStatus,
-                                            )}`}
-                                        >
-                                            {getStatusIcon(
-                                                video.submissionStatus,
-                                            )}
-                                            <span className='capitalize'>
-                                                {video.submissionStatus}
-                                            </span>
-                                        </span>
+                                    <div className="ml-3">
+                                        <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
+                                            Submission Rejected
+                                        </h3>
+                                        <div className="mt-2 text-sm text-red-700 dark:text-red-200">
+                                            <p>{video.rejectionReason}</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
-                        {/* Raw Data Toggle */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <button
-                                onClick={() => setShowRawData(!showRawData)}
-                                className='flex items-center justify-between w-full text-left'
-                            >
-                                <span className='text-sm font-medium text-gray-900 dark:text-white'>
-                                    Raw Data
-                                </span>
-                                <span className='text-xs text-blue-600 dark:text-blue-400 hover:underline'>
-                                    {showRawData ? 'Hide JSON' : 'Show JSON'}
-                                </span>
-                            </button>
-                            {showRawData && (
-                                <div className='mt-4'>
-                                    <pre className='bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-x-auto text-xs font-mono text-gray-700 dark:text-gray-300'>
-                                        {JSON.stringify(video, null, 2)}
-                                    </pre>
+                    {/* Content */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Main Info (Left Column) */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {viewMode === 'formatted' ? (
+                                <>
+                                    {/* Video Player */}
+                                    <div className="bg-white dark:bg-gray-800 shadow rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                        <div className="aspect-w-16 aspect-h-9 bg-black">
+                                            {videoId ? (
+                                                <iframe
+                                                    src={`https://www.youtube.com/embed/${videoId}`}
+                                                    title={video.title}
+                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                    allowFullScreen
+                                                    className="w-full h-full"
+                                                />
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full text-gray-400">
+                                                    <div className="text-center">
+                                                        <Video className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                                        <p>
+                                                            Video preview not
+                                                            available
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="px-4 py-4 sm:px-6">
+                                            <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                                                <div className="flex items-center gap-4">
+                                                    <span className="flex items-center gap-1">
+                                                        <Clock className="w-4 h-4" />
+                                                        {video.duration ||
+                                                            'N/A'}
+                                                    </span>
+                                                    <span className="flex items-center gap-1">
+                                                        <Eye className="w-4 h-4" />
+                                                        {formatNumber(
+                                                            video.clickCounts ||
+                                                                0
+                                                        )}{' '}
+                                                        views
+                                                    </span>
+                                                </div>
+                                                <a
+                                                    href={video.videoUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline"
+                                                >
+                                                    Open in YouTube
+                                                    <ExternalLink className="w-3 h-3" />
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Description */}
+                                    <div className="bg-white dark:bg-gray-800 shadow rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                        <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+                                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                                                <Tag className="w-5 h-5 text-indigo-500" />
+                                                Description
+                                            </h3>
+                                        </div>
+                                        <div className="px-4 py-5 sm:p-6">
+                                            <div className="prose dark:prose-invert max-w-none text-gray-500 dark:text-gray-300">
+                                                {video.description ? (
+                                                    <p className="whitespace-pre-wrap">
+                                                        {video.description}
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-gray-400 italic">
+                                                        No description available
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="bg-white dark:bg-gray-800 shadow rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                    <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+                                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                                            <Code className="w-5 h-5 text-indigo-500" />
+                                            Raw JSON Data
+                                        </h3>
+                                    </div>
+                                    <div className="px-4 py-5 sm:p-6">
+                                        <pre className="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-sm font-mono">
+                                            {JSON.stringify(video, null, 2)}
+                                        </pre>
+                                    </div>
                                 </div>
                             )}
+                        </div>
+
+                        {/* Details (Right Column) */}
+                        <div className="space-y-6">
+                            {/* Metadata */}
+                            <div className="bg-white dark:bg-gray-800 shadow rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+                                    <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                                        <AlertTriangle className="w-5 h-5 text-indigo-500" />
+                                        Video details
+                                    </h3>
+                                </div>
+                                <div className="px-4 py-5 sm:p-0">
+                                    <dl>
+                                        <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+                                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                                Subject
+                                            </dt>
+                                            <dd className="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2 flex items-center gap-2">
+                                                <BookOpen className="w-4 h-4 text-gray-400" />
+                                                {video.subject?.subjectName ||
+                                                    'N/A'}
+                                            </dd>
+                                        </div>
+                                        <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+                                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                                Status
+                                            </dt>
+                                            <dd className="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
+                                                <span
+                                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                        video.submissionStatus ===
+                                                        'approved'
+                                                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                                            : video.submissionStatus ===
+                                                              'rejected'
+                                                            ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                                                    }`}
+                                                >
+                                                    {video.submissionStatus &&
+                                                        video.submissionStatus
+                                                            .charAt(0)
+                                                            .toUpperCase() +
+                                                            video.submissionStatus.slice(
+                                                                1
+                                                            )}
+                                                </span>
+                                            </dd>
+                                        </div>
+                                        <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+                                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                                Uploaded By
+                                            </dt>
+                                            <dd className="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2 flex items-center gap-2">
+                                                <User className="w-4 h-4 text-gray-400" />
+                                                {video.owner?.username || 'N/A'}
+                                            </dd>
+                                        </div>
+                                        <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                                Created At
+                                            </dt>
+                                            <dd className="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2 flex items-center gap-2">
+                                                <Calendar className="w-4 h-4 text-gray-400" />
+                                                {new Date(
+                                                    video.createdAt
+                                                ).toLocaleDateString()}
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Modals */}
-            <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={closeConfirm}
-                onConfirm={confirmModal.onConfirm}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                variant={confirmModal.variant}
-            />
+                {isEditModalOpen && (
+                    <VideoEditModal
+                        isOpen={isEditModalOpen}
+                        onClose={() => setIsEditModalOpen(false)}
+                        video={video}
+                        onSuccess={handleVideoUpdate}
+                        collegeslug={collegeslug}
+                    />
+                )}
 
-            <VideoEditModal
-                isOpen={showModal}
-                onClose={() => setShowModal(false)}
-                video={video}
-                onSuccess={handleModalSuccess}
-                collegeslug={collegeslug}
-            />
+                <ConfirmModal
+                    isOpen={isDeleteModalOpen}
+                    onClose={() => setIsDeleteModalOpen(false)}
+                    onConfirm={confirmDelete}
+                    title="Delete Video"
+                    message="Are you sure you want to delete this video? This action cannot be undone."
+                    isDeleting={isDeleting}
+                />
+            </main>
         </div>
     );
 };
