@@ -41,6 +41,7 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                 subject: video.subject || '',
                 duration: video.duration || '',
                 submissionStatus: video.submissionStatus || 'pending',
+                rejectionReason: video.rejectionReason || '',
             });
         } else {
             setFormData({
@@ -51,6 +52,7 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                 subject: '',
                 duration: '',
                 submissionStatus: 'pending',
+                rejectionReason: '',
             });
         }
         setErrors({});
@@ -130,6 +132,14 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                 'Please enter duration in format MM:SS or HH:MM:SS';
         }
 
+        if (
+            formData.submissionStatus === 'rejected' &&
+            !formData.rejectionReason?.trim()
+        ) {
+            newErrors.rejectionReason =
+                'Rejection reason is required when rejecting a video';
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -163,6 +173,7 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                 description: formData.description,
                 subjectCode: formData.subject,
                 submissionStatus: formData.submissionStatus,
+                rejectionReason: formData.rejectionReason,
             };
 
             let response;
@@ -237,6 +248,34 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                                     <option value='rejected'>Rejected</option>
                                 </select>
                             </div>
+
+                            {/* Rejection Reason */}
+                            {formData.submissionStatus === 'rejected' && (
+                                <div>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Rejection Reason{' '}
+                                        <span className='text-red-500'>*</span>
+                                    </label>
+                                    <textarea
+                                        name='rejectionReason'
+                                        value={formData.rejectionReason}
+                                        onChange={handleChange}
+                                        rows={3}
+                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none ${
+                                            errors.rejectionReason
+                                                ? 'border-red-300'
+                                                : 'border-gray-300 dark:border-gray-600'
+                                        }`}
+                                        placeholder='Please provide a reason for rejection...'
+                                    />
+                                    {errors.rejectionReason && (
+                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                            <AlertTriangle className='h-3 w-3' />
+                                            {errors.rejectionReason}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Video Title */}
                             <div>

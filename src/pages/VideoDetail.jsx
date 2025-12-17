@@ -16,6 +16,9 @@ import {
     Eye,
     ThumbsUp,
     ExternalLink,
+    AlertTriangle,
+    CheckCircle,
+    XCircle,
 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import VideoEditModal from '../components/VideoEditModal';
@@ -25,6 +28,7 @@ const VideoDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [showRawData, setShowRawData] = useState(false);
     const { collegeslug, videoid } = useParams();
     const navigate = useNavigate();
 
@@ -113,7 +117,30 @@ const VideoDetail = () => {
 
     const handleModalSuccess = (updatedVideo) => {
         setVideo(updatedVideo);
+        setVideo(updatedVideo);
         setShowModal(false);
+    };
+
+    const getStatusColor = (status) => {
+        const colors = {
+            approved:
+                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+            pending:
+                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+            rejected:
+                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+        };
+        return colors[status] || colors.pending;
+    };
+
+    const getStatusIcon = (status) => {
+        const icons = {
+            approved: CheckCircle,
+            pending: Clock,
+            rejected: XCircle,
+        };
+        const Icon = icons[status] || Clock;
+        return <Icon className='h-4 w-4' />;
     };
 
     if (loading) {
@@ -198,6 +225,26 @@ const VideoDetail = () => {
                         </button>
                     </div>
                 </div>
+
+                {/* Rejection Alert */}
+                {video.submissionStatus === 'rejected' &&
+                    video.rejectionReason && (
+                        <div className='bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg'>
+                            <div className='flex items-start'>
+                                <div className='flex-shrink-0'>
+                                    <AlertTriangle className='h-5 w-5 text-red-500' />
+                                </div>
+                                <div className='ml-3'>
+                                    <h3 className='text-sm font-medium text-red-800 dark:text-red-300'>
+                                        Submission Rejected
+                                    </h3>
+                                    <div className='mt-2 text-sm text-red-700 dark:text-red-200'>
+                                        <p>{video.rejectionReason}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                 {/* Main Content */}
                 <div className='grid lg:grid-cols-3 gap-6'>
@@ -320,7 +367,48 @@ const VideoDetail = () => {
                                         </a>
                                     </div>
                                 </div>
+                                <div className='flex items-center space-x-3'>
+                                    <div className='flex-1'>
+                                        <p className='text-sm text-gray-600 dark:text-gray-400 mb-1'>
+                                            Status
+                                        </p>
+                                        <span
+                                            className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                                                video.submissionStatus,
+                                            )}`}
+                                        >
+                                            {getStatusIcon(
+                                                video.submissionStatus,
+                                            )}
+                                            <span className='capitalize'>
+                                                {video.submissionStatus}
+                                            </span>
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
+                        </div>
+
+                        {/* Raw Data Toggle */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
+                            <button
+                                onClick={() => setShowRawData(!showRawData)}
+                                className='flex items-center justify-between w-full text-left'
+                            >
+                                <span className='text-sm font-medium text-gray-900 dark:text-white'>
+                                    Raw Data
+                                </span>
+                                <span className='text-xs text-blue-600 dark:text-blue-400 hover:underline'>
+                                    {showRawData ? 'Hide JSON' : 'Show JSON'}
+                                </span>
+                            </button>
+                            {showRawData && (
+                                <div className='mt-4'>
+                                    <pre className='bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-x-auto text-xs font-mono text-gray-700 dark:text-gray-300'>
+                                        {JSON.stringify(video, null, 2)}
+                                    </pre>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
