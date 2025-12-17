@@ -8,34 +8,28 @@ import {
     Loader,
     Edit2,
     Trash2,
-    MessageCircle,
-    Users,
-    ExternalLink,
-    AlertTriangle,
-    Hash,
     Calendar,
-    BookOpen,
-    GraduationCap,
-    Clock,
-    User,
-    Shield,
-    Code,
+    MapPin,
+    AlertTriangle,
     CheckCircle,
     XCircle,
+    Clock,
+    Package,
+    Phone,
+    Image,
+    Code,
+    Tag,
 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
-import GroupEditModal from '../components/GroupEditModal';
+import LostFoundEditModal from '../components/LostFoundEditModal';
 
-const GroupDetail = () => {
-    const [group, setGroup] = useState(null);
+const LostFoundDetail = () => {
+    const { collegeslug, itemid } = useParams();
+    const navigate = useNavigate();
+    const [item, setItem] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [showRawData, setShowRawData] = useState(false);
-    const { collegeslug, groupid } = useParams();
-    const navigate = useNavigate();
-
-    // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
         isOpen: false,
         title: '',
@@ -44,39 +38,18 @@ const GroupDetail = () => {
         variant: 'danger',
     });
 
-    const showConfirm = (config) => {
-        return new Promise((resolve) => {
-            setConfirmModal({
-                isOpen: true,
-                title: config.title || 'Confirm Action',
-                message: config.message,
-                variant: config.variant || 'danger',
-                onConfirm: () => {
-                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-                    resolve(true);
-                },
-            });
-        });
-    };
-
-    const handleCloseConfirm = () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-    };
-
     useEffect(() => {
-        fetchGroup();
-    }, [groupid]); // eslint-disable-line react-hooks/exhaustive-deps
+        fetchItemDetails();
+    }, [itemid]);
 
-    const fetchGroup = async () => {
+    const fetchItemDetails = async () => {
         try {
             setLoading(true);
-            const response = await api.get(`/group/${groupid}`);
-            setGroup(response.data.data);
-            setError(null);
+            const response = await api.get(`/lostandfound/${itemid}`);
+            setItem(response.data.data);
         } catch (error) {
-            console.error('Error fetching group:', error);
-            setError('Failed to fetch group details');
-            toast.error('Failed to fetch group details');
+            console.error('Error fetching item details:', error);
+            toast.error('Failed to load item details');
         } finally {
             setLoading(false);
         }
@@ -87,30 +60,28 @@ const GroupDetail = () => {
     };
 
     const handleDelete = async () => {
-        const confirmed = await showConfirm({
-            title: 'Delete WhatsApp Group',
-            message: `Are you sure you want to delete "${group.title}"? This action cannot be undone.`,
+        setConfirmModal({
+            isOpen: true,
+            title: 'Delete Item',
+            message: `Are you sure you want to delete "${item.title}"? This action cannot be undone.`,
             variant: 'danger',
+            onConfirm: async () => {
+                try {
+                    await api.delete(`/lostandfound/delete/${item._id}`);
+                    toast.success('Item deleted successfully');
+                    navigate(`/${collegeslug}/lost-found`);
+                } catch (error) {
+                    console.error('Error deleting item:', error);
+                    toast.error('Failed to delete item');
+                } finally {
+                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+                }
+            },
         });
-
-        if (confirmed) {
-            try {
-                await api.delete(`/group/delete/${group._id}`);
-                toast.success('Group deleted successfully');
-                navigate(`/${collegeslug}/groups`);
-            } catch (error) {
-                console.error('Error deleting group:', error);
-                toast.error('Failed to delete group');
-            }
-        }
     };
 
-    const handleJoinGroup = () => {
-        if (group.link) {
-            window.open(group.link, '_blank');
-        } else {
-            toast.error('WhatsApp link not available');
-        }
+    const handleCloseConfirm = () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
     };
 
     const handleModalClose = () => {
@@ -118,30 +89,40 @@ const GroupDetail = () => {
     };
 
     const handleModalSuccess = () => {
-        fetchGroup();
-        handleModalClose();
+        fetchItemDetails();
+        setShowModal(false);
     };
 
     const getStatusColor = (status) => {
         switch (status) {
             case 'approved':
-                return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+                return 'bg-green-500/20 text-green-200';
+            case 'pending':
+                return 'bg-yellow-500/20 text-yellow-200';
             case 'rejected':
-                return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+                return 'bg-red-500/20 text-red-200';
             default:
-                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+                return 'bg-gray-500/20 text-gray-200';
         }
     };
 
     const getStatusIcon = (status) => {
         switch (status) {
             case 'approved':
-                return <CheckCircle className='h-4 w-4' />;
+                return <CheckCircle className='h-3 w-3' />;
+            case 'pending':
+                return <Clock className='h-3 w-3' />;
             case 'rejected':
-                return <XCircle className='h-4 w-4' />;
+                return <XCircle className='h-3 w-3' />;
             default:
-                return <Clock className='h-4 w-4' />;
+                return <Clock className='h-3 w-3' />;
         }
+    };
+
+    const getTypeColor = (type) => {
+        return type === 'lost'
+            ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+            : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
     };
 
     if (loading) {
@@ -149,51 +130,27 @@ const GroupDetail = () => {
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
                 <div className='flex items-center justify-center min-h-[60vh]'>
-                    <div className='text-center'>
-                        <Loader className='h-8 w-8 animate-spin text-blue-600 mx-auto mb-4' />
-                        <p className='text-gray-600 dark:text-gray-400'>
-                            Loading group details...
-                        </p>
-                    </div>
+                    <Loader className='h-8 w-8 animate-spin text-purple-600' />
                 </div>
             </div>
         );
     }
 
-    if (error || !group) {
+    if (!item) {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-                    <button
-                        onClick={() => navigate(-1)}
-                        className='flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 mb-6 transition-colors'
-                    >
-                        <ArrowLeft className='h-4 w-4 mr-2' />
-                        Back
-                    </button>
-
-                    <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12'>
-                        <div className='text-center'>
-                            <div className='w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4'>
-                                <AlertTriangle className='h-8 w-8 text-red-600 dark:text-red-400' />
-                            </div>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2'>
-                                Group Not Found
-                            </h3>
-                            <p className='text-gray-600 dark:text-gray-400 mb-4'>
-                                {error ||
-                                    'The requested group could not be found.'}
-                            </p>
-                            <button
-                                onClick={() =>
-                                    navigate(`/${collegeslug}/groups`)
-                                }
-                                className='bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors'
-                            >
-                                Back to Groups
-                            </button>
-                        </div>
+                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+                    <div className='text-center'>
+                        <h2 className='text-xl font-semibold text-gray-900 dark:text-gray-100'>
+                            Item not found
+                        </h2>
+                        <button
+                            onClick={() => navigate(-1)}
+                            className='mt-4 text-purple-600 hover:text-purple-500'
+                        >
+                            Go back
+                        </button>
                     </div>
                 </div>
             </div>
@@ -211,64 +168,66 @@ const GroupDetail = () => {
                         className='flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors'
                     >
                         <ArrowLeft className='h-4 w-4 mr-2' />
-                        Back to Groups
+                        Back to List
                     </button>
                 </div>
 
-                {/* Group Header */}
+                {/* Header Card */}
                 <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6'>
-                    <div className='bg-gradient-to-r from-green-600 via-teal-600 to-blue-600 px-6 py-8'>
+                    <div className='bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 px-6 py-8'>
                         <div className='flex items-center justify-between'>
                             <div className='flex items-center space-x-6'>
-                                <div className='w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center'>
-                                    <MessageCircle className='h-12 w-12 text-white' />
+                                <div className='w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center overflow-hidden'>
+                                    {item.imageUrl ? (
+                                        <img
+                                            src={item.imageUrl}
+                                            alt={item.title}
+                                            className='w-full h-full object-cover'
+                                        />
+                                    ) : (
+                                        <Package className='h-12 w-12 text-white' />
+                                    )}
                                 </div>
                                 <div>
                                     <div className='flex items-center space-x-3 mb-2'>
                                         <h1 className='text-3xl font-bold text-white'>
-                                            {group.title}
+                                            {item.title}
                                         </h1>
                                         <span
                                             className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                                                group.submissionStatus,
-                                            )} bg-white/20 text-white`}
+                                                item.submissionStatus,
+                                            )} border border-white/20`}
                                         >
-                                            {getStatusIcon(group.submissionStatus)}
+                                            {getStatusIcon(item.submissionStatus)}
                                             <span className='capitalize'>
-                                                {group.submissionStatus}
+                                                {item.submissionStatus}
                                             </span>
                                         </span>
                                     </div>
                                     <div className='flex items-center space-x-4 text-white/90'>
                                         <div className='flex items-center space-x-1'>
-                                            <GraduationCap className='h-4 w-4' />
-                                            <span>
-                                                {group.domain || 'All Domains'}
-                                            </span>
+                                            <Tag className='h-4 w-4' />
+                                            <span className='capitalize'>{item.type}</span>
+                                        </div>
+                                        <div className='flex items-center space-x-1'>
+                                            <MapPin className='h-4 w-4' />
+                                            <span>{item.location}</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div className='flex space-x-2'>
                                 <button
-                                    onClick={handleJoinGroup}
-                                    className='flex items-center space-x-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg transition-colors text-white font-medium'
-                                >
-                                    <MessageCircle className='h-4 w-4' />
-                                    <span>Join Group</span>
-                                    <ExternalLink className='h-4 w-4' />
-                                </button>
-                                <button
                                     onClick={handleEdit}
                                     className='p-3 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white'
-                                    title='Edit Group'
+                                    title='Edit Item'
                                 >
                                     <Edit2 className='h-5 w-5' />
                                 </button>
                                 <button
                                     onClick={handleDelete}
                                     className='p-3 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white'
-                                    title='Delete Group'
+                                    title='Delete Item'
                                 >
                                     <Trash2 className='h-5 w-5' />
                                 </button>
@@ -282,7 +241,7 @@ const GroupDetail = () => {
                     <div className='lg:col-span-2 space-y-6'>
                         
                         {/* Status Alert - Only if rejected */}
-                        {group.submissionStatus === 'rejected' && (
+                        {item.submissionStatus === 'rejected' && (
                             <div className='bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg'>
                                 <div className='flex'>
                                     <div className='flex-shrink-0'>
@@ -290,78 +249,64 @@ const GroupDetail = () => {
                                     </div>
                                     <div className='ml-3'>
                                         <h3 className='text-sm font-medium text-red-800 dark:text-red-200'>
-                                            Group Rejected
+                                            Rejected
                                         </h3>
                                         <div className='mt-2 text-sm text-red-700 dark:text-red-300'>
-                                            <p>{group.rejectionReason}</p>
+                                            <p>{item.rejectionReason}</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* Description Section */}
-                        {group.info && (
-                            <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4'>
-                                    About This Group
-                                </h3>
-                                <p className='text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap'>
-                                    {group.info}
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Group Details */}
+                        {/* Details */}
                         <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
                             <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                <GraduationCap className='h-5 w-5 text-blue-500' />
-                                Group Details
+                                <Package className='h-5 w-5 text-purple-500' />
+                                Item Details
                             </h3>
-                            <div className='grid md:grid-cols-2 gap-4'>
-                                <div className='space-y-3'>
+                            <div className='space-y-4'>
+                                <div className='grid grid-cols-2 gap-4'>
                                     <div>
-                                        <label className='text-sm font-medium text-gray-500 dark:text-gray-400'>
-                                            Domain
-                                        </label>
-                                        <p className='text-gray-900 dark:text-gray-100'>
-                                            {group.domain || 'N/A'}
-                                        </p>
+                                        <label className='text-sm text-gray-500 dark:text-gray-400 block mb-1'>Type</label>
+                                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full uppercase ${getTypeColor(item.type)}`}>
+                                            {item.type}
+                                        </span>
                                     </div>
                                     <div>
-                                        <label className='text-sm font-medium text-gray-500 dark:text-gray-400'>
-                                            Submission Status
-                                        </label>
-                                        <div className='mt-1'>
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(group.submissionStatus)}`}>
-                                                {group.submissionStatus}
-                                            </span>
-                                        </div>
+                                        <label className='text-sm text-gray-500 dark:text-gray-400 block mb-1'>Current Status</label>
+                                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full uppercase ${
+                                            item.currentStatus === 'open' 
+                                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                                                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                                        }`}>
+                                            {item.currentStatus}
+                                        </span>
                                     </div>
                                 </div>
-                                <div className='space-y-3'>
+                                
+                                <div>
+                                    <label className='text-sm text-gray-500 dark:text-gray-400 block mb-1'>Description</label>
+                                    <p className='text-gray-900 dark:text-gray-100 whitespace-pre-wrap'>
+                                        {item.description}
+                                    </p>
+                                </div>
+
+                                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                                     <div>
-                                        <label className='text-sm font-medium text-gray-500 dark:text-gray-400'>
-                                            Group Link
-                                        </label>
-                                        <p className='text-gray-900 dark:text-gray-100 truncate'>
-                                            {group.link ? (
-                                                <a href={group.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                                    {group.link}
-                                                </a>
-                                            ) : 'N/A'}
-                                        </p>
-                                    </div>
-                                    {group.rejectionReason && (
-                                        <div>
-                                            <label className='text-sm font-medium text-gray-500 dark:text-gray-400'>
-                                                Rejection Reason
-                                            </label>
-                                            <p className='text-red-600 dark:text-red-400'>
-                                                {group.rejectionReason}
-                                            </p>
+                                        <label className='text-sm text-gray-500 dark:text-gray-400 block mb-1'>WhatsApp Contact</label>
+                                        <div className='flex items-center gap-2 text-gray-900 dark:text-gray-100'>
+                                            <Phone className='h-4 w-4 text-green-500' />
+                                            {item.whatsapp}
                                         </div>
-                                    )}
+                                    </div>
+                                    <div>
+                                        <label className='text-sm text-gray-500 dark:text-gray-400 block mb-1'>Date</label>
+                                        <div className='flex items-center gap-2 text-gray-900 dark:text-gray-100'>
+                                            <Calendar className='h-4 w-4 text-gray-500' />
+                                            {new Date(item.date).toLocaleDateString()}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -375,7 +320,7 @@ const GroupDetail = () => {
                                 </h3>
                                 <button
                                     onClick={() => setShowRawData(!showRawData)}
-                                    className='px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors text-gray-700 dark:text-gray-300'
+                                    className='text-sm text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium'
                                 >
                                     {showRawData ? 'Hide JSON' : 'Show JSON'}
                                 </button>
@@ -383,7 +328,7 @@ const GroupDetail = () => {
                             
                             {showRawData && (
                                 <div className='bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs font-mono'>
-                                    <pre>{JSON.stringify(group, null, 2)}</pre>
+                                    <pre>{JSON.stringify(item, null, 2)}</pre>
                                 </div>
                             )}
                         </div>
@@ -393,7 +338,7 @@ const GroupDetail = () => {
                     {/* Sidebar */}
                     <div className='space-y-6'>
                         
-                        {/* Group Information */}
+                        {/* Meta Information */}
                         <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
                             <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4'>
                                 Meta Information
@@ -401,10 +346,10 @@ const GroupDetail = () => {
                             <div className='space-y-3'>
                                 <div className='flex justify-between'>
                                     <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                        Group ID:
+                                        Item ID:
                                     </span>
                                     <span className='text-sm font-mono text-gray-900 dark:text-gray-100'>
-                                        {group._id.slice(-6)}
+                                        {item._id.slice(-6)}
                                     </span>
                                 </div>
                                 <div className='flex justify-between'>
@@ -413,7 +358,7 @@ const GroupDetail = () => {
                                     </span>
                                     <span className='text-sm text-gray-900 dark:text-gray-100'>
                                         {new Date(
-                                            group.createdAt,
+                                            item.createdAt,
                                         ).toLocaleDateString()}
                                     </span>
                                 </div>
@@ -423,31 +368,47 @@ const GroupDetail = () => {
                                     </span>
                                     <span className='text-sm text-gray-900 dark:text-gray-100'>
                                         {new Date(
-                                            group.updatedAt || group.createdAt,
+                                            item.updatedAt || item.createdAt,
                                         ).toLocaleDateString()}
                                     </span>
                                 </div>
                                 <div className='flex justify-between'>
                                     <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                        College:
+                                        Deleted:
                                     </span>
-                                    <span className='text-sm text-gray-900 dark:text-gray-100'>
-                                        {group.college?.slug ||
-                                            'Unknown'}
+                                    <span className={`text-sm ${item.deleted ? 'text-red-500' : 'text-green-500'}`}>
+                                        {item.deleted ? 'Yes' : 'No'}
                                     </span>
                                 </div>
-                                {group.owner && (
+                                {item.owner && (
                                     <div className='flex justify-between'>
                                         <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                            Created by:
+                                            Posted by:
                                         </span>
                                         <span className='text-sm text-gray-900 dark:text-gray-100'>
-                                            {group.owner.username}
+                                            {item.owner.username || 'Unknown'}
                                         </span>
                                     </div>
                                 )}
                             </div>
                         </div>
+
+                        {/* Image Preview */}
+                        {item.imageUrl && (
+                            <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
+                                <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
+                                    <Image className='h-5 w-5 text-purple-500' />
+                                    Image
+                                </h3>
+                                <div className='rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700'>
+                                    <img 
+                                        src={item.imageUrl} 
+                                        alt={item.title} 
+                                        className='w-full h-auto'
+                                    />
+                                </div>
+                            </div>
+                        )}
 
                     </div>
                 </div>
@@ -463,14 +424,14 @@ const GroupDetail = () => {
                 variant={confirmModal.variant}
             />
 
-            <GroupEditModal
+            <LostFoundEditModal
                 isOpen={showModal}
                 onClose={handleModalClose}
-                group={group}
+                item={item}
                 onSuccess={handleModalSuccess}
             />
         </div>
     );
 };
 
-export default GroupDetail;
+export default LostFoundDetail;

@@ -138,7 +138,7 @@ const LostFoundList = () => {
     const fetchItems = async () => {
         try {
             setLoading(true);
-            const response = await api.get(`/lostandfound/${collegeslug}`);
+            const response = await api.get(`/lostandfound/all/${collegeslug}`);
             setItems(response.data.data || []);
             setError(null);
         } catch (error) {

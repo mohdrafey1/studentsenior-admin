@@ -1,17 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     X,
-    Save,
     AlertTriangle,
-    MessageSquare,
-    Type,
-    FileText,
-    Link,
-    Building,
-    BookOpen,
-    Hash,
-    Users,
-    ExternalLink,
     Loader,
 } from 'lucide-react';
 import api from '../utils/api';
@@ -20,55 +10,24 @@ import toast from 'react-hot-toast';
 const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
-        groupName: '',
-        description: '',
-        groupLink: '',
-        branch: '',
-        subject: '',
-        semester: '',
-        memberCount: '',
-        groupType: 'study',
-        isActive: true,
+        title: '',
+        info: '',
+        link: '',
+        domain: '',
+        submissionStatus: 'pending',
+        rejectionReason: '',
     });
     const [errors, setErrors] = useState({});
-
-    const groupTypes = [
-        {
-            value: 'study',
-            label: 'Study Group',
-            icon: <BookOpen className='h-4 w-4' />,
-        },
-        {
-            value: 'project',
-            label: 'Project Group',
-            icon: <Building className='h-4 w-4' />,
-        },
-        {
-            value: 'general',
-            label: 'General Discussion',
-            icon: <MessageSquare className='h-4 w-4' />,
-        },
-        {
-            value: 'placement',
-            label: 'Placement/Career',
-            icon: <Users className='h-4 w-4' />,
-        },
-    ];
-
-    const semesters = Array.from({ length: 8 }, (_, i) => i + 1);
 
     useEffect(() => {
         if (group && isOpen) {
             setFormData({
-                groupName: group.groupName || '',
-                description: group.description || '',
-                groupLink: group.groupLink || '',
-                branch: group.branch || '',
-                subject: group.subject || '',
-                semester: group.semester || '',
-                memberCount: group.memberCount || '',
-                groupType: group.groupType || 'study',
-                isActive: group.isActive !== undefined ? group.isActive : true,
+                title: group.title || '',
+                info: group.info || '',
+                link: group.link || '',
+                domain: group.domain || '',
+                submissionStatus: group.submissionStatus || 'pending',
+                rejectionReason: group.rejectionReason || '',
             });
             setErrors({});
         }
@@ -77,32 +36,28 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
     const validateForm = () => {
         const newErrors = {};
 
-        if (!formData.groupName.trim()) {
-            newErrors.groupName = 'Group name is required';
+        if (!formData.title.trim()) {
+            newErrors.title = 'Group title is required';
         }
 
-        if (!formData.description.trim()) {
-            newErrors.description = 'Description is required';
+        if (!formData.info.trim()) {
+            newErrors.info = 'Info/Description is required';
         }
 
-        if (formData.groupLink && !isValidWhatsAppLink(formData.groupLink)) {
-            newErrors.groupLink = 'Please enter a valid WhatsApp group link';
+        if (formData.link && !isValidWhatsAppLink(formData.link)) {
+            newErrors.link = 'Please enter a valid WhatsApp group link';
         }
 
-        if (
-            formData.memberCount &&
-            (isNaN(formData.memberCount) || Number(formData.memberCount) < 0)
-        ) {
-            newErrors.memberCount = 'Member count must be a valid number';
+        if (!formData.domain.trim()) {
+            newErrors.domain = 'Domain is required';
         }
 
         if (
-            formData.semester &&
-            (isNaN(formData.semester) ||
-                Number(formData.semester) < 1 ||
-                Number(formData.semester) > 8)
+            formData.submissionStatus === 'rejected' &&
+            !formData.rejectionReason.trim()
         ) {
-            newErrors.semester = 'Semester must be between 1 and 8';
+            newErrors.rejectionReason =
+                'Rejection reason is required when status is rejected';
         }
 
         setErrors(newErrors);
@@ -115,10 +70,10 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
     };
 
     const handleInputChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        const { name, value } = e.target;
         setFormData((prev) => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : value,
+            [name]: value,
         }));
 
         // Clear error when user starts typing
@@ -142,19 +97,12 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
 
         try {
             const updatedGroup = {
-                groupName: formData.groupName.trim(),
-                description: formData.description.trim(),
-                groupLink: formData.groupLink.trim(),
-                branch: formData.branch.trim(),
-                subject: formData.subject.trim(),
-                semester: formData.semester
-                    ? Number(formData.semester)
-                    : undefined,
-                memberCount: formData.memberCount
-                    ? Number(formData.memberCount)
-                    : undefined,
-                groupType: formData.groupType,
-                isActive: formData.isActive,
+                title: formData.title.trim(),
+                info: formData.info.trim(),
+                link: formData.link.trim(),
+                domain: formData.domain.trim(),
+                submissionStatus: formData.submissionStatus,
+                rejectionReason: formData.rejectionReason.trim() || undefined,
             };
 
             await api.put(`/group/edit/${group._id}`, updatedGroup);
@@ -171,402 +119,212 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
         }
     };
 
-    const FormField = ({
-        label,
-        icon,
-        children,
-        required = false,
-        description,
-        error,
-    }) => (
-        <div className='space-y-2'>
-            <label className='flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100'>
-                {icon}
-                {label}
-                {required && <span className='text-red-500'>*</span>}
-            </label>
-            {description && (
-                <p className='text-xs text-gray-500 dark:text-gray-400'>
-                    {description}
-                </p>
-            )}
-            {children}
-            {error && (
-                <p className='flex items-center gap-1 text-xs text-red-600 dark:text-red-400'>
-                    <AlertTriangle className='h-3 w-3' />
-                    {error}
-                </p>
-            )}
-        </div>
-    );
-
-    const getCurrentGroupType = () => {
-        return groupTypes.find((type) => type.value === formData.groupType);
-    };
-
     if (!isOpen) return null;
 
     return (
-        <div className='fixed inset-0 z-50 overflow-y-auto'>
-            <div className='flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0'>
+        <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
+            <div className='flex items-center justify-center min-h-screen p-4'>
                 <div
-                    className='fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75'
+                    className='fixed inset-0'
                     onClick={onClose}
                 ></div>
-                <span
-                    className='hidden sm:inline-block sm:align-middle sm:h-screen'
-                    aria-hidden='true'
-                >
-                    &#8203;
-                </span>
-                <div className='inline-block align-bottom bg-white dark:bg-gray-900 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full relative z-10'>
-                    <div className='flex flex-col h-full max-h-[90vh]'>
-                        {/* Header */}
-                        <div className='flex-shrink-0 bg-gradient-to-r from-green-600 via-teal-600 to-blue-600 text-white p-6'>
-                            <div className='flex items-center justify-between'>
-                                <div className='flex items-center space-x-3'>
-                                    <div className='flex-shrink-0'>
-                                        <div className='w-10 h-10 bg-white/20 rounded-full flex items-center justify-center'>
-                                            <MessageSquare className='w-5 h-5 text-white' />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <h3 className='text-lg font-semibold text-white'>
-                                            Edit WhatsApp Group
-                                        </h3>
-                                        <p className='text-sm text-green-100'>
-                                            Update group information and
-                                            settings
-                                        </p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={onClose}
-                                    className='text-white/80 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full'
-                                >
-                                    <X className='w-5 h-5' />
-                                </button>
-                            </div>
+                
+                <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
+                    {/* Header */}
+                    <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
+                        <div>
+                            <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
+                                Edit WhatsApp Group
+                            </h2>
+                            <p className='text-sm text-gray-500 dark:text-gray-400'>
+                                {group?.college?.collegeName}
+                            </p>
                         </div>
-
-                        <form
-                            onSubmit={handleSubmit}
-                            className='flex-1 flex flex-col overflow-hidden'
+                        <button
+                            onClick={onClose}
+                            className='p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded'
+                            disabled={isSubmitting}
                         >
-                            <div className='flex-1 overflow-y-auto p-6 space-y-6'>
-                                {/* Basic Information Section */}
-                                <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
-                                    <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                        <MessageSquare className='h-5 w-5 text-green-500' />
-                                        Basic Information
-                                    </h3>
+                            <X className='h-5 w-5' />
+                        </button>
+                    </div>
 
-                                    <div className='space-y-6'>
-                                        <FormField
-                                            label='Group Name'
-                                            icon={
-                                                <Type className='h-4 w-4 text-gray-500' />
-                                            }
-                                            required
-                                            description='Clear and descriptive group name'
-                                            error={errors.groupName}
-                                        >
-                                            <input
-                                                type='text'
-                                                name='groupName'
-                                                value={formData.groupName}
-                                                onChange={handleInputChange}
-                                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                                    errors.groupName
-                                                        ? 'border-red-300 dark:border-red-600'
-                                                        : 'border-gray-300 dark:border-gray-600'
-                                                } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                                placeholder='Enter group name...'
-                                            />
-                                        </FormField>
+                    <form onSubmit={handleSubmit}>
+                        <div className='p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto'>
 
-                                        <FormField
-                                            label='Description'
-                                            icon={
-                                                <FileText className='h-4 w-4 text-gray-500' />
-                                            }
-                                            required
-                                            description='Brief description of the group purpose'
-                                            error={errors.description}
-                                        >
-                                            <textarea
-                                                name='description'
-                                                value={formData.description}
-                                                onChange={handleInputChange}
-                                                rows={4}
-                                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${
-                                                    errors.description
-                                                        ? 'border-red-300 dark:border-red-600'
-                                                        : 'border-gray-300 dark:border-gray-600'
-                                                } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                                placeholder='Describe the group purpose and guidelines...'
-                                            />
-                                        </FormField>
-
-                                        <FormField
-                                            label='WhatsApp Group Link'
-                                            icon={
-                                                <Link className='h-4 w-4 text-gray-500' />
-                                            }
-                                            description='WhatsApp group invitation link'
-                                            error={errors.groupLink}
-                                        >
-                                            <input
-                                                type='url'
-                                                name='groupLink'
-                                                value={formData.groupLink}
-                                                onChange={handleInputChange}
-                                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                                    errors.groupLink
-                                                        ? 'border-red-300 dark:border-red-600'
-                                                        : 'border-gray-300 dark:border-gray-600'
-                                                } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                                placeholder='https://chat.whatsapp.com/...'
-                                            />
-                                        </FormField>
-                                    </div>
+                            {/* Status and Rejection Reason */}
+                            <div className='space-y-4'>
+                                <div>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Status <span className='text-red-500'>*</span>
+                                    </label>
+                                    <select
+                                        name='submissionStatus'
+                                        value={formData.submissionStatus}
+                                        onChange={handleInputChange}
+                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                    >
+                                        <option value='pending'>Pending</option>
+                                        <option value='approved'>Approved</option>
+                                        <option value='rejected'>Rejected</option>
+                                    </select>
                                 </div>
 
-                                {/* Academic Information Section */}
-                                <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
-                                    <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                        <BookOpen className='h-5 w-5 text-blue-500' />
-                                        Academic Information
-                                    </h3>
-
-                                    <div className='grid md:grid-cols-2 gap-6'>
-                                        <FormField
-                                            label='Branch'
-                                            icon={
-                                                <Building className='h-4 w-4 text-gray-500' />
-                                            }
-                                            description='Academic branch (leave empty for all branches)'
-                                        >
-                                            <input
-                                                type='text'
-                                                name='branch'
-                                                value={formData.branch}
-                                                onChange={handleInputChange}
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                                placeholder='e.g., Computer Science, Mechanical'
-                                            />
-                                        </FormField>
-
-                                        <FormField
-                                            label='Subject'
-                                            icon={
-                                                <BookOpen className='h-4 w-4 text-gray-500' />
-                                            }
-                                            description='Specific subject (leave empty for general)'
-                                        >
-                                            <input
-                                                type='text'
-                                                name='subject'
-                                                value={formData.subject}
-                                                onChange={handleInputChange}
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                                placeholder='e.g., Data Structures, Mathematics'
-                                            />
-                                        </FormField>
-
-                                        <FormField
-                                            label='Semester'
-                                            icon={
-                                                <Hash className='h-4 w-4 text-gray-500' />
-                                            }
-                                            description='Target semester (leave empty for all)'
-                                            error={errors.semester}
-                                        >
-                                            <select
-                                                name='semester'
-                                                value={formData.semester}
-                                                onChange={handleInputChange}
-                                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                    errors.semester
-                                                        ? 'border-red-300 dark:border-red-600'
-                                                        : 'border-gray-300 dark:border-gray-600'
-                                                } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                            >
-                                                <option value=''>
-                                                    All Semesters
-                                                </option>
-                                                {semesters.map((sem) => (
-                                                    <option
-                                                        key={sem}
-                                                        value={sem}
-                                                    >
-                                                        Semester {sem}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </FormField>
-
-                                        <FormField
-                                            label='Group Type'
-                                            icon={getCurrentGroupType()?.icon}
-                                            description='Purpose of the group'
-                                        >
-                                            <select
-                                                name='groupType'
-                                                value={formData.groupType}
-                                                onChange={handleInputChange}
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                            >
-                                                {groupTypes.map((type) => (
-                                                    <option
-                                                        key={type.value}
-                                                        value={type.value}
-                                                    >
-                                                        {type.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </FormField>
-                                    </div>
-                                </div>
-
-                                {/* Group Settings Section */}
-                                <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
-                                    <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                        <Users className='h-5 w-5 text-purple-500' />
-                                        Group Settings
-                                    </h3>
-
-                                    <div className='grid md:grid-cols-2 gap-6'>
-                                        <FormField
-                                            label='Member Count'
-                                            icon={
-                                                <Users className='h-4 w-4 text-gray-500' />
-                                            }
-                                            description='Current number of members'
-                                            error={errors.memberCount}
-                                        >
-                                            <input
-                                                type='number'
-                                                name='memberCount'
-                                                value={formData.memberCount}
-                                                onChange={handleInputChange}
-                                                min='0'
-                                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                                    errors.memberCount
-                                                        ? 'border-red-300 dark:border-red-600'
-                                                        : 'border-gray-300 dark:border-gray-600'
-                                                } bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                                                placeholder='0'
-                                            />
-                                        </FormField>
-
-                                        <FormField
-                                            label='Status'
-                                            icon={
-                                                <MessageSquare className='h-4 w-4 text-gray-500' />
-                                            }
-                                            description='Group availability status'
-                                        >
-                                            <div className='flex items-center space-x-3'>
-                                                <label className='flex items-center'>
-                                                    <input
-                                                        type='checkbox'
-                                                        name='isActive'
-                                                        checked={
-                                                            formData.isActive
-                                                        }
-                                                        onChange={
-                                                            handleInputChange
-                                                        }
-                                                        className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded'
-                                                    />
-                                                    <span className='ml-2 text-sm text-gray-900 dark:text-gray-100'>
-                                                        Group is active and
-                                                        accepting members
-                                                    </span>
-                                                </label>
-                                            </div>
-                                        </FormField>
-                                    </div>
-                                </div>
-
-                                {/* Group Information */}
-                                {group && (
-                                    <div className='bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700'>
-                                        <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                            <MessageSquare className='h-5 w-5 text-green-500' />
-                                            Group Information
-                                        </h3>
-                                        <div className='grid md:grid-cols-2 gap-6'>
-                                            <div className='space-y-2'>
-                                                <label className='text-gray-500 dark:text-gray-400'>
-                                                    Group ID
-                                                </label>
-                                                <div className='text-gray-900 dark:text-gray-100 font-mono text-sm'>
-                                                    {group._id}
-                                                </div>
-                                            </div>
-                                            <div className='space-y-2'>
-                                                <label className='text-gray-500 dark:text-gray-400'>
-                                                    College
-                                                </label>
-                                                <div className='flex items-center space-x-2'>
-                                                    <Building className='h-4 w-4 text-gray-400' />
-                                                    <span className='text-gray-900 dark:text-gray-100'>
-                                                        {group.college
-                                                            ?.collegeName ||
-                                                            'N/A'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                {formData.submissionStatus === 'rejected' && (
+                                    <div>
+                                        <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                            Rejection Reason <span className='text-red-500'>*</span>
+                                        </label>
+                                        <textarea
+                                            name='rejectionReason'
+                                            value={formData.rejectionReason}
+                                            onChange={handleInputChange}
+                                            rows={2}
+                                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 dark:text-white resize-none ${
+                                                errors.rejectionReason
+                                                    ? 'border-red-300'
+                                                    : 'border-gray-300 dark:border-gray-600'
+                                            }`}
+                                            placeholder='Provide rejection reason...'
+                                        />
+                                        {errors.rejectionReason && (
+                                            <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                                <AlertTriangle className='h-3 w-3' />
+                                                {errors.rejectionReason}
+                                            </p>
+                                        )}
                                     </div>
                                 )}
                             </div>
-
-                            {/* Footer */}
-                            <div className='flex-shrink-0 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-6 py-4'>
-                                <div className='flex items-center justify-between'>
-                                    <div className='text-sm text-gray-500 dark:text-gray-400'>
-                                        Last updated:{' '}
-                                        {group &&
-                                            new Date(
-                                                group.updatedAt ||
-                                                    group.createdAt,
-                                            ).toLocaleString()}
-                                    </div>
-                                    <div className='flex gap-3'>
-                                        <button
-                                            type='button'
-                                            onClick={onClose}
-                                            disabled={isSubmitting}
-                                            className='px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed'
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type='submit'
-                                            disabled={isSubmitting}
-                                            className='px-6 py-2.5 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg text-sm font-medium hover:from-green-700 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
-                                        >
-                                            {isSubmitting ? (
-                                                <>
-                                                    <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' />
-                                                    Updating...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Save className='h-4 w-4' />
-                                                    Update Group
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
+                            
+                            {/* Group Title */}
+                            <div>
+                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                    Group Title <span className='text-red-500'>*</span>
+                                </label>
+                                <input
+                                    type='text'
+                                    name='title'
+                                    value={formData.title}
+                                    onChange={handleInputChange}
+                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
+                                        errors.title
+                                            ? 'border-red-300'
+                                            : 'border-gray-300 dark:border-gray-600'
+                                    }`}
+                                    placeholder='Enter group title...'
+                                />
+                                {errors.title && (
+                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                        <AlertTriangle className='h-3 w-3' />
+                                        {errors.title}
+                                    </p>
+                                )}
                             </div>
-                        </form>
-                    </div>
+
+                            {/* Info/Description */}
+                            <div>
+                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                    Info / Description <span className='text-red-500'>*</span>
+                                </label>
+                                <textarea
+                                    name='info'
+                                    value={formData.info}
+                                    onChange={handleInputChange}
+                                    rows={3}
+                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none ${
+                                        errors.info
+                                            ? 'border-red-300'
+                                            : 'border-gray-300 dark:border-gray-600'
+                                    }`}
+                                    placeholder='Describe the group purpose...'
+                                />
+                                {errors.info && (
+                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                        <AlertTriangle className='h-3 w-3' />
+                                        {errors.info}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* WhatsApp Link */}
+                            <div>
+                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                    WhatsApp Group Link <span className='text-red-500'>*</span>
+                                </label>
+                                <input
+                                    type='url'
+                                    name='link'
+                                    value={formData.link}
+                                    onChange={handleInputChange}
+                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
+                                        errors.link
+                                            ? 'border-red-300'
+                                            : 'border-gray-300 dark:border-gray-600'
+                                    }`}
+                                    placeholder='https://chat.whatsapp.com/...'
+                                />
+                                {errors.link && (
+                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                        <AlertTriangle className='h-3 w-3' />
+                                        {errors.link}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Domain */}
+                            <div>
+                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                    Domain <span className='text-red-500'>*</span>
+                                </label>
+                                <input
+                                    type='text'
+                                    name='domain'
+                                    value={formData.domain}
+                                    onChange={handleInputChange}
+                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
+                                        errors.domain
+                                            ? 'border-red-300'
+                                            : 'border-gray-300 dark:border-gray-600'
+                                    }`}
+                                    placeholder='e.g., Computer Science, General...'
+                                />
+                                {errors.domain && (
+                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                        <AlertTriangle className='h-3 w-3' />
+                                        {errors.domain}
+                                    </p>
+                                )}
+                            </div>
+
+                        </div>
+
+                        {/* Footer */}
+                        <div className='flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700'>
+                            <button
+                                type='button'
+                                onClick={onClose}
+                                disabled={isSubmitting}
+                                className='px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg disabled:opacity-50'
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type='submit'
+                                disabled={isSubmitting}
+                                className='px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 flex items-center gap-2'
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader className='h-4 w-4 animate-spin' />
+                                        Updating...
+                                    </>
+                                ) : (
+                                    'Update Group'
+                                )}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

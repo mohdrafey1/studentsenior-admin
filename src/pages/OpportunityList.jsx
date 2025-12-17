@@ -127,7 +127,7 @@ const OpportunityList = () => {
     const fetchOpportunities = async () => {
         try {
             setLoading(true);
-            const response = await api.get(`/opportunity/${collegeslug}`);
+            const response = await api.get(`/opportunity/all/${collegeslug}`);
             setOpportunities(response.data.data || []);
             setError(null);
         } catch (error) {

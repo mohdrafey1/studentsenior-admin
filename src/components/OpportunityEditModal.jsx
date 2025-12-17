@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader, Briefcase, Save } from 'lucide-react';
+import { X, Loader, AlertTriangle } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -11,6 +11,7 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
         whatsapp: '',
         link: '',
         submissionStatus: 'pending',
+        rejectionReason: '',
     });
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
@@ -24,6 +25,7 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                 whatsapp: opportunity.whatsapp || '',
                 link: opportunity.link || '',
                 submissionStatus: opportunity.submissionStatus || 'pending',
+                rejectionReason: opportunity.rejectionReason || '',
             });
         } else {
             setFormData({
@@ -33,6 +35,7 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                 whatsapp: '',
                 link: '',
                 submissionStatus: 'pending',
+                rejectionReason: '',
             });
         }
         setErrors({});
@@ -74,6 +77,14 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
             newErrors.link = 'Please enter a valid URL';
         }
 
+        if (
+            formData.submissionStatus === 'rejected' &&
+            !formData.rejectionReason.trim()
+        ) {
+            newErrors.rejectionReason =
+                'Rejection reason is required when status is rejected';
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -100,10 +111,6 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                 // Update existing opportunity
                 await api.put(`/opportunity/edit/${opportunity._id}`, formData);
                 toast.success('Opportunity updated successfully');
-            } else {
-                // Create new opportunity
-                await api.post('/opportunity/create', formData);
-                toast.success('Opportunity created successfully');
             }
             onSuccess();
         } catch (error) {
@@ -119,194 +126,224 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
     if (!isOpen) return null;
 
     return (
-        <div className='fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50'>
-            <div className='bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto'>
-                {/* Header */}
-                <div className='flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700'>
-                    <div className='flex items-center space-x-3'>
-                        <div className='p-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg'>
-                            <Briefcase className='h-5 w-5 text-white' />
+        <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
+            <div className='flex items-center justify-center min-h-screen p-4'>
+                <div
+                    className='fixed inset-0'
+                    onClick={onClose}
+                ></div>
+                
+                <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
+                    {/* Header */}
+                    <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
+                        <div>
+                            <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
+                                {opportunity ? 'Edit Opportunity' : 'Create Opportunity'}
+                            </h2>
+                            <p className='text-sm text-gray-500 dark:text-gray-400'>
+                                {opportunity?.college?.collegeName || 'Opportunities'}
+                            </p>
                         </div>
-                        <h2 className='text-xl font-semibold text-gray-900 dark:text-gray-100'>
-                            {opportunity
-                                ? 'Edit Opportunity'
-                                : 'Create Opportunity'}
-                        </h2>
+                        <button
+                            onClick={onClose}
+                            className='p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded'
+                            disabled={loading}
+                        >
+                            <X className='h-5 w-5' />
+                        </button>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className='text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors'
-                    >
-                        <X className='h-6 w-6' />
-                    </button>
-                </div>
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className='p-6'>
-                    {/* Status (Admin only) */}
-                        <div>
-                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                                Status
-                            </label>
-                            <select
-                                name='submissionStatus'
-                                value={formData.submissionStatus}
-                                onChange={handleChange}
-                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                            >
-                                <option value='pending'>Pending</option>
-                                <option value='approved'>Approved</option>
-                                <option value='rejected'>Rejected</option>
-                            </select>
-                        </div>
-                    <div className='space-y-6'>
-                        {/* Opportunity Name */}
-                        <div>
-                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                                Opportunity Name *
-                            </label>
-                            <input
-                                type='text'
-                                name='name'
-                                value={formData.name}
-                                onChange={handleChange}
-                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${
-                                    errors.name
-                                        ? 'border-red-300 dark:border-red-600'
-                                        : 'border-gray-300 dark:border-gray-600'
-                                }`}
-                                placeholder='e.g., Software Engineer Internship'
-                            />
-                            {errors.name && (
-                                <p className='mt-1 text-sm text-red-600 dark:text-red-400'>
-                                    {errors.name}
-                                </p>
-                            )}
-                        </div>
+                    {/* Form */}
+                    <form onSubmit={handleSubmit}>
+                        <div className='p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto'>
+                            {/* Status */}
+                            <div className='space-y-4'>
+                                <div>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Status <span className='text-red-500'>*</span>
+                                    </label>
+                                    <select
+                                        name='submissionStatus'
+                                        value={formData.submissionStatus}
+                                        onChange={handleChange}
+                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                    >
+                                        <option value='pending'>Pending</option>
+                                        <option value='approved'>Approved</option>
+                                        <option value='rejected'>Rejected</option>
+                                    </select>
+                                </div>
+                                {formData.submissionStatus === 'rejected' && (
+                                    <div>
+                                        <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                            Rejection Reason <span className='text-red-500'>*</span>
+                                        </label>
+                                        <textarea
+                                            name='rejectionReason'
+                                            value={formData.rejectionReason}
+                                            onChange={handleChange}
+                                            rows={2}
+                                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none ${
+                                                errors.rejectionReason
+                                                    ? 'border-red-300'
+                                                    : 'border-gray-300 dark:border-gray-600'
+                                            }`}
+                                            placeholder='Reason for rejection...'
+                                        />
+                                        {errors.rejectionReason && (
+                                            <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                                <AlertTriangle className='h-3 w-3' />
+                                                {errors.rejectionReason}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
 
-                        {/* Description */}
-                        <div>
-                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                                Description *
-                            </label>
-                            <textarea
-                                name='description'
-                                value={formData.description}
-                                onChange={handleChange}
-                                rows={4}
-                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${
-                                    errors.description
-                                        ? 'border-red-300 dark:border-red-600'
-                                        : 'border-gray-300 dark:border-gray-600'
-                                }`}
-                                placeholder='Describe the opportunity, requirements, and benefits...'
-                            />
-                            {errors.description && (
-                                <p className='mt-1 text-sm text-red-600 dark:text-red-400'>
-                                    {errors.description}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Contact Information */}
-                        <div className='grid md:grid-cols-2 gap-4'>
-                            {/* Email */}
+                            {/* Opportunity Name */}
                             <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                                    Email *
+                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                    Opportunity Name <span className='text-red-500'>*</span>
                                 </label>
                                 <input
-                                    type='email'
-                                    name='email'
-                                    value={formData.email}
+                                    type='text'
+                                    name='name'
+                                    value={formData.name}
                                     onChange={handleChange}
-                                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${
-                                        errors.email
-                                            ? 'border-red-300 dark:border-red-600'
+                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
+                                        errors.name
+                                            ? 'border-red-300'
                                             : 'border-gray-300 dark:border-gray-600'
                                     }`}
-                                    placeholder='contact@company.com'
+                                    placeholder='e.g., Software Engineer Internship'
                                 />
-                                {errors.email && (
-                                    <p className='mt-1 text-sm text-red-600 dark:text-red-400'>
-                                        {errors.email}
+                                {errors.name && (
+                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                        <AlertTriangle className='h-3 w-3' />
+                                        {errors.name}
                                     </p>
                                 )}
                             </div>
 
-                            {/* WhatsApp */}
+                            {/* Description */}
                             <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                                    WhatsApp Number
+                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                    Description <span className='text-red-500'>*</span>
+                                </label>
+                                <textarea
+                                    name='description'
+                                    value={formData.description}
+                                    onChange={handleChange}
+                                    rows={3}
+                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none ${
+                                        errors.description
+                                            ? 'border-red-300'
+                                            : 'border-gray-300 dark:border-gray-600'
+                                    }`}
+                                    placeholder='Describe the opportunity, requirements, and benefits...'
+                                />
+                                {errors.description && (
+                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                        <AlertTriangle className='h-3 w-3' />
+                                        {errors.description}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Email and WhatsApp */}
+                            <div className='grid grid-cols-2 gap-4'>
+                                <div>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Email <span className='text-red-500'>*</span>
+                                    </label>
+                                    <input
+                                        type='email'
+                                        name='email'
+                                        value={formData.email}
+                                        onChange={handleChange}
+                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
+                                            errors.email
+                                                ? 'border-red-300'
+                                                : 'border-gray-300 dark:border-gray-600'
+                                        }`}
+                                        placeholder='contact@company.com'
+                                    />
+                                    {errors.email && (
+                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                            <AlertTriangle className='h-3 w-3' />
+                                            {errors.email}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        WhatsApp Number
+                                    </label>
+                                    <input
+                                        type='text'
+                                        name='whatsapp'
+                                        value={formData.whatsapp}
+                                        onChange={handleChange}
+                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                        placeholder='+1234567890'
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Application Link */}
+                            <div>
+                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                    Application Link
                                 </label>
                                 <input
-                                    type='text'
-                                    name='whatsapp'
-                                    value={formData.whatsapp}
+                                    type='url'
+                                    name='link'
+                                    value={formData.link}
                                     onChange={handleChange}
-                                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                    placeholder='+1234567890'
+                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
+                                        errors.link
+                                            ? 'border-red-300'
+                                            : 'border-gray-300 dark:border-gray-600'
+                                    }`}
+                                    placeholder='https://company.com/apply'
                                 />
+                                {errors.link && (
+                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                        <AlertTriangle className='h-3 w-3' />
+                                        {errors.link}
+                                    </p>
+                                )}
                             </div>
                         </div>
 
-                        {/* External Link */}
-                        <div>
-                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                                Application Link
-                            </label>
-                            <input
-                                type='url'
-                                name='link'
-                                value={formData.link}
-                                onChange={handleChange}
-                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${
-                                    errors.link
-                                        ? 'border-red-300 dark:border-red-600'
-                                        : 'border-gray-300 dark:border-gray-600'
-                                }`}
-                                placeholder='https://company.com/apply'
-                            />
-                            {errors.link && (
-                                <p className='mt-1 text-sm text-red-600 dark:text-red-400'>
-                                    {errors.link}
-                                </p>
-                            )}
+                        {/* Footer */}
+                        <div className='flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700'>
+                            <button
+                                type='button'
+                                onClick={onClose}
+                                disabled={loading}
+                                className='px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg disabled:opacity-50'
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type='submit'
+                                disabled={loading}
+                                className='px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 flex items-center gap-2'
+                            >
+                                {loading ? (
+                                    <>
+                                        <Loader className='h-4 w-4 animate-spin' />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    opportunity ? 'Update' : 'Create'
+                                )}
+                            </button>
                         </div>
-
-                        
-                    </div>
-
-                    {/* Footer */}
-                    <div className='flex items-center justify-end space-x-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700'>
-                        <button
-                            type='button'
-                            onClick={onClose}
-                            className='px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors'
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type='submit'
-                            disabled={loading}
-                            className='flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-                        >
-                            {loading ? (
-                                <>
-                                    <Loader className='h-4 w-4 animate-spin' />
-                                    <span>Saving...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Save className='h-4 w-4' />
-                                    <span>
-                                        {opportunity ? 'Update' : 'Create'}
-                                    </span>
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     );

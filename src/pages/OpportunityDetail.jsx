@@ -29,6 +29,7 @@ const OpportunityDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [showRawData, setShowRawData] = useState(false);
     const { collegeslug, opportunityid } = useParams();
     const navigate = useNavigate();
 
@@ -99,16 +100,6 @@ const OpportunityDetail = () => {
                 console.error('Error deleting opportunity:', error);
                 toast.error('Failed to delete opportunity');
             }
-        }
-    };
-
-    const handleApplyNow = () => {
-        if (opportunity.link) {
-            window.open(opportunity.link, '_blank');
-        } else if (opportunity.email) {
-            window.location.href = `mailto:${opportunity.email}?subject=Application for ${opportunity.name}`;
-        } else {
-            toast.info('No application method available');
         }
     };
 
@@ -262,13 +253,6 @@ const OpportunityDetail = () => {
                             </div>
                             <div className='flex space-x-2'>
                                 <button
-                                    onClick={handleApplyNow}
-                                    className='flex items-center space-x-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg transition-colors text-white font-medium'
-                                >
-                                    <ExternalLink className='h-4 w-4' />
-                                    <span>Apply Now</span>
-                                </button>
-                                <button
                                     onClick={handleEdit}
                                     className='p-3 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white'
                                     title='Edit Opportunity'
@@ -287,6 +271,26 @@ const OpportunityDetail = () => {
                     </div>
                 </div>
 
+                {/* Rejection Alert */}
+                {opportunity.submissionStatus === 'rejected' &&
+                    opportunity.rejectionReason && (
+                        <div className='bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg'>
+                            <div className='flex items-start'>
+                                <div className='flex-shrink-0'>
+                                    <AlertTriangle className='h-5 w-5 text-red-500' />
+                                </div>
+                                <div className='ml-3'>
+                                    <h3 className='text-sm font-medium text-red-800 dark:text-red-300'>
+                                        Submission Rejected
+                                    </h3>
+                                    <div className='mt-2 text-sm text-red-700 dark:text-red-200'>
+                                        <p>{opportunity.rejectionReason}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                 <div className='grid lg:grid-cols-3 gap-6'>
                     {/* Main Content */}
                     <div className='lg:col-span-2 space-y-6'>
@@ -302,49 +306,6 @@ const OpportunityDetail = () => {
                             </div>
                         </div>
 
-                        {/* Application Instructions */}
-                        <div className='bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-6'>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
-                                <ExternalLink className='h-5 w-5 text-blue-500' />
-                                How to Apply
-                            </h3>
-                            <div className='space-y-3'>
-                                {opportunity.link && (
-                                    <div className='flex items-center space-x-3 text-sm'>
-                                        <div className='w-6 h-6 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center'>
-                                            <span className='text-blue-600 dark:text-blue-400 font-semibold text-xs'>
-                                                1
-                                            </span>
-                                        </div>
-                                        <span className='text-gray-700 dark:text-gray-300'>
-                                            Click "Apply Now" to visit the
-                                            application portal
-                                        </span>
-                                    </div>
-                                )}
-                                <div className='flex items-center space-x-3 text-sm'>
-                                    <div className='w-6 h-6 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center'>
-                                        <span className='text-blue-600 dark:text-blue-400 font-semibold text-xs'>
-                                            {opportunity.link ? '2' : '1'}
-                                        </span>
-                                    </div>
-                                    <span className='text-gray-700 dark:text-gray-300'>
-                                        Contact the recruiter using the provided
-                                        email or WhatsApp
-                                    </span>
-                                </div>
-                                <div className='flex items-center space-x-3 text-sm'>
-                                    <div className='w-6 h-6 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center'>
-                                        <span className='text-blue-600 dark:text-blue-400 font-semibold text-xs'>
-                                            {opportunity.link ? '3' : '2'}
-                                        </span>
-                                    </div>
-                                    <span className='text-gray-700 dark:text-gray-300'>
-                                        Prepare your resume and cover letter
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
                     {/* Sidebar */}
@@ -398,39 +359,6 @@ const OpportunityDetail = () => {
                                             </a>
                                         </div>
                                     </div>
-                                )}
-                            </div>
-
-                            {/* Contact Actions */}
-                            <div className='mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2'>
-                                <button
-                                    onClick={() => {
-                                        window.location.href = `mailto:${opportunity.email}?subject=Application for ${opportunity.name}`;
-                                    }}
-                                    className='w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors'
-                                >
-                                    <Mail className='h-4 w-4' />
-                                    <span>Send Email</span>
-                                </button>
-
-                                {opportunity.whatsapp && (
-                                    <button
-                                        onClick={() => {
-                                            window.open(
-                                                `https://wa.me/${opportunity.whatsapp.replace(
-                                                    /[^0-9]/g,
-                                                    '',
-                                                )}?text=Hi, I'm interested in the ${
-                                                    opportunity.name
-                                                } opportunity.`,
-                                                '_blank',
-                                            );
-                                        }}
-                                        className='w-full flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors'
-                                    >
-                                        <Phone className='h-4 w-4' />
-                                        <span>WhatsApp</span>
-                                    </button>
                                 )}
                             </div>
                         </div>
@@ -498,22 +426,29 @@ const OpportunityDetail = () => {
                             </div>
                         </div>
 
-                        {/* Quick Actions */}
-                        <div className='bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-6 text-white'>
-                            <h3 className='text-lg font-semibold mb-2'>
-                                Don't Miss Out!
-                            </h3>
-                            <p className='text-orange-100 text-sm mb-4'>
-                                This is a great opportunity. Apply now to secure
-                                your spot.
-                            </p>
+                        {/* Raw Data Toggle */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
                             <button
-                                onClick={handleApplyNow}
-                                className='w-full bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium'
+                                onClick={() => setShowRawData(!showRawData)}
+                                className='flex items-center justify-between w-full text-left'
                             >
-                                Apply Now
+                                <span className='text-sm font-medium text-gray-900 dark:text-white'>
+                                    Raw Data
+                                </span>
+                                <span className='text-xs text-blue-600 dark:text-blue-400 hover:underline'>
+                                    {showRawData ? 'Hide JSON' : 'Show JSON'}
+                                </span>
                             </button>
+                            {showRawData && (
+                                <div className='mt-4'>
+                                    <pre className='bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-x-auto text-xs font-mono text-gray-700 dark:text-gray-300'>
+                                        {JSON.stringify(opportunity, null, 2)}
+                                    </pre>
+                                </div>
+                            )}
                         </div>
+
+
                     </div>
                 </div>
             </div>
