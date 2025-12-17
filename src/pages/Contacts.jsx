@@ -23,9 +23,11 @@ import {
     User,
     Clock,
     X,
+    Eye,
 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import ConfirmModal from '../components/ConfirmModal';
+import ContactDetailModal from '../components/ContactDetailModal';
 
 const Contacts = () => {
     const location = useLocation();
@@ -50,6 +52,8 @@ const Contacts = () => {
         window.innerWidth >= 1024 ? 'table' : 'grid',
     );
     const [expandedItems, setExpandedItems] = useState(new Set());
+    const [selectedContact, setSelectedContact] = useState(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const { mainContentMargin } = useSidebarLayout();
 
     // Confirmation modal state
@@ -633,7 +637,17 @@ const Contacts = () => {
                                                     </div>
 
                                                     {/* Actions */}
-                                                    <div className='ml-4 flex-shrink-0'>
+                                                    <div className='ml-4 flex-shrink-0 flex flex-col gap-2'>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedContact(contact);
+                                                                setIsDetailModalOpen(true);
+                                                            }}
+                                                            className='p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors'
+                                                            title='View details'
+                                                        >
+                                                            <Eye className='w-5 h-5' />
+                                                        </button>
                                                         <button
                                                             onClick={() =>
                                                                 handleDelete(
@@ -716,17 +730,30 @@ const Contacts = () => {
                                                                     : 'N/A'}
                                                             </td>
                                                             <td className='px-6 py-4 whitespace-nowrap text-sm'>
-                                                                <button
-                                                                    onClick={() =>
-                                                                        handleDelete(
-                                                                            contact._id,
-                                                                        )
-                                                                    }
-                                                                    className='px-3 py-1 rounded-md bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 hover:opacity-90'
-                                                                >
-                                                                    Delete
-                                                                </button>
-                                                            </td>
+                                                                    <div className='flex items-center gap-2'>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setSelectedContact(contact);
+                                                                                setIsDetailModalOpen(true);
+                                                                            }}
+                                                                            className='px-3 py-1 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:opacity-90 flex items-center gap-1'
+                                                                            title="View Details"
+                                                                        >
+                                                                            <Eye className="w-3 h-3" />
+                                                                            View
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                handleDelete(
+                                                                                    contact._id,
+                                                                                )
+                                                                            }
+                                                                            className='px-3 py-1 rounded-md bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 hover:opacity-90'
+                                                                        >
+                                                                            Delete
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
                                                         </tr>
                                                     ),
                                                 )}
@@ -774,6 +801,13 @@ const Contacts = () => {
                 title={confirmModal.title}
                 message={confirmModal.message}
                 variant={confirmModal.variant}
+            />
+
+            {/* Detail Modal */}
+            <ContactDetailModal
+                isOpen={isDetailModalOpen}
+                onClose={() => setIsDetailModalOpen(false)}
+                contact={selectedContact}
             />
         </div>
     );

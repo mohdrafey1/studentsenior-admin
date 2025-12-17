@@ -10,17 +10,12 @@ import {
     Edit2,
     Trash2,
     DollarSign,
-    Tag,
     User,
-    Calendar,
-    Building,
-    ExternalLink,
     CheckCircle2,
     Clock,
     XCircle,
     AlertTriangle,
-    Eye,
-    ImageIcon,
+    Calendar,
 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import ProductEditModal from '../components/ProductEditModal';
@@ -118,17 +113,17 @@ const ProductDetail = () => {
         const statusConfig = {
             available: {
                 icon: <CheckCircle2 className='h-4 w-4' />,
-                color: 'text-green-800 dark:text-green-300 bg-green-100 dark:bg-green-900/30',
+                color: 'text-green-700 bg-green-50 dark:text-green-300 dark:bg-green-900/30 border-green-200 dark:border-green-800',
                 label: 'Available',
             },
             sold: {
                 icon: <XCircle className='h-4 w-4' />,
-                color: 'text-red-800 dark:text-red-300 bg-red-100 dark:bg-red-900/30',
+                color: 'text-red-700 bg-red-50 dark:text-red-300 dark:bg-red-900/30 border-red-200 dark:border-red-800',
                 label: 'Sold',
             },
             pending: {
                 icon: <Clock className='h-4 w-4' />,
-                color: 'text-yellow-800 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900/30',
+                color: 'text-yellow-700 bg-yellow-50 dark:text-yellow-300 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800',
                 label: 'Pending',
             },
         };
@@ -136,7 +131,7 @@ const ProductDetail = () => {
         const config = statusConfig[status] || statusConfig.available;
         return (
             <span
-                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${config.color}`}
             >
                 {config.icon}
                 {config.label}
@@ -149,12 +144,7 @@ const ProductDetail = () => {
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
                 <div className='flex items-center justify-center min-h-[60vh]'>
-                    <div className='text-center'>
-                        <Loader className='h-8 w-8 animate-spin text-blue-600 mx-auto mb-4' />
-                        <p className='text-gray-600 dark:text-gray-400'>
-                            Loading product details...
-                        </p>
-                    </div>
+                    <Loader className='h-8 w-8 animate-spin text-blue-600' />
                 </div>
             </div>
         );
@@ -164,36 +154,24 @@ const ProductDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
                     <button
                         onClick={() => navigate(-1)}
-                        className='flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 mb-6 transition-colors'
+                        className='flex items-center text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 mb-8 transition-colors'
                     >
                         <ArrowLeft className='h-4 w-4 mr-2' />
-                        Back
+                        Back to Products
                     </button>
-
-                    <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12'>
-                        <div className='text-center'>
-                            <div className='w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4'>
-                                <AlertTriangle className='h-8 w-8 text-red-600 dark:text-red-400' />
-                            </div>
-                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2'>
-                                Product Not Found
-                            </h3>
-                            <p className='text-gray-600 dark:text-gray-400 mb-4'>
-                                {error ||
-                                    'The requested product could not be found.'}
-                            </p>
-                            <button
-                                onClick={() =>
-                                    navigate(`/${collegeslug}/products`)
-                                }
-                                className='bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors'
-                            >
-                                Back to Products
-                            </button>
+                    <div className='text-center py-12'>
+                        <div className='w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4'>
+                            <AlertTriangle className='h-8 w-8 text-red-600 dark:text-red-400' />
                         </div>
+                        <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2'>
+                            Product Not Found
+                        </h3>
+                        <p className='text-gray-500 dark:text-gray-400'>
+                            {error || 'The requested product could not be found.'}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -201,187 +179,180 @@ const ProductDetail = () => {
     }
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
+        <div className='min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans'>
             <Header />
-            <div className='max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-                {/* Navigation */}
-                <div className='mb-6'>
-                    <button
-                        onClick={() => navigate(-1)}
-                        className='flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors'
-                    >
-                        <ArrowLeft className='h-4 w-4 mr-2' />
-                        Back to Products
-                    </button>
+            <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+                {/* Top Navigation & Actions */}
+                <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8'>
+                    <div className='flex items-center gap-4'>
+                        <button
+                            onClick={() => navigate(-1)}
+                            className='p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors'
+                        >
+                            <ArrowLeft className='h-5 w-5' />
+                        </button>
+                        <div>
+                            <h1 className='text-2xl font-bold flex items-center gap-3'>
+                                {product.title}
+                                {getStatusBadge(product.submissionStatus)}
+                            </h1>
+                            <p className='text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2'>
+                                <span className='font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded'>
+                                    ID: {product._id}
+                                </span>
+                                <span>•</span>
+                                <span>
+                                    Created{' '}
+                                    {new Date(product.createdAt).toLocaleDateString()}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                    <div className='flex items-center gap-2'>
+                        <button
+                            onClick={handleEdit}
+                            className='flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium'
+                        >
+                            <Edit2 className='h-4 w-4' />
+                            Edit
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium'
+                        >
+                            <Trash2 className='h-4 w-4' />
+                            Delete
+                        </button>
+                    </div>
                 </div>
 
-                {/* Product Header */}
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6'>
-                    <div className='bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 px-6 py-4'>
-                        <div className='flex items-center justify-between'>
-                            <div className='flex items-center space-x-3'>
-                                <div className='p-2 bg-white/20 rounded-lg'>
-                                    <Package className='h-6 w-6 text-white' />
-                                </div>
-                                <div>
-                                    <h1 className='text-2xl font-bold text-white'>
-                                        {product.title}
-                                    </h1>
-                                    <p className='text-green-100'>
-                                        Product Details
-                                    </p>
-                                </div>
+                <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
+                    {/* Left Column: Image & Description */}
+                    <div className='lg:col-span-2 space-y-8'>
+                        {/* Image Card */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                            <div className='aspect-video w-full bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4'>
+                                {product.image ? (
+                                    <img
+                                        src={product.image}
+                                        alt={product.title}
+                                        className='h-full w-auto object-contain rounded-lg shadow-sm'
+                                    />
+                                ) : (
+                                    <div className='flex flex-col items-center justify-center text-gray-400'>
+                                        <Package className='h-12 w-12 mb-2 opacity-50' />
+                                        <span className='text-sm'>No Image Available</span>
+                                    </div>
+                                )}
                             </div>
-                            <div className='flex space-x-2'>
-                                <button
-                                    onClick={handleEdit}
-                                    className='p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white'
-                                    title='Edit Product'
-                                >
-                                    <Edit2 className='h-5 w-5' />
-                                </button>
-                                <button
-                                    onClick={handleDelete}
-                                    className='p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white'
-                                    title='Delete Product'
-                                >
-                                    <Trash2 className='h-5 w-5' />
-                                </button>
+                        </div>
+
+                        {/* Description Card */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
+                            <h2 className='text-lg font-semibold mb-4'>Description</h2>
+                            <div className='prose prose-sm dark:prose-invert max-w-none text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed'>
+                                {product.description || 'No description provided.'}
                             </div>
                         </div>
                     </div>
 
-                    <div className='p-6'>
-                        <div className='grid lg:grid-cols-2 gap-8'>
-                            {/* Product Images */}
-                            <div className='space-y-4'>
-                                <div className='aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden'>
-                                    {product.image && (
-                                        <img
-                                            src={product.image}
-                                            alt={product.title}
-                                            className='w-full h-full object-cover'
-                                        />
-                                    )}
-                                </div>
+                    {/* Right Column: Metadata & Details */}
+                    <div className='space-y-8'>
+                        {/* Price Card */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
+                            <div className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                Price
                             </div>
+                            <div className='text-3xl font-bold flex items-center gap-1 text-green-600 dark:text-green-400'>
+                                <DollarSign className='h-6 w-6' />
+                                {product.price || 0}
+                            </div>
+                        </div>
 
-                            {/* Product Info */}
-                            <div className='space-y-6'>
+                        {/* Info Card */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
+                            <h2 className='text-lg font-semibold mb-6 flex items-center gap-2'>
+                                <Package className='h-5 w-5 text-gray-400' />
+                                Product Details
+                            </h2>
+                            <dl className='space-y-4'>
                                 <div>
-                                    <div className='flex items-center justify-between mb-4'>
-                                        <div className='flex items-center space-x-3'>
-                                            <DollarSign className='h-6 w-6 text-green-500' />
-                                            <span className='text-3xl font-bold text-gray-900 dark:text-gray-100'>
-                                                ₹{product.price || 0}
+                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                        Seller
+                                    </dt>
+                                    <dd className='flex items-center gap-2 text-sm'>
+                                        <div className='h-6 w-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400'>
+                                            <User className='h-3.5 w-3.5' />
+                                        </div>
+                                        {product.owner?.username || 'Unknown'}
+                                    </dd>
+                                </div>
+
+                                <div className='pt-4 border-t border-gray-100 dark:border-gray-700'>
+                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                        Timestamps
+                                    </dt>
+                                    <dd className='space-y-2 text-sm'>
+                                        <div className='flex justify-between'>
+                                            <span className='text-gray-500'>Created</span>
+                                            <span className='font-mono'>
+                                                {new Date(product.createdAt).toLocaleDateString()}
                                             </span>
                                         </div>
-                                        {getStatusBadge(
-                                            product.submissionStatus,
-                                        )}
-                                    </div>
-
-                                    <div className='prose prose-sm dark:prose-invert max-w-none'>
-                                        <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2'>
-                                            Description
-                                        </h3>
-                                        <p className='text-gray-600 dark:text-gray-400'>
-                                            {product.description ||
-                                                'No description available.'}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Seller Information */}
-                                <div className='bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4'>
-                                    <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3'>
-                                        Seller Information
-                                    </h3>
-                                    <div className='space-y-2'>
-                                        <div className='flex items-center space-x-2'>
-                                            <User className='h-4 w-4 text-gray-400' />
-                                            <span className='text-sm text-gray-600 dark:text-gray-400'>
-                                                {product.owner?.username ||
-                                                    'Unknown'}
+                                        <div className='flex justify-between'>
+                                            <span className='text-gray-500'>Updated</span>
+                                            <span className='font-mono'>
+                                                {new Date(
+                                                    product.updatedAt || product.createdAt,
+                                                ).toLocaleDateString()}
                                             </span>
                                         </div>
-                                    </div>
+                                    </dd>
                                 </div>
-                            </div>
+                            </dl>
+                        </div>
+
+                        {/* Raw Data Toggle */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                            <button
+                                onClick={() => setShowRawData(!showRawData)}
+                                className='w-full flex items-center justify-between px-6 py-4 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors'
+                            >
+                                <span className='text-gray-900 dark:text-white'>
+                                    Raw Data
+                                </span>
+                                <span className='text-blue-600 dark:text-blue-400'>
+                                    {showRawData ? 'Hide' : 'Show'}
+                                </span>
+                            </button>
+                            {showRawData && (
+                                <div className='border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 overflow-x-auto'>
+                                    <pre className='text-xs font-mono text-gray-600 dark:text-gray-400'>
+                                        {JSON.stringify(product, null, 2)}
+                                    </pre>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* Additional Details */}
-                <div className='grid md:grid-cols-2 gap-6'>
-                    <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                        <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4'>
-                            Timestamps
-                        </h3>
-                        <div className='space-y-3'>
-                            <div className='flex justify-between'>
-                                <span className='text-gray-600 dark:text-gray-400'>
-                                    Created:
-                                </span>
-                                <span className='text-gray-900 dark:text-gray-100'>
-                                    {new Date(
-                                        product.createdAt,
-                                    ).toLocaleString()}
-                                </span>
-                            </div>
-                            <div className='flex justify-between'>
-                                <span className='text-gray-600 dark:text-gray-400'>
-                                    Last Updated:
-                                </span>
-                                <span className='text-gray-900 dark:text-gray-100'>
-                                    {new Date(
-                                        product.updatedAt || product.createdAt,
-                                    ).toLocaleString()}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                {/* Modals */}
+                <ConfirmModal
+                    isOpen={confirmModal.isOpen}
+                    onClose={handleCloseConfirm}
+                    onConfirm={confirmModal.onConfirm}
+                    title={confirmModal.title}
+                    message={confirmModal.message}
+                    variant={confirmModal.variant}
+                />
 
-                {/* Raw Data Toggle */}
-                <div className='mt-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                    <button
-                        onClick={() => setShowRawData(!showRawData)}
-                        className='flex items-center justify-between w-full text-left'
-                    >
-                        <span className='text-sm font-medium text-gray-900 dark:text-white'>
-                            Raw Data
-                        </span>
-                        <span className='text-xs text-blue-600 dark:text-blue-400 hover:underline'>
-                            {showRawData ? 'Hide JSON' : 'Show JSON'}
-                        </span>
-                    </button>
-                    {showRawData && (
-                        <div className='mt-4'>
-                            <pre className='bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-x-auto text-xs font-mono text-gray-700 dark:text-gray-300'>
-                                {JSON.stringify(product, null, 2)}
-                            </pre>
-                        </div>
-                    )}
-                </div>
+                <ProductEditModal
+                    isOpen={showModal}
+                    onClose={handleModalClose}
+                    product={product}
+                    onSuccess={handleModalSuccess}
+                />
             </div>
-
-            {/* Modals */}
-            <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={handleCloseConfirm}
-                onConfirm={confirmModal.onConfirm}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                variant={confirmModal.variant}
-            />
-
-            <ProductEditModal
-                isOpen={showModal}
-                onClose={handleModalClose}
-                product={product}
-                onSuccess={handleModalSuccess}
-            />
         </div>
     );
 };

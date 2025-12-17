@@ -14,10 +14,11 @@ import {
     Trash2,
     CheckCircle2,
     Clock,
-    Building,
     Link,
     ExternalLink,
     DollarSign,
+    AlertTriangle,
+    Eye,
 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import NotesEditModal from '../components/NotesEditModal';
@@ -27,12 +28,13 @@ const NotesDetail = () => {
     const [note, setNote] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [activeTab, setActiveTab] = useState('info');
     const [showModal, setShowModal] = useState(false);
 
     const [signedUrl, setSignedUrl] = useState(null);
     const [showRawData, setShowRawData] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
+    const [showPreview, setShowPreview] = useState(false);
+    
     const { collegeslug, noteid } = useParams();
     const navigate = useNavigate();
 
@@ -52,13 +54,16 @@ const NotesDetail = () => {
                 title: config.title || 'Confirm Action',
                 message: config.message,
                 variant: config.variant || 'danger',
-                onConfirm: () => resolve(true),
+                onConfirm: () => {
+                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+                    resolve(true);
+                },
             });
         });
     };
 
-    const closeConfirm = () => {
-        setConfirmModal({ ...confirmModal, isOpen: false });
+    const handleCloseConfirm = () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
     };
 
     const fetchNote = async () => {
@@ -97,10 +102,10 @@ const NotesDetail = () => {
     }, [noteid]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
-        if (activeTab === 'preview' && note?.fileUrl && !signedUrl) {
+        if (showPreview && note?.fileUrl && !signedUrl) {
             fetchSignedUrl(note.fileUrl);
         }
-    }, [activeTab, note?.fileUrl, signedUrl]);
+    }, [showPreview, note?.fileUrl, signedUrl]);
 
     const handleEdit = () => {
         setShowModal(true);
@@ -124,17 +129,20 @@ const NotesDetail = () => {
                 );
             }
         }
-        closeConfirm();
+    };
+
+    const handleModalSuccess = (updatedNote) => {
+        setNote(updatedNote);
+        setShowModal(false);
     };
 
     const getStatusIcon = (status) => {
         switch (status) {
             case true:
-                return <CheckCircle2 className='w-5 h-5 text-green-500' />;
-            case false:
-                return <Clock className='w-5 h-5 text-yellow-500' />;
+            case 'approved':
+                return <CheckCircle2 className='w-4 h-4' />;
             default:
-                return <Clock className='w-5 h-5 text-yellow-500' />;
+                return <Clock className='w-4 h-4' />;
         }
     };
 
@@ -142,16 +150,9 @@ const NotesDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <main className='max-w-7xl mx-auto py-6 sm:px-6 lg:px-8'>
-                    <div className='flex items-center justify-center h-96'>
-                        <div className='text-center'>
-                            <Loader className='w-12 h-12 animate-spin mx-auto text-indigo-600 dark:text-indigo-400' />
-                            <p className='mt-4 text-gray-600 dark:text-gray-400'>
-                                Loading note details...
-                            </p>
-                        </div>
-                    </div>
-                </main>
+                <div className='flex items-center justify-center min-h-[60vh]'>
+                    <Loader className='h-8 w-8 animate-spin text-blue-600' />
+                </div>
             </div>
         );
     }
@@ -160,302 +161,267 @@ const NotesDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-                <main className='max-w-7xl mx-auto py-6 sm:px-6 lg:px-8'>
+                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+                    <button
+                        onClick={() => navigate(`/${collegeslug}/notes`)}
+                        className='flex items-center text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 mb-8 transition-colors'
+                    >
+                        <ArrowLeft className='h-4 w-4 mr-2' />
+                        Back to Notes
+                    </button>
                     <div className='text-center py-12'>
-                        <FileText className='w-16 h-16 text-gray-400 mx-auto mb-4' />
-                        <h2 className='text-2xl font-bold text-gray-900 dark:text-white mb-2'>
+                        <div className='w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4'>
+                            <AlertTriangle className='h-8 w-8 text-red-600 dark:text-red-400' />
+                        </div>
+                        <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2'>
                             Note Not Found
-                        </h2>
-                        <p className='text-gray-600 dark:text-gray-400 mb-8'>
-                            {error ||
-                                "The note you're looking for doesn't exist."}
+                        </h3>
+                        <p className='text-gray-500 dark:text-gray-400'>
+                            {error || "The note you're looking for doesn't exist."}
                         </p>
-                        <button
-                            onClick={() => navigate(`/${collegeslug}/notes`)}
-                            className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-                        >
-                            <ArrowLeft className='w-4 h-4 mr-2' />
-                            Back to Notes
-                        </button>
                     </div>
-                </main>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
+        <div className='min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans'>
             <Header />
-            <main className='max-w-7xl mx-auto py-6 sm:px-6 lg:px-8'>
-                <div className='px-4 py-6 sm:px-0'>
-                    {/* Header */}
-                    <div className='flex items-center justify-between mb-6'>
-                        <div className='flex items-center space-x-4'>
-                            <button
-                                onClick={() =>
-                                    navigate(`/${collegeslug}/notes`)
-                                }
-                                className='inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-                            >
-                                <ArrowLeft className='w-4 h-4 mr-2' />
-                                Back to Notes
-                            </button>
-                            <div className='flex items-center'>
-                                <FileText className='w-8 h-8 text-purple-600 dark:text-purple-400 mr-3' />
-                                <div>
-                                    <h1 className='text-2xl font-bold text-gray-900 dark:text-white'>
-                                        {note.title}
-                                    </h1>
-                                    <div className='flex items-center space-x-4 mt-1'>
-                                        <span
-                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(
-                                                note.submissionStatus,
-                                            )}`}
-                                        >
-                                            {getStatusIcon(
-                                                note.submissionStatus,
-                                            )}
-                                            <span className='ml-1'>
-                                                {note.submissionStatus}
-                                            </span>
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className='flex items-center space-x-3'>
-                            <button
-                                onClick={handleEdit}
-                                className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-                            >
-                                <Edit2 className='w-4 h-4 mr-2' />
-                                Edit Note
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'
-                            >
-                                <Trash2 className='w-4 h-4 mr-2' />
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Tabs */}
-                    <div className='border-b border-gray-200 dark:border-gray-700 mb-6'>
-                        <nav className='-mb-px flex space-x-8'>
-                            <button
-                                onClick={() => setActiveTab('info')}
-                                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                                    activeTab === 'info'
-                                        ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                                }`}
-                            >
-                                Information
-                            </button>
-                            {note.fileUrl && (
-                                <button
-                                    onClick={() => setActiveTab('preview')}
-                                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                                        activeTab === 'preview'
-                                            ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                                    }`}
+            <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+                {/* Top Navigation & Actions */}
+                <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8'>
+                    <div className='flex items-center gap-4'>
+                        <button
+                            onClick={() => navigate(`/${collegeslug}/notes`)}
+                            className='p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors'
+                        >
+                            <ArrowLeft className='h-5 w-5' />
+                        </button>
+                        <div>
+                            <h1 className='text-2xl font-bold flex items-center gap-3'>
+                                {note.title}
+                                <span
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(
+                                        note.submissionStatus,
+                                    )}`}
                                 >
-                                    Preview
-                                </button>
-                            )}
-                        </nav>
+                                    {getStatusIcon(note.submissionStatus)}
+                                    <span className='capitalize'>
+                                        {note.submissionStatus}
+                                    </span>
+                                </span>
+                            </h1>
+                            <p className='text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2'>
+                                <span className='font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded'>
+                                    ID: {note._id}
+                                </span>
+                                <span>•</span>
+                                <span>
+                                    Created{' '}
+                                    {new Date(note.createdAt).toLocaleDateString()}
+                                </span>
+                            </p>
+                        </div>
                     </div>
+                    <div className='flex items-center gap-2'>
+                        <button
+                            onClick={handleEdit}
+                            className='flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium'
+                        >
+                            <Edit2 className='h-4 w-4' />
+                            Edit
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium'
+                        >
+                            <Trash2 className='h-4 w-4' />
+                            Delete
+                        </button>
+                    </div>
+                </div>
 
-                    {/* Content */}
-                    <div className='bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg'>
-                        {activeTab === 'info' && (
-                            <div className='px-4 py-5 sm:p-6'>
-                                <dl className='grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2'>
-                                    <div>
-                                        <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center'>
-                                            <FileText className='w-4 h-4 mr-2' />
-                                            Title
-                                        </dt>
-                                        <dd className='mt-1 text-sm text-gray-900 dark:text-white'>
-                                            {note.title || 'N/A'}
-                                        </dd>
-                                    </div>
-
-                                    <div>
-                                        <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center'>
-                                            <BookOpen className='w-4 h-4 mr-2' />
-                                            Subject
-                                        </dt>
-                                        <dd className='mt-1 text-sm text-gray-900 dark:text-white'>
-                                            {note.subject?.subjectName || 'N/A'}
-                                        </dd>
-                                    </div>
-
-                                    <div>
-                                        <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center'>
-                                            <User className='w-4 h-4 mr-2' />
-                                            Owner
-                                        </dt>
-                                        <dd className='mt-1 text-sm text-gray-900 dark:text-white'>
-                                            {note.owner?.username || 'N/A'}
-                                        </dd>
-                                    </div>
-                                    {note.isPaid && (
-                                        <div>
-                                            <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center'>
-                                                <DollarSign className='w-4 h-4 mr-2' />
-                                                Price
-                                            </dt>
-                                            <dd className='mt-1 text-sm text-gray-900 dark:text-white'>
-                                                {note.price
-                                                    ? `₹${note.price / 5} / ${note.price}pts`
-                                                    : 'Free'}
-                                            </dd>
-                                        </div>
-                                    )}
-
-                                    <div>
-                                        <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center'>
-                                            <Calendar className='w-4 h-4 mr-2' />
-                                            Created
-                                        </dt>
-                                        <dd className='mt-1 text-sm text-gray-900 dark:text-white'>
-                                            {note.createdAt
-                                                ? new Date(
-                                                      note.createdAt,
-                                                  ).toLocaleString()
-                                                : 'N/A'}
-                                        </dd>
-                                    </div>
-
-                                    {note.slug && (
-                                        <div>
-                                            <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center'>
-                                                <Link className='w-4 h-4 mr-2' />
-                                                Slug
-                                            </dt>
-                                            <dd className='mt-1 text-sm text-gray-900 dark:text-white'>
-                                                {note.slug}
-                                            </dd>
-                                        </div>
-                                    )}
-
-                                    <div className='sm:col-span-2'>
-                                        <dt className='text-sm font-medium text-gray-500 dark:text-gray-400'>
-                                            Description
-                                        </dt>
-                                        <dd className='mt-1 text-sm text-gray-900 dark:text-white'>
-                                            {note.description ||
-                                                'No description provided'}
-                                        </dd>
-                                    </div>
-
-                                    {note.fileUrl && (
-                                        <div className='sm:col-span-2'>
-                                            <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center'>
-                                                <ExternalLink className='w-4 h-4 mr-2' />
-                                                File
-                                            </dt>
-                                            <dd className='mt-1'>
-                                                <a
-                                                    href={note.fileUrl}
-                                                    target='_blank'
-                                                    rel='noopener noreferrer'
-                                                    className='inline-flex items-center text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300'
-                                                >
-                                                    View Original File
-                                                    <ExternalLink className='w-4 h-4 ml-1' />
-                                                </a>
-                                            </dd>
-                                        </div>
-                                    )}
-                                </dl>
-
-                                {/* Raw Data Toggle */}
-                                <div className='mt-8 pt-6 border-t border-gray-200 dark:border-gray-700'>
+                <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
+                    {/* Left Column: Preview & Description */}
+                    <div className='lg:col-span-2 space-y-8'>
+                        {/* File Preview */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                            <div className='p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between'>
+                                <h3 className='font-semibold flex items-center gap-2'>
+                                    <FileText className='h-5 w-5 text-gray-400' />
+                                    File Preview
+                                </h3>
+                                {note.fileUrl && !showPreview && (
                                     <button
-                                        onClick={() =>
-                                            setShowRawData(!showRawData)
-                                        }
-                                        className='flex items-center justify-between w-full text-left'
+                                        onClick={() => setShowPreview(true)}
+                                        className='text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1'
                                     >
-                                        <span className='text-sm font-medium text-gray-900 dark:text-white'>
-                                            Raw Data
-                                        </span>
-                                        <span className='text-xs text-blue-600 dark:text-blue-400 hover:underline'>
-                                            {showRawData
-                                                ? 'Hide JSON'
-                                                : 'Show JSON'}
-                                        </span>
+                                        <Eye className='h-4 w-4' />
+                                        Load Preview
                                     </button>
-                                    {showRawData && (
-                                        <div className='mt-4'>
-                                            <pre className='bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-x-auto text-xs font-mono text-gray-700 dark:text-gray-300'>
-                                                {JSON.stringify(note, null, 2)}
-                                            </pre>
-                                        </div>
-                                    )}
-                                </div>
+                                )}
                             </div>
-                        )}
-
-                        {activeTab === 'preview' && note.fileUrl && (
-                            <div className='p-6'>
-                                <div className='bg-gray-100 dark:bg-gray-700 rounded-lg p-4'>
-                                    {pdfLoading ? (
-                                        <div className='flex items-center justify-center h-96'>
-                                            <div className='text-center'>
-                                                <Loader className='w-8 h-8 animate-spin mx-auto text-indigo-600 dark:text-indigo-400' />
-                                                <p className='mt-2 text-gray-600 dark:text-gray-400'>
-                                                    Loading preview...
-                                                </p>
-                                            </div>
+                            
+                            <div className='bg-gray-100 dark:bg-gray-900 min-h-[300px] flex items-center justify-center'>
+                                {showPreview ? (
+                                    pdfLoading ? (
+                                        <div className='text-center'>
+                                            <Loader className='w-8 h-8 animate-spin mx-auto text-indigo-600 dark:text-indigo-400 mb-2' />
+                                            <p className='text-sm text-gray-500'>Loading preview...</p>
                                         </div>
                                     ) : signedUrl ? (
                                         <iframe
                                             src={signedUrl}
-                                            className='w-full h-96 border-0 rounded'
+                                            className='w-full h-[600px] border-0'
                                             title='Note Preview'
                                         />
                                     ) : (
-                                        <div className='flex items-center justify-center h-96'>
-                                            <div className='text-center'>
-                                                <FileText className='w-12 h-12 text-gray-400 mx-auto mb-4' />
-                                                <p className='text-gray-600 dark:text-gray-400'>
-                                                    Preview not available
-                                                </p>
-                                            </div>
+                                        <div className='text-center p-8'>
+                                            <AlertTriangle className='w-12 h-12 text-gray-400 mx-auto mb-2' />
+                                            <p className='text-gray-500'>Preview could not be loaded.</p>
                                         </div>
-                                    )}
+                                    )
+                                ) : (
+                                    <div className='text-center p-8'>
+                                        <FileText className='w-16 h-16 text-gray-300 dark:text-gray-700 mx-auto mb-4' />
+                                        <p className='text-gray-500 dark:text-gray-400 max-w-sm mx-auto mb-4'>
+                                            Click "Load Preview" to view the document contents.
+                                        </p>
+                                        {note.fileUrl && (
+                                            <a
+                                                href={note.fileUrl}
+                                                target='_blank'
+                                                rel='noopener noreferrer'
+                                                className='inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
+                                            >
+                                                <ExternalLink className='h-4 w-4' />
+                                                Open in New Tab
+                                            </a>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Description Card */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
+                            <h2 className='text-lg font-semibold mb-4'>Description</h2>
+                            <div className='prose prose-sm dark:prose-invert max-w-none text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed'>
+                                {note.description || 'No description provided.'}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Metadata & Details */}
+                    <div className='space-y-8'>
+                        {/* Status Card */}
+                        {note.isPaid && (
+                            <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
+                                <div className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                    Price
+                                </div>
+                                <div className='text-3xl font-bold flex items-center gap-1 text-green-600 dark:text-green-400'>
+                                    <DollarSign className='h-6 w-6' />
+                                    {note.price ? `${note.price / 5} (${note.price} pts)` : 'Free'}
                                 </div>
                             </div>
                         )}
+
+                        {/* Info Card */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
+                            <h2 className='text-lg font-semibold mb-6 flex items-center gap-2'>
+                                <BookOpen className='h-5 w-5 text-gray-400' />
+                                Note Details
+                            </h2>
+                            <dl className='space-y-4'>
+                                <div>
+                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                        Subject
+                                    </dt>
+                                    <dd className='font-medium text-gray-900 dark:text-gray-100'>
+                                        {note.subject?.subjectName || 'N/A'}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                        Owner
+                                    </dt>
+                                    <dd className='flex items-center gap-2 text-sm'>
+                                        <div className='h-6 w-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400'>
+                                            <User className='h-3.5 w-3.5' />
+                                        </div>
+                                        {note.owner?.username || 'Unknown'}
+                                    </dd>
+                                </div>
+                                {note.slug && (
+                                    <div>
+                                        <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                            Slug
+                                        </dt>
+                                        <dd className='text-sm font-mono text-gray-600 dark:text-gray-400 break-all'>
+                                            {note.slug}
+                                        </dd>
+                                    </div>
+                                )}
+
+                                <div className='pt-4 border-t border-gray-100 dark:border-gray-700'>
+                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
+                                        Timestamps
+                                    </dt>
+                                    <dd className='space-y-2 text-sm'>
+                                        <div className='flex justify-between'>
+                                            <span className='text-gray-500'>Created</span>
+                                            <span className='font-mono'>
+                                                {new Date(note.createdAt).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    </dd>
+                                </div>
+                            </dl>
+                        </div>
+
+                        {/* Raw Data Toggle */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                            <button
+                                onClick={() => setShowRawData(!showRawData)}
+                                className='w-full flex items-center justify-between px-6 py-4 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors'
+                            >
+                                <span className='text-gray-900 dark:text-white'>
+                                    Raw Data
+                                </span>
+                                <span className='text-blue-600 dark:text-blue-400'>
+                                    {showRawData ? 'Hide' : 'Show'}
+                                </span>
+                            </button>
+                            {showRawData && (
+                                <div className='border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 overflow-x-auto'>
+                                    <pre className='text-xs font-mono text-gray-600 dark:text-gray-400'>
+                                        {JSON.stringify(note, null, 2)}
+                                    </pre>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </main>
 
-            <NotesEditModal
-                isOpen={showModal}
-                onClose={() => setShowModal(false)}
-                note={note}
-                onSuccess={(updatedNote) => {
-                    setNote(updatedNote);
-                    setShowModal(false);
-                }}
-            />
+                {/* Modals */}
+                <ConfirmModal
+                    isOpen={confirmModal.isOpen}
+                    onClose={handleCloseConfirm}
+                    onConfirm={confirmModal.onConfirm}
+                    title={confirmModal.title}
+                    message={confirmModal.message}
+                    variant={confirmModal.variant}
+                />
 
-            {/* Confirmation Modal */}
-            <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={closeConfirm}
-                onConfirm={confirmModal.onConfirm}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                variant={confirmModal.variant}
-            />
+                <NotesEditModal
+                    isOpen={showModal}
+                    onClose={() => setShowModal(false)}
+                    note={note}
+                    onSuccess={handleModalSuccess}
+                />
+            </div>
         </div>
     );
 };
