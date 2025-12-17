@@ -40,6 +40,7 @@ import GroupDetail from './pages/GroupDetail';
 import OpportunityList from './pages/OpportunityList';
 import OpportunityDetail from './pages/OpportunityDetail';
 import LostFoundList from './pages/LostFoundList';
+import LostFoundDetail from './pages/LostFoundDetail';
 import VideoList from './pages/VideoList';
 import VideoDetail from './pages/VideoDetail';
 import Analytics from './pages/Analytics';
@@ -337,7 +338,14 @@ function App() {
                                 </ProtectedRoute>
                             }
                         />
-
+                        <Route
+                            path='/:collegeslug/lost-found/:itemid'
+                            element={
+                                <ProtectedRoute>
+                                    <LostFoundDetail />
+                                </ProtectedRoute>
+                            }
+                        />
                         {/* Video routes */}
                         <Route
                             path='/:collegeslug/videos'

@@ -10,39 +10,24 @@ import toast from 'react-hot-toast';
 const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
-        groupName: '',
-        description: '',
-        groupLink: '',
-        branch: '',
-        subject: '',
-        semester: '',
-        memberCount: '',
-        groupType: 'study',
-        isActive: true,
+        title: '',
+        info: '',
+        link: '',
+        domain: '',
+        submissionStatus: 'pending',
+        rejectionReason: '',
     });
     const [errors, setErrors] = useState({});
-
-    const groupTypes = [
-        { value: 'study', label: 'Study Group' },
-        { value: 'project', label: 'Project Group' },
-        { value: 'general', label: 'General Discussion' },
-        { value: 'placement', label: 'Placement/Career' },
-    ];
-
-    const semesters = Array.from({ length: 8 }, (_, i) => i + 1);
 
     useEffect(() => {
         if (group && isOpen) {
             setFormData({
-                groupName: group.groupName || '',
-                description: group.description || '',
-                groupLink: group.groupLink || '',
-                branch: group.branch || '',
-                subject: group.subject || '',
-                semester: group.semester || '',
-                memberCount: group.memberCount || '',
-                groupType: group.groupType || 'study',
-                isActive: group.isActive !== undefined ? group.isActive : true,
+                title: group.title || '',
+                info: group.info || '',
+                link: group.link || '',
+                domain: group.domain || '',
+                submissionStatus: group.submissionStatus || 'pending',
+                rejectionReason: group.rejectionReason || '',
             });
             setErrors({});
         }
@@ -51,32 +36,28 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
     const validateForm = () => {
         const newErrors = {};
 
-        if (!formData.groupName.trim()) {
-            newErrors.groupName = 'Group name is required';
+        if (!formData.title.trim()) {
+            newErrors.title = 'Group title is required';
         }
 
-        if (!formData.description.trim()) {
-            newErrors.description = 'Description is required';
+        if (!formData.info.trim()) {
+            newErrors.info = 'Info/Description is required';
         }
 
-        if (formData.groupLink && !isValidWhatsAppLink(formData.groupLink)) {
-            newErrors.groupLink = 'Please enter a valid WhatsApp group link';
+        if (formData.link && !isValidWhatsAppLink(formData.link)) {
+            newErrors.link = 'Please enter a valid WhatsApp group link';
         }
 
-        if (
-            formData.memberCount &&
-            (isNaN(formData.memberCount) || Number(formData.memberCount) < 0)
-        ) {
-            newErrors.memberCount = 'Member count must be a valid number';
+        if (!formData.domain.trim()) {
+            newErrors.domain = 'Domain is required';
         }
 
         if (
-            formData.semester &&
-            (isNaN(formData.semester) ||
-                Number(formData.semester) < 1 ||
-                Number(formData.semester) > 8)
+            formData.submissionStatus === 'rejected' &&
+            !formData.rejectionReason.trim()
         ) {
-            newErrors.semester = 'Semester must be between 1 and 8';
+            newErrors.rejectionReason =
+                'Rejection reason is required when status is rejected';
         }
 
         setErrors(newErrors);
@@ -89,10 +70,10 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
     };
 
     const handleInputChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        const { name, value } = e.target;
         setFormData((prev) => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : value,
+            [name]: value,
         }));
 
         // Clear error when user starts typing
@@ -116,19 +97,12 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
 
         try {
             const updatedGroup = {
-                groupName: formData.groupName.trim(),
-                description: formData.description.trim(),
-                groupLink: formData.groupLink.trim(),
-                branch: formData.branch.trim(),
-                subject: formData.subject.trim(),
-                semester: formData.semester
-                    ? Number(formData.semester)
-                    : undefined,
-                memberCount: formData.memberCount
-                    ? Number(formData.memberCount)
-                    : undefined,
-                groupType: formData.groupType,
-                isActive: formData.isActive,
+                title: formData.title.trim(),
+                info: formData.info.trim(),
+                link: formData.link.trim(),
+                domain: formData.domain.trim(),
+                submissionStatus: formData.submissionStatus,
+                rejectionReason: formData.rejectionReason.trim() || undefined,
             };
 
             await api.put(`/group/edit/${group._id}`, updatedGroup);
@@ -177,68 +151,98 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
 
                     <form onSubmit={handleSubmit}>
                         <div className='p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto'>
-                            {/* Status */}
-                            <div>
-                                <label className='flex items-center gap-2'>
-                                    <input
-                                        type='checkbox'
-                                        name='isActive'
-                                        checked={formData.isActive}
-                                        onChange={handleInputChange}
-                                        className='w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
-                                    />
-                                    <span className='text-sm text-gray-700 dark:text-gray-300'>
-                                        Group is Active
-                                    </span>
-                                </label>
-                            </div>
 
-                            {/* Group Name */}
+                            {/* Status and Rejection Reason */}
+                            <div className='space-y-4'>
+                                <div>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Status <span className='text-red-500'>*</span>
+                                    </label>
+                                    <select
+                                        name='submissionStatus'
+                                        value={formData.submissionStatus}
+                                        onChange={handleInputChange}
+                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                    >
+                                        <option value='pending'>Pending</option>
+                                        <option value='approved'>Approved</option>
+                                        <option value='rejected'>Rejected</option>
+                                    </select>
+                                </div>
+
+                                {formData.submissionStatus === 'rejected' && (
+                                    <div>
+                                        <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                            Rejection Reason <span className='text-red-500'>*</span>
+                                        </label>
+                                        <textarea
+                                            name='rejectionReason'
+                                            value={formData.rejectionReason}
+                                            onChange={handleInputChange}
+                                            rows={2}
+                                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 dark:text-white resize-none ${
+                                                errors.rejectionReason
+                                                    ? 'border-red-300'
+                                                    : 'border-gray-300 dark:border-gray-600'
+                                            }`}
+                                            placeholder='Provide rejection reason...'
+                                        />
+                                        {errors.rejectionReason && (
+                                            <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                                <AlertTriangle className='h-3 w-3' />
+                                                {errors.rejectionReason}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* Group Title */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Group Name <span className='text-red-500'>*</span>
+                                    Group Title <span className='text-red-500'>*</span>
                                 </label>
                                 <input
                                     type='text'
-                                    name='groupName'
-                                    value={formData.groupName}
+                                    name='title'
+                                    value={formData.title}
                                     onChange={handleInputChange}
                                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                        errors.groupName
+                                        errors.title
                                             ? 'border-red-300'
                                             : 'border-gray-300 dark:border-gray-600'
                                     }`}
-                                    placeholder='Enter group name...'
+                                    placeholder='Enter group title...'
                                 />
-                                {errors.groupName && (
+                                {errors.title && (
                                     <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
                                         <AlertTriangle className='h-3 w-3' />
-                                        {errors.groupName}
+                                        {errors.title}
                                     </p>
                                 )}
                             </div>
 
-                            {/* Description */}
+                            {/* Info/Description */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Description <span className='text-red-500'>*</span>
+                                    Info / Description <span className='text-red-500'>*</span>
                                 </label>
                                 <textarea
-                                    name='description'
-                                    value={formData.description}
+                                    name='info'
+                                    value={formData.info}
                                     onChange={handleInputChange}
                                     rows={3}
                                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none ${
-                                        errors.description
+                                        errors.info
                                             ? 'border-red-300'
                                             : 'border-gray-300 dark:border-gray-600'
                                     }`}
                                     placeholder='Describe the group purpose...'
                                 />
-                                {errors.description && (
+                                {errors.info && (
                                     <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
                                         <AlertTriangle className='h-3 w-3' />
-                                        {errors.description}
+                                        {errors.info}
                                     </p>
                                 )}
                             </div>
@@ -246,134 +250,53 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
                             {/* WhatsApp Link */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    WhatsApp Group Link
+                                    WhatsApp Group Link <span className='text-red-500'>*</span>
                                 </label>
                                 <input
                                     type='url'
-                                    name='groupLink'
-                                    value={formData.groupLink}
+                                    name='link'
+                                    value={formData.link}
                                     onChange={handleInputChange}
                                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                        errors.groupLink
+                                        errors.link
                                             ? 'border-red-300'
                                             : 'border-gray-300 dark:border-gray-600'
                                     }`}
                                     placeholder='https://chat.whatsapp.com/...'
                                 />
-                                {errors.groupLink && (
+                                {errors.link && (
                                     <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
                                         <AlertTriangle className='h-3 w-3' />
-                                        {errors.groupLink}
+                                        {errors.link}
                                     </p>
                                 )}
                             </div>
 
-                            {/* Group Type and Semester */}
-                            <div className='grid grid-cols-2 gap-4'>
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Group Type
-                                    </label>
-                                    <select
-                                        name='groupType'
-                                        value={formData.groupType}
-                                        onChange={handleInputChange}
-                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                    >
-                                        {groupTypes.map((type) => (
-                                            <option key={type.value} value={type.value}>
-                                                {type.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Semester
-                                    </label>
-                                    <select
-                                        name='semester'
-                                        value={formData.semester}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                            errors.semester
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                    >
-                                        <option value=''>All Semesters</option>
-                                        {semesters.map((sem) => (
-                                            <option key={sem} value={sem}>
-                                                Semester {sem}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.semester && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.semester}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Branch and Subject */}
-                            <div className='grid grid-cols-2 gap-4'>
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Branch
-                                    </label>
-                                    <input
-                                        type='text'
-                                        name='branch'
-                                        value={formData.branch}
-                                        onChange={handleInputChange}
-                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                        placeholder='e.g., Computer Science'
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Subject
-                                    </label>
-                                    <input
-                                        type='text'
-                                        name='subject'
-                                        value={formData.subject}
-                                        onChange={handleInputChange}
-                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                        placeholder='e.g., Data Structures'
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Member Count */}
+                            {/* Domain */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Member Count
+                                    Domain <span className='text-red-500'>*</span>
                                 </label>
                                 <input
-                                    type='number'
-                                    name='memberCount'
-                                    value={formData.memberCount}
+                                    type='text'
+                                    name='domain'
+                                    value={formData.domain}
                                     onChange={handleInputChange}
-                                    min='0'
                                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                        errors.memberCount
+                                        errors.domain
                                             ? 'border-red-300'
                                             : 'border-gray-300 dark:border-gray-600'
                                     }`}
-                                    placeholder='0'
+                                    placeholder='e.g., Computer Science, General...'
                                 />
-                                {errors.memberCount && (
+                                {errors.domain && (
                                     <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
                                         <AlertTriangle className='h-3 w-3' />
-                                        {errors.memberCount}
+                                        {errors.domain}
                                     </p>
                                 )}
                             </div>
+
                         </div>
 
                         {/* Footer */}

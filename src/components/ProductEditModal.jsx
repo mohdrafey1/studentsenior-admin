@@ -152,7 +152,7 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
                 available: formData.available,
             };
 
-            await api.put(`/dashboard/store/edit/${product._id}`, updateData);
+            await api.put(`/store/edit/${product._id}`, updateData);
             toast.success('Product updated successfully!');
             onClose();
             onSuccess && onSuccess();

@@ -17,9 +17,11 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
         currentStatus: 'open',
         imageUrl: '',
         whatsapp: '',
+        submissionStatus: 'pending',
+        rejectionReason: '',
     });
     const [loading, setLoading] = useState(false);
-    const [imageLoading, setImageLoading] = useState(false);
+ 
     const [errors, setErrors] = useState({});
 
     useEffect(() => {
@@ -35,6 +37,8 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                 currentStatus: item.currentStatus || 'open',
                 imageUrl: item.imageUrl || '',
                 whatsapp: item.whatsapp || '',
+                submissionStatus: item.submissionStatus || 'pending',
+                rejectionReason: item.rejectionReason || '',
             });
         } else {
             setFormData({
@@ -46,6 +50,8 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                 currentStatus: 'open',
                 imageUrl: '',
                 whatsapp: '',
+                submissionStatus: 'pending',
+                rejectionReason: '',
             });
         }
         setErrors({});
@@ -66,39 +72,6 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
         }
     };
 
-    const handleImageUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-            toast.error('Please select an image file');
-            return;
-        }
-
-        // Validate file size (5MB max)
-        if (file.size > 5 * 1024 * 1024) {
-            toast.error('Image size must be less than 5MB');
-            return;
-        }
-
-        setImageLoading(true);
-        try {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                setFormData((prev) => ({
-                    ...prev,
-                    imageUrl: e.target.result,
-                }));
-                setImageLoading(false);
-            };
-            reader.readAsDataURL(file);
-        } catch (error) {
-            console.error('Error uploading image:', error);
-            toast.error('Failed to upload image');
-            setImageLoading(false);
-        }
-    };
 
     const validateForm = () => {
         const newErrors = {};
@@ -123,6 +96,14 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
             newErrors.whatsapp = 'WhatsApp number is required';
         }
 
+        if (
+            formData.submissionStatus === 'rejected' &&
+            !formData.rejectionReason.trim()
+        ) {
+            newErrors.rejectionReason =
+                'Rejection reason is required when status is rejected';
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -140,11 +121,7 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                 // Update existing item
                 await api.put(`/lostandfound/edit/${item._id}`, formData);
                 toast.success('Item updated successfully');
-            } else {
-                // Create new item
-                await api.post('/lostandfound/create', formData);
-                toast.success('Item created successfully');
-            }
+            } 
             onSuccess();
         } catch (error) {
             console.error('Error saving item:', error);
@@ -208,7 +185,7 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
 
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Status
+                                        Current Status
                                     </label>
                                     <select
                                         name='currentStatus'
@@ -220,6 +197,51 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                                         <option value='closed'>Closed</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            {/* Submission Status and Rejection Reason */}
+                            <div className='space-y-4'>
+                                <div>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Submission Status <span className='text-red-500'>*</span>
+                                    </label>
+                                    <select
+                                        name='submissionStatus'
+                                        value={formData.submissionStatus}
+                                        onChange={handleChange}
+                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                    >
+                                        <option value='pending'>Pending</option>
+                                        <option value='approved'>Approved</option>
+                                        <option value='rejected'>Rejected</option>
+                                    </select>
+                                </div>
+
+                                {formData.submissionStatus === 'rejected' && (
+                                    <div>
+                                        <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                            Rejection Reason <span className='text-red-500'>*</span>
+                                        </label>
+                                        <textarea
+                                            name='rejectionReason'
+                                            value={formData.rejectionReason}
+                                            onChange={handleChange}
+                                            rows={2}
+                                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 dark:text-white resize-none ${
+                                                errors.rejectionReason
+                                                    ? 'border-red-300'
+                                                    : 'border-gray-300 dark:border-gray-600'
+                                            }`}
+                                            placeholder='Provide rejection reason...'
+                                        />
+                                        {errors.rejectionReason && (
+                                            <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                                <AlertTriangle className='h-3 w-3' />
+                                                {errors.rejectionReason}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Title */}

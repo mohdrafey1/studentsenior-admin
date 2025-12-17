@@ -11,6 +11,7 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
         whatsapp: '',
         link: '',
         submissionStatus: 'pending',
+        rejectionReason: '',
     });
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
@@ -24,6 +25,7 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                 whatsapp: opportunity.whatsapp || '',
                 link: opportunity.link || '',
                 submissionStatus: opportunity.submissionStatus || 'pending',
+                rejectionReason: opportunity.rejectionReason || '',
             });
         } else {
             setFormData({
@@ -33,6 +35,7 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                 whatsapp: '',
                 link: '',
                 submissionStatus: 'pending',
+                rejectionReason: '',
             });
         }
         setErrors({});
@@ -74,6 +77,14 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
             newErrors.link = 'Please enter a valid URL';
         }
 
+        if (
+            formData.submissionStatus === 'rejected' &&
+            !formData.rejectionReason.trim()
+        ) {
+            newErrors.rejectionReason =
+                'Rejection reason is required when status is rejected';
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -100,10 +111,6 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                 // Update existing opportunity
                 await api.put(`/opportunity/edit/${opportunity._id}`, formData);
                 toast.success('Opportunity updated successfully');
-            } else {
-                // Create new opportunity
-                await api.post('/opportunity/create', formData);
-                toast.success('Opportunity created successfully');
             }
             onSuccess();
         } catch (error) {
@@ -150,20 +157,47 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                     <form onSubmit={handleSubmit}>
                         <div className='p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto'>
                             {/* Status */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Status <span className='text-red-500'>*</span>
-                                </label>
-                                <select
-                                    name='submissionStatus'
-                                    value={formData.submissionStatus}
-                                    onChange={handleChange}
-                                    className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                >
-                                    <option value='pending'>Pending</option>
-                                    <option value='approved'>Approved</option>
-                                    <option value='rejected'>Rejected</option>
-                                </select>
+                            <div className='space-y-4'>
+                                <div>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                        Status <span className='text-red-500'>*</span>
+                                    </label>
+                                    <select
+                                        name='submissionStatus'
+                                        value={formData.submissionStatus}
+                                        onChange={handleChange}
+                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                    >
+                                        <option value='pending'>Pending</option>
+                                        <option value='approved'>Approved</option>
+                                        <option value='rejected'>Rejected</option>
+                                    </select>
+                                </div>
+                                {formData.submissionStatus === 'rejected' && (
+                                    <div>
+                                        <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                            Rejection Reason <span className='text-red-500'>*</span>
+                                        </label>
+                                        <textarea
+                                            name='rejectionReason'
+                                            value={formData.rejectionReason}
+                                            onChange={handleChange}
+                                            rows={2}
+                                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none ${
+                                                errors.rejectionReason
+                                                    ? 'border-red-300'
+                                                    : 'border-gray-300 dark:border-gray-600'
+                                            }`}
+                                            placeholder='Reason for rejection...'
+                                        />
+                                        {errors.rejectionReason && (
+                                            <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
+                                                <AlertTriangle className='h-3 w-3' />
+                                                {errors.rejectionReason}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Opportunity Name */}
