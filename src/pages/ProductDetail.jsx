@@ -30,6 +30,7 @@ const ProductDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [showRawData, setShowRawData] = useState(false);
 
     const { collegeslug, productid } = useParams();
     const navigate = useNavigate();
@@ -340,6 +341,28 @@ const ProductDetail = () => {
                             </div>
                         </div>
                     </div>
+                </div>
+
+                {/* Raw Data Toggle */}
+                <div className='mt-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
+                    <button
+                        onClick={() => setShowRawData(!showRawData)}
+                        className='flex items-center justify-between w-full text-left'
+                    >
+                        <span className='text-sm font-medium text-gray-900 dark:text-white'>
+                            Raw Data
+                        </span>
+                        <span className='text-xs text-blue-600 dark:text-blue-400 hover:underline'>
+                            {showRawData ? 'Hide JSON' : 'Show JSON'}
+                        </span>
+                    </button>
+                    {showRawData && (
+                        <div className='mt-4'>
+                            <pre className='bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-x-auto text-xs font-mono text-gray-700 dark:text-gray-300'>
+                                {JSON.stringify(product, null, 2)}
+                            </pre>
+                        </div>
+                    )}
                 </div>
             </div>
 

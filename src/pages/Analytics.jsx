@@ -545,7 +545,7 @@ function Analytics() {
                                                         {index + 1}
                                                     </div>
                                                     <div className='flex-1 min-w-0'>
-                                                        <p className='text-sm font-medium text-gray-900 dark:text-white truncate'>
+                                                        <p className='text-sm truncate max-w-80 font-medium text-gray-900 dark:text-white truncate'>
                                                             {item.title}
                                                         </p>
                                                         <p className='text-xs text-gray-500 dark:text-gray-400'>

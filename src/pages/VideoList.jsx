@@ -129,7 +129,7 @@ const VideoList = () => {
     const fetchVideos = async () => {
         try {
             setLoading(true);
-            const response = await api.get(`/video/${collegeslug}`);
+            const response = await api.get(`/video/all/${collegeslug}`);
 
             setVideos(response.data.data.videos);
 
