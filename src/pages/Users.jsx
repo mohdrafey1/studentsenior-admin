@@ -476,7 +476,10 @@ const UsersPage = () => {
                                     {current.map((u) => (
                                         <div
                                             key={u._id}
-                                            className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow'
+                                            className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow cursor-pointer'
+                                            onClick={() =>
+                                                navigate(`/users/${u._id}`)
+                                            }
                                         >
                                             <div className='flex justify-between items-start mb-3'>
                                                 <span
@@ -594,7 +597,12 @@ const UsersPage = () => {
                                                 {current.map((u) => (
                                                     <tr
                                                         key={u._id}
-                                                        className='hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                        className='hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
+                                                        onClick={() =>
+                                                            navigate(
+                                                                `/users/${u._id}`,
+                                                            )
+                                                        }
                                                     >
                                                         <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
                                                             {u.username ||

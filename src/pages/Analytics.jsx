@@ -242,13 +242,7 @@ function Analytics() {
             color: 'text-blue-600 dark:text-blue-400',
             bgColor: 'bg-blue-100 dark:bg-blue-900/30',
         },
-        {
-            label: 'Active Users',
-            value: analyticsData?.totals?.totalClient || '0',
-            icon: Users,
-            color: 'text-green-600 dark:text-green-400',
-            bgColor: 'bg-green-100 dark:bg-green-900/30',
-        },
+
         {
             label: 'Total Views',
             value: formatNumber(
@@ -476,7 +470,7 @@ function Analytics() {
                             <div className='space-y-6'>
                                 {analyticsData?.engagement &&
                                     Object.entries(analyticsData.engagement)
-                                        .slice(0, 4)
+                                        .slice(0, 10)
                                         .map(([key, value], index) => {
                                             const maxViews = Math.max(
                                                 ...Object.values(

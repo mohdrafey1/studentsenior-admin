@@ -24,6 +24,7 @@ const Redemptions = lazy(() => import('./pages/Redemptions'));
 const Transactions = lazy(() => import('./pages/Transactions'));
 const Contacts = lazy(() => import('./pages/Contacts'));
 const Users = lazy(() => import('./pages/Users'));
+const UserDetail = lazy(() => import('./pages/UserDetail'));
 const DashboardUsers = lazy(() => import('./pages/DashboardUsers'));
 const CollegeDetail = lazy(() => import('./pages/CollegeDetail'));
 const Courses = lazy(() => import('./pages/Courses'));
@@ -115,6 +116,24 @@ function App() {
                                     element={
                                         <ProtectedRoute>
                                             <Reports />
+                                        </ProtectedRoute>
+                                    }
+                                />
+
+                                {/* Users routes */}
+                                <Route
+                                    path='/users'
+                                    element={
+                                        <ProtectedRoute>
+                                            <Users />
+                                        </ProtectedRoute>
+                                    }
+                                />
+                                <Route
+                                    path='/users/:userId'
+                                    element={
+                                        <ProtectedRoute>
+                                            <UserDetail />
                                         </ProtectedRoute>
                                     }
                                 />
