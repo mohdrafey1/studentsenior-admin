@@ -111,9 +111,9 @@ const SyllabusModal = ({
                                         <option value='integral-university'>
                                             Integral University
                                         </option>
-                                        <option value='mpec-kanpur'>
+                                        {/* <option value='mpec-kanpur'>
                                             Mpec Kanpur
-                                        </option>
+                                        </option> */}
                                     </select>
                                 </div>
 
