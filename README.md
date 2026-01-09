@@ -56,7 +56,7 @@ A modern, responsive Progressive Web Application (PWA) for managing the Student 
    Create a `.env` file in the root directory:
 
     ```env
-    VITE_API_URL=http://localhost:8081/api
+    VITE_API_URL=http://localhost:5000/api
     ```
 
 4. **Start the development server:**
@@ -70,7 +70,7 @@ A modern, responsive Progressive Web Application (PWA) for managing the Student 
 
 ### Backend Setup
 
-Ensure the backend API is running on the specified port (8081 by default). The backend should have:
+Ensure the backend API is running on the specified port (5000 by default). The backend should have:
 
 - Dashboard authentication endpoints (`/api/dashboard/auth/signup`, `/api/dashboard/auth/signin`)
 - Proper CORS configuration
