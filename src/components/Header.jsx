@@ -12,6 +12,7 @@ import {
     Sun,
     Moon,
     BarChart2,
+    Bell,
 } from 'lucide-react';
 
 const Header = () => {
@@ -37,6 +38,7 @@ const Header = () => {
         { path: '/dashboard', label: 'Dashboard', icon: Home },
         { path: '/reports', label: 'Reports', icon: BarChart2 },
         { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+        { path: '/notifications', label: 'Notifications', icon: Bell },
     ];
 
     const getRoleColor = (role) => {
