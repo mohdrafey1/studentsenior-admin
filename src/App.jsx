@@ -49,6 +49,7 @@ const LostFoundDetail = lazy(() => import('./pages/LostFoundDetail'));
 const VideoList = lazy(() => import('./pages/VideoList'));
 const VideoDetail = lazy(() => import('./pages/VideoDetail'));
 const Analytics = lazy(() => import('./pages/Analytics'));
+const Notifications = lazy(() => import('./pages/Notifications'));
 
 function App() {
     return (
@@ -106,6 +107,15 @@ function App() {
                                     element={
                                         <ProtectedRoute>
                                             <Analytics />
+                                        </ProtectedRoute>
+                                    }
+                                />
+
+                                <Route
+                                    path='/notifications'
+                                    element={
+                                        <ProtectedRoute>
+                                            <Notifications />
                                         </ProtectedRoute>
                                     }
                                 />
