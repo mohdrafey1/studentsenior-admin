@@ -356,9 +356,9 @@ const Notifications = () => {
                                         </select>
                                     </div>
 
-                                    {/* College Slug - shown for pyq, notes, syllabus, college */}
+                                    {/* College Slug - shown for pyqs, notes, syllabus, college */}
                                     {[
-                                        'pyq',
+                                        'pyqs',
                                         'notes',
                                         'syllabus',
                                         'college',
@@ -391,8 +391,8 @@ const Notifications = () => {
                                         </div>
                                     )}
 
-                                    {/* Item Slug - shown for pyq, notes, syllabus */}
-                                    {['pyq', 'notes', 'syllabus'].includes(
+                                    {/* Item Slug - shown for pyqs, notes, syllabus */}
+                                    {['pyqs', 'notes', 'syllabus'].includes(
                                         formData.screen,
                                     ) && (
                                         <div>
