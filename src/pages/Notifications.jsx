@@ -11,6 +11,7 @@ import {
     XCircle,
     Clock,
     ExternalLink,
+    RotateCcw,
 } from 'lucide-react';
 
 // Navigation screen options
@@ -19,6 +20,7 @@ const NAVIGATION_SCREENS = [
     { value: 'pyqs', label: 'PYQs Page' },
     { value: 'notes', label: 'Notes Page' },
     { value: 'syllabus', label: 'Syllabus Page' },
+    { value: 'store', label: 'Store Page' },
     { value: 'college', label: 'College Home' },
     { value: 'profile', label: 'User Profile' },
     { value: 'settings', label: 'Settings' },
@@ -163,6 +165,22 @@ const Notifications = () => {
             dateStyle: 'medium',
             timeStyle: 'short',
         });
+    };
+
+    // Handle repeat notification - populate form with existing notification data
+    const handleRepeatNotification = (notification) => {
+        setFormData({
+            title: notification.title,
+            body: notification.body,
+            screen: notification.data?.screen || '',
+            college: notification.data?.params?.college || '',
+            slug: notification.data?.params?.slug || '',
+        });
+
+        // Scroll to form
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        toast.success('Notification loaded! Edit and send again.');
     };
 
     return (
@@ -356,11 +374,12 @@ const Notifications = () => {
                                         </select>
                                     </div>
 
-                                    {/* College Slug - shown for pyqs, notes, syllabus, college */}
+                                    {/* College Slug - shown for pyqs, notes, syllabus, store, college */}
                                     {[
                                         'pyqs',
                                         'notes',
                                         'syllabus',
+                                        'store',
                                         'college',
                                     ].includes(formData.screen) && (
                                         <div>
@@ -391,10 +410,13 @@ const Notifications = () => {
                                         </div>
                                     )}
 
-                                    {/* Item Slug - shown for pyqs, notes, syllabus */}
-                                    {['pyqs', 'notes', 'syllabus'].includes(
-                                        formData.screen,
-                                    ) && (
+                                    {/* Item Slug - shown for pyqs, notes, syllabus, store */}
+                                    {[
+                                        'pyqs',
+                                        'notes',
+                                        'syllabus',
+                                        'store',
+                                    ].includes(formData.screen) && (
                                         <div>
                                             <label
                                                 htmlFor='slug'
@@ -490,6 +512,9 @@ const Notifications = () => {
                                                 <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
                                                     Status
                                                 </th>
+                                                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
+                                                    Actions
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody className='divide-y divide-gray-200 dark:divide-gray-700'>
@@ -549,6 +574,20 @@ const Notifications = () => {
                                                                     </div>
                                                                 )}
                                                             </div>
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap'>
+                                                            <button
+                                                                onClick={() =>
+                                                                    handleRepeatNotification(
+                                                                        notification,
+                                                                    )
+                                                                }
+                                                                className='inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md transition-colors'
+                                                                title='Repeat this notification'
+                                                            >
+                                                                <RotateCcw className='w-3.5 h-3.5' />
+                                                                Repeat
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 ),
