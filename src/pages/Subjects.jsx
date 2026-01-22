@@ -29,11 +29,13 @@ const Subjects = () => {
     const [subjects, setSubjects] = useState([]);
     const [courses, setCourses] = useState([]);
     const [branches, setBranches] = useState([]);
+    const [colleges, setColleges] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(12);
+    const [filterCollege, setFilterCollege] = useState('');
     const [filterCourse, setFilterCourse] = useState('');
     const [filterBranch, setFilterBranch] = useState('');
     const [filterSemester, setFilterSemester] = useState('');
@@ -69,6 +71,7 @@ const Subjects = () => {
         course: '',
         branch: '',
         semester: '',
+        college: '',
     });
     const [submitting, setSubmitting] = useState(false);
     const { mainContentMargin } = useSidebarLayout();
@@ -103,14 +106,17 @@ const Subjects = () => {
     const fetchData = async () => {
         try {
             setError(null);
-            const [subjectsRes, coursesRes, branchesRes] = await Promise.all([
-                api.get('/resource/subjects'),
-                api.get('/resource/courses'),
-                api.get('/resource/branches'),
-            ]);
+            const [subjectsRes, coursesRes, branchesRes, collegesRes] =
+                await Promise.all([
+                    api.get('/resource/subjects'),
+                    api.get('/resource/courses'),
+                    api.get('/resource/branches'),
+                    api.get('/college'),
+                ]);
             setSubjects(subjectsRes.data.data || []);
             setCourses(coursesRes.data.data || []);
             setBranches(branchesRes.data.data || []);
+            setColleges(collegesRes.data.data || []);
         } catch (e) {
             console.error(e);
             setError('Failed to load data');
@@ -130,6 +136,7 @@ const Subjects = () => {
         const q = params.get('search') || '';
         const p = parseInt(params.get('page') || '1', 10);
         const ps = parseInt(params.get('pageSize') || '12', 10);
+        const fco = params.get('college') || '';
         const fc = params.get('course') || '';
         const fb = params.get('branch') || '';
         const fs = params.get('semester') || '';
@@ -141,6 +148,7 @@ const Subjects = () => {
         setSearch(q);
         setPage(Number.isFinite(p) && p > 0 ? p : 1);
         setPageSize(Number.isFinite(ps) && ps > 0 ? ps : 12);
+        setFilterCollege(fco);
         setFilterCourse(fc);
         setFilterBranch(fb);
         setFilterSemester(fs);
@@ -156,6 +164,7 @@ const Subjects = () => {
         params.set('search', search || '');
         params.set('page', String(page));
         params.set('pageSize', String(pageSize));
+        params.set('college', filterCollege || '');
         params.set('course', filterCourse || '');
         params.set('branch', filterBranch || '');
         params.set('semester', filterSemester || '');
@@ -170,6 +179,7 @@ const Subjects = () => {
         search,
         page,
         pageSize,
+        filterCollege,
         filterCourse,
         filterBranch,
         filterSemester,
@@ -237,6 +247,7 @@ const Subjects = () => {
             course: subject.course?._id || '',
             branch: subject.branch?._id || '',
             semester: subject.semester || '',
+            college: subject.college?._id || '',
         });
         setShowModal(true);
     };
@@ -268,6 +279,7 @@ const Subjects = () => {
             course: '',
             branch: '',
             semester: '',
+            college: '',
         });
     };
 
@@ -384,6 +396,8 @@ const Subjects = () => {
                     s.course?.courseName?.toLowerCase().includes(q) ||
                     s.branch?.branchName?.toLowerCase().includes(q) ||
                     s.semester?.toString().includes(q);
+                const matchesCollege =
+                    !filterCollege || (s.college?._id || '') === filterCollege;
                 const matchesCourse =
                     !filterCourse || (s.course?._id || '') === filterCourse;
                 const matchesBranch =
@@ -393,6 +407,7 @@ const Subjects = () => {
                     String(s.semester || '') === String(filterSemester);
                 return (
                     matchesSearch &&
+                    matchesCollege &&
                     matchesCourse &&
                     matchesBranch &&
                     matchesSemester
@@ -414,6 +429,7 @@ const Subjects = () => {
     }, [
         subjects,
         search,
+        filterCollege,
         filterCourse,
         filterBranch,
         filterSemester,
@@ -515,6 +531,22 @@ const Subjects = () => {
                                 </button>
                             </div>
 
+                            {/* College Filter */}
+                            <select
+                                value={filterCollege}
+                                onChange={(e) => {
+                                    setFilterCollege(e.target.value);
+                                }}
+                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
+                            >
+                                <option value=''>All Colleges</option>
+                                {colleges.map((c) => (
+                                    <option key={c._id} value={c._id}>
+                                        {c.slug}
+                                    </option>
+                                ))}
+                            </select>
+
                             {/* Course Filter */}
                             <select
                                 value={filterCourse}
@@ -604,12 +636,14 @@ const Subjects = () => {
 
                             {/* Clear Filters (shows when any filter active) */}
                             {(search.trim().length > 0 ||
+                                filterCollege ||
                                 filterCourse ||
                                 filterBranch ||
                                 filterSemester) && (
                                 <button
                                     onClick={() => {
                                         setSearch('');
+                                        setFilterCollege('');
                                         setFilterCourse('');
                                         setFilterBranch('');
                                         setFilterSemester('');
@@ -647,6 +681,13 @@ const Subjects = () => {
                                             </div>
                                             <div className='text-xs text-gray-500 dark:text-gray-400 mb-2'>
                                                 Code: {subject.subjectCode}
+                                            </div>
+                                            <div className='text-sm text-gray-700 dark:text-gray-300'>
+                                                College:{' '}
+                                                <span className='font-semibold'>
+                                                    {subject.college?.slug ||
+                                                        'N/A'}
+                                                </span>
                                             </div>
                                             <div className='text-sm text-gray-700 dark:text-gray-300'>
                                                 Course:{' '}
@@ -730,6 +771,9 @@ const Subjects = () => {
                                                         Subject Code
                                                     </th>
                                                     <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        College
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                                                         Course
                                                     </th>
                                                     <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
@@ -759,6 +803,10 @@ const Subjects = () => {
                                                             {
                                                                 subject.subjectCode
                                                             }
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                            {subject.college
+                                                                ?.slug || 'N/A'}
                                                         </td>
                                                         <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
                                                             {subject.course
@@ -930,6 +978,35 @@ const Subjects = () => {
                                                 placeholder='Enter subject code'
                                                 required
                                             />
+                                        </div>
+                                        <div>
+                                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                                                College
+                                            </label>
+                                            <select
+                                                value={formData.college}
+                                                onChange={(e) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        college: e.target.value,
+                                                    })
+                                                }
+                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                                required
+                                            >
+                                                <option value=''>
+                                                    Select a college
+                                                </option>
+                                                {colleges.map((college) => (
+                                                    <option
+                                                        key={college._id}
+                                                        value={college._id}
+                                                    >
+                                                        {college.name} (
+                                                        {college.slug})
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div>
                                             <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
