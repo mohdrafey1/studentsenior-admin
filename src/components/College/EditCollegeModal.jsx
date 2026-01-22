@@ -1,6 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Loader2 } from 'lucide-react';
 
+const DEFAULT_SECTIONS = {
+    pyqs: true,
+    notes: true,
+    videos: true,
+    syllabus: true,
+    store: false,
+    seniors: false,
+    resources: true,
+    groups: false,
+    opportunities: false,
+    lostFound: false,
+};
+
+const ALL_SECTIONS_ENABLED = {
+    pyqs: true,
+    notes: true,
+    videos: true,
+    syllabus: true,
+    store: true,
+    seniors: true,
+    resources: true,
+    groups: true,
+    opportunities: true,
+    lostFound: true,
+};
+
 const EditCollegeModal = ({
     isOpen,
     onClose,
@@ -15,6 +41,7 @@ const EditCollegeModal = ({
         location: '',
         slug: '',
         status: true,
+        sections: DEFAULT_SECTIONS,
     });
     const [errors, setErrors] = useState({});
 
@@ -26,6 +53,12 @@ const EditCollegeModal = ({
                 location: college.location || '',
                 slug: college.slug || '',
                 status: college.status !== undefined ? college.status : true,
+                sections: college.sections
+                    ? {
+                          ...ALL_SECTIONS_ENABLED,
+                          ...college.sections,
+                      }
+                    : ALL_SECTIONS_ENABLED,
             });
         } else {
             setFormData({
@@ -34,6 +67,7 @@ const EditCollegeModal = ({
                 location: '',
                 slug: '',
                 status: true,
+                sections: DEFAULT_SECTIONS,
             });
         }
         setErrors({});
@@ -71,6 +105,16 @@ const EditCollegeModal = ({
         if (errors[name]) {
             setErrors((prev) => ({ ...prev, [name]: '' }));
         }
+    };
+
+    const handleSectionToggle = (sectionKey) => {
+        setFormData((prev) => ({
+            ...prev,
+            sections: {
+                ...prev.sections,
+                [sectionKey]: !prev.sections?.[sectionKey],
+            },
+        }));
     };
 
     const validateForm = () => {
@@ -291,6 +335,58 @@ const EditCollegeModal = ({
                                 >
                                     Active Status
                                 </label>
+                            </div>
+
+                            {/* Sections */}
+                            <div>
+                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+                                    Enabled Sections
+                                </label>
+                                <div className='grid grid-cols-2 gap-3'>
+                                    {[
+                                        { key: 'pyqs', label: 'PYQs' },
+                                        { key: 'notes', label: 'Notes' },
+                                        { key: 'videos', label: 'Videos' },
+                                        { key: 'syllabus', label: 'Syllabus' },
+                                        { key: 'store', label: 'Store' },
+                                        { key: 'seniors', label: 'Seniors' },
+                                        {
+                                            key: 'resources',
+                                            label: 'Resources',
+                                        },
+                                        { key: 'groups', label: 'Groups' },
+                                        {
+                                            key: 'opportunities',
+                                            label: 'Opportunities',
+                                        },
+                                        {
+                                            key: 'lostFound',
+                                            label: 'Lost & Found',
+                                        },
+                                    ].map((section) => (
+                                        <label
+                                            key={section.key}
+                                            className='flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300'
+                                        >
+                                            <input
+                                                type='checkbox'
+                                                checked={
+                                                    formData.sections?.[
+                                                        section.key
+                                                    ] || false
+                                                }
+                                                onChange={() =>
+                                                    handleSectionToggle(
+                                                        section.key,
+                                                    )
+                                                }
+                                                className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+                                                disabled={loading || readOnly}
+                                            />
+                                            {section.label}
+                                        </label>
+                                    ))}
+                                </div>
                             </div>
                         </div>
 
