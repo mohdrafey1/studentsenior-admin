@@ -24,6 +24,8 @@ import {
     Clock,
     X,
     Eye,
+    CheckCircle,
+    AlertCircle,
 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import ConfirmModal from '../components/ConfirmModal';
@@ -38,6 +40,7 @@ const Contacts = () => {
     const initialSearch = params.get('search') || '';
     const initialTimeFilter = params.get('time') || '';
     const initialPage = parseInt(params.get('page')) || 1;
+    const initialStatusFilter = params.get('status') || '';
 
     const [contacts, setContacts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -46,6 +49,7 @@ const Contacts = () => {
     const [currentPage, setCurrentPage] = useState(initialPage);
     const [pageSize, setPageSize] = useState(12);
     const [timeFilter, setTimeFilter] = useState(initialTimeFilter); // time filter
+    const [statusFilter, setStatusFilter] = useState(initialStatusFilter); // status filter
     const [sortBy, setSortBy] = useState('createdAt'); // createdAt | name | email
     const [sortOrder, setSortOrder] = useState('desc'); // asc | desc
     const [viewMode, setViewMode] = useState(() =>
@@ -55,6 +59,41 @@ const Contacts = () => {
     const [selectedContact, setSelectedContact] = useState(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const { mainContentMargin } = useSidebarLayout();
+
+    // Status badge helper
+    const getStatusBadge = (status) => {
+        const statusConfig = {
+            pending: {
+                label: 'Pending',
+                className:
+                    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+                icon: Clock,
+            },
+            'in-progress': {
+                label: 'In Progress',
+                className:
+                    'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+                icon: AlertCircle,
+            },
+            resolved: {
+                label: 'Resolved',
+                className:
+                    'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+                icon: CheckCircle,
+            },
+        };
+        return statusConfig[status] || statusConfig.pending;
+    };
+
+    // Handle status update from modal
+    const handleStatusUpdate = (updatedContact) => {
+        setContacts((prevContacts) =>
+            prevContacts.map((contact) =>
+                contact._id === updatedContact._id ? updatedContact : contact,
+            ),
+        );
+        setSelectedContact(updatedContact);
+    };
 
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -122,9 +161,10 @@ const Contacts = () => {
         const params = new URLSearchParams();
         if (searchQuery) params.set('search', searchQuery);
         if (timeFilter) params.set('time', timeFilter);
+        if (statusFilter) params.set('status', statusFilter);
         if (currentPage > 1) params.set('page', currentPage.toString());
         navigate({ search: params.toString() }, { replace: true });
-    }, [searchQuery, timeFilter, currentPage, navigate]);
+    }, [searchQuery, timeFilter, statusFilter, currentPage, navigate]);
 
     // Auto switch view mode on resize
     useEffect(() => {
@@ -228,7 +268,11 @@ const Contacts = () => {
                 }
             })();
 
-            return matchesSearch && matchesTime;
+            // Status filter
+            const matchesStatus =
+                !statusFilter || (contact.status || 'pending') === statusFilter;
+
+            return matchesSearch && matchesTime && matchesStatus;
         })
         .sort((a, b) => {
             let aVal = 0;
@@ -258,11 +302,13 @@ const Contacts = () => {
         indexOfLastContact,
     );
 
-    const totalContacts = timeFilter ? filteredAndSorted.length : 0;
+    const totalContacts =
+        timeFilter || statusFilter ? filteredAndSorted.length : 0;
 
     const clearFilters = () => {
         setSearchQuery('');
         setTimeFilter('');
+        setStatusFilter('');
         setCurrentPage(1);
     };
 
@@ -416,6 +462,25 @@ const Contacts = () => {
                                 </select>
                             </div>
 
+                            {/* Status Filter */}
+                            <div className='relative'>
+                                <AlertCircle className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none' />
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) =>
+                                        setStatusFilter(e.target.value)
+                                    }
+                                    className='pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm appearance-none'
+                                >
+                                    <option value=''>All Status</option>
+                                    <option value='pending'>Pending</option>
+                                    <option value='in-progress'>
+                                        In Progress
+                                    </option>
+                                    <option value='resolved'>Resolved</option>
+                                </select>
+                            </div>
+
                             {/* Sort Order */}
                             <button
                                 onClick={() =>
@@ -438,7 +503,7 @@ const Contacts = () => {
                             </button>
 
                             {/* Clear Filters Button */}
-                            {(searchQuery || timeFilter) && (
+                            {(searchQuery || timeFilter || statusFilter) && (
                                 <button
                                     onClick={clearFilters}
                                     className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors text-sm font-medium'
@@ -481,7 +546,7 @@ const Contacts = () => {
                                                 <div className='flex items-start justify-between'>
                                                     {/* Contact Info */}
                                                     <div className='flex-1 min-w-0'>
-                                                        <div className='flex items-center space-x-4 mb-4'>
+                                                        <div className='flex items-center flex-wrap gap-2 mb-4'>
                                                             <div className='flex items-center text-sm text-gray-600 dark:text-gray-400'>
                                                                 <Mail className='w-4 h-4 mr-2' />
                                                                 <span className='font-medium'>
@@ -497,6 +562,26 @@ const Contacts = () => {
                                                                       ).toLocaleString()
                                                                     : 'N/A'}
                                                             </div>
+                                                            {/* Status Badge */}
+                                                            {(() => {
+                                                                const statusInfo =
+                                                                    getStatusBadge(
+                                                                        contact.status ||
+                                                                            'pending',
+                                                                    );
+                                                                const StatusIcon =
+                                                                    statusInfo.icon;
+                                                                return (
+                                                                    <span
+                                                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusInfo.className}`}
+                                                                    >
+                                                                        <StatusIcon className='w-3 h-3' />
+                                                                        {
+                                                                            statusInfo.label
+                                                                        }
+                                                                    </span>
+                                                                );
+                                                            })()}
                                                         </div>
 
                                                         {/* Subject */}
@@ -640,8 +725,12 @@ const Contacts = () => {
                                                     <div className='ml-4 flex-shrink-0 flex flex-col gap-2'>
                                                         <button
                                                             onClick={() => {
-                                                                setSelectedContact(contact);
-                                                                setIsDetailModalOpen(true);
+                                                                setSelectedContact(
+                                                                    contact,
+                                                                );
+                                                                setIsDetailModalOpen(
+                                                                    true,
+                                                                );
                                                             }}
                                                             className='p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors'
                                                             title='View details'
@@ -675,6 +764,12 @@ const Contacts = () => {
                                             <thead className='bg-gray-50 dark:bg-gray-700'>
                                                 <tr>
                                                     <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Action
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                        Status
+                                                    </th>
+                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                                                         User
                                                     </th>
                                                     <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
@@ -686,60 +781,40 @@ const Contacts = () => {
                                                     <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                                                         Date
                                                     </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Action
-                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
                                                 {currentContacts.map(
-                                                    (contact) => (
-                                                        <tr
-                                                            key={contact._id}
-                                                            className='hover:bg-gray-50 dark:hover:bg-gray-700'
-                                                        >
-                                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                                <div className='flex items-start gap-2'>
-                                                                    <User className='w-4 h-4 text-gray-400 mt-1' />
-                                                                    <div>
-                                                                        {/* <div className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                                            {contact.name ||
-                                                                                'N/A'}
-                                                                        </div> */}
-                                                                        <div className='text-sm text-gray-500 dark:text-gray-400'>
-                                                                            {contact.email ||
-                                                                                'N/A'}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </td>
-                                                            <td className='px-6 py-4 text-sm text-gray-900 dark:text-white max-w-xs truncate'>
-                                                                {contact.subject ||
-                                                                    '-'}
-                                                            </td>
-                                                            <td className='px-6 py-4 text-sm text-gray-900 dark:text-white max-w-md truncate'>
-                                                                {contact.description ||
-                                                                    contact.message ||
-                                                                    '-'}
-                                                            </td>
-                                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
-                                                                {contact.createdAt
-                                                                    ? new Date(
-                                                                          contact.createdAt,
-                                                                      ).toLocaleString()
-                                                                    : 'N/A'}
-                                                            </td>
-                                                            <td className='px-6 py-4 whitespace-nowrap text-sm'>
+                                                    (contact) => {
+                                                        const statusInfo =
+                                                            getStatusBadge(
+                                                                contact.status ||
+                                                                    'pending',
+                                                            );
+                                                        const StatusIcon =
+                                                            statusInfo.icon;
+                                                        return (
+                                                            <tr
+                                                                key={
+                                                                    contact._id
+                                                                }
+                                                                className='hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                            >
+                                                                <td className='px-6 py-4 whitespace-nowrap text-sm'>
                                                                     <div className='flex items-center gap-2'>
                                                                         <button
                                                                             onClick={() => {
-                                                                                setSelectedContact(contact);
-                                                                                setIsDetailModalOpen(true);
+                                                                                setSelectedContact(
+                                                                                    contact,
+                                                                                );
+                                                                                setIsDetailModalOpen(
+                                                                                    true,
+                                                                                );
                                                                             }}
                                                                             className='px-3 py-1 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:opacity-90 flex items-center gap-1'
-                                                                            title="View Details"
+                                                                            title='View Details'
                                                                         >
-                                                                            <Eye className="w-3 h-3" />
+                                                                            <Eye className='w-3 h-3' />
                                                                             View
                                                                         </button>
                                                                         <button
@@ -754,8 +829,50 @@ const Contacts = () => {
                                                                         </button>
                                                                     </div>
                                                                 </td>
-                                                        </tr>
-                                                    ),
+                                                                <td className='px-6 py-4 whitespace-nowrap text-sm'>
+                                                                    <span
+                                                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusInfo.className}`}
+                                                                    >
+                                                                        <StatusIcon className='w-3 h-3' />
+                                                                        {
+                                                                            statusInfo.label
+                                                                        }
+                                                                    </span>
+                                                                </td>
+                                                                <td className='px-6 py-4 whitespace-nowrap'>
+                                                                    <div className='flex items-start gap-2'>
+                                                                        <User className='w-4 h-4 text-gray-400 mt-1' />
+                                                                        <div>
+                                                                            {/* <div className='text-sm font-medium text-gray-900 dark:text-white'>
+                                                                            {contact.name ||
+                                                                                'N/A'}
+                                                                        </div> */}
+                                                                            <div className='text-sm text-gray-500 dark:text-gray-400'>
+                                                                                {contact.email ||
+                                                                                    'N/A'}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className='px-6 py-4 text-sm text-gray-900 dark:text-white max-w-xs truncate'>
+                                                                    {contact.subject ||
+                                                                        '-'}
+                                                                </td>
+                                                                <td className='px-6 py-4 text-sm text-gray-900 dark:text-white max-w-md truncate'>
+                                                                    {contact.description ||
+                                                                        contact.message ||
+                                                                        '-'}
+                                                                </td>
+                                                                <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                                    {contact.createdAt
+                                                                        ? new Date(
+                                                                              contact.createdAt,
+                                                                          ).toLocaleString()
+                                                                        : 'N/A'}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    },
                                                 )}
                                             </tbody>
                                         </table>
@@ -808,6 +925,7 @@ const Contacts = () => {
                 isOpen={isDetailModalOpen}
                 onClose={() => setIsDetailModalOpen(false)}
                 contact={selectedContact}
+                onStatusUpdate={handleStatusUpdate}
             />
         </div>
     );
