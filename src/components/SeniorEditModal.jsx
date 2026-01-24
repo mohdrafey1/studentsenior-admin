@@ -137,7 +137,7 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        
+
         setFormData((prev) => {
             const newData = { ...prev, [name]: value };
 
@@ -145,7 +145,7 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
             if (name === 'submissionStatus') {
                 const currentSlug = prev.slug || '';
                 const baseSlug = currentSlug.replace(/-rejected$/, '');
-                
+
                 if (value === 'rejected') {
                     newData.slug = baseSlug + '-rejected';
                 } else {
@@ -248,11 +248,8 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
     return (
         <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
             <div className='flex items-center justify-center min-h-screen p-4'>
-                <div
-                    className='fixed inset-0'
-                    onClick={onClose}
-                ></div>
-                
+                <div className='fixed inset-0' onClick={onClose}></div>
+
                 <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
                     {/* Header */}
                     <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
@@ -279,7 +276,8 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
                             <div className='grid grid-cols-2 gap-4'>
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Status <span className='text-red-500'>*</span>
+                                        Status{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <select
                                         name='submissionStatus'
@@ -288,8 +286,12 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
                                         className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
                                     >
                                         <option value='pending'>Pending</option>
-                                        <option value='approved'>Approved</option>
-                                        <option value='rejected'>Rejected</option>
+                                        <option value='approved'>
+                                            Approved
+                                        </option>
+                                        <option value='rejected'>
+                                            Rejected
+                                        </option>
                                     </select>
                                 </div>
 
@@ -312,7 +314,8 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
                             {formData.submissionStatus === 'rejected' && (
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Rejection Reason <span className='text-red-500'>*</span>
+                                        Rejection Reason{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <textarea
                                         name='rejectionReason'
@@ -339,7 +342,8 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
                             <div className='grid grid-cols-2 gap-4'>
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Full Name <span className='text-red-500'>*</span>
+                                        Full Name{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <input
                                         type='text'
@@ -363,7 +367,8 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
 
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Year <span className='text-red-500'>*</span>
+                                        Year{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <input
                                         type='text'
@@ -390,7 +395,8 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
                             <div className='grid grid-cols-2 gap-4'>
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Course <span className='text-red-500'>*</span>
+                                        Course{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <SearchableSelect
                                         options={courses}
@@ -422,7 +428,8 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
 
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Branch <span className='text-red-500'>*</span>
+                                        Branch{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <SearchableSelect
                                         options={branches}
@@ -512,51 +519,72 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
                                     </button>
                                 </div>
                                 <div className='space-y-2'>
-                                    {formData.socialMediaLinks.map((link, index) => (
-                                        <div key={index} className='flex gap-2'>
-                                            <select
-                                                value={link.platform}
-                                                onChange={(e) =>
-                                                    updateSocialMediaLink(
-                                                        index,
-                                                        'platform',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className='px-3 py-2 border rounded-lg dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                    {formData.socialMediaLinks.map(
+                                        (link, index) => (
+                                            <div
+                                                key={index}
+                                                className='flex gap-2'
                                             >
-                                                <option value='whatsapp'>WhatsApp</option>
-                                                <option value='linkedin'>LinkedIn</option>
-                                                <option value='github'>GitHub</option>
-                                                <option value='twitter'>Twitter</option>
-                                                <option value='instagram'>Instagram</option>
-                                                <option value='telegram'>Telegram</option>
-                                                <option value='other'>Other</option>
-                                            </select>
-                                            <input
-                                                type='text'
-                                                value={link.url}
-                                                onChange={(e) =>
-                                                    updateSocialMediaLink(
-                                                        index,
-                                                        'url',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder='https://...'
-                                                className='flex-1 px-3 py-2 border rounded-lg dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                            />
-                                            <button
-                                                type='button'
-                                                onClick={() =>
-                                                    removeSocialMediaLink(index)
-                                                }
-                                                className='p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg'
-                                            >
-                                                <Trash2 className='h-4 w-4' />
-                                            </button>
-                                        </div>
-                                    ))}
+                                                <select
+                                                    value={link.platform}
+                                                    onChange={(e) =>
+                                                        updateSocialMediaLink(
+                                                            index,
+                                                            'platform',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className='px-3 py-2 border rounded-lg dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                                >
+                                                    <option value='whatsapp'>
+                                                        WhatsApp
+                                                    </option>
+                                                    <option value='linkedin'>
+                                                        LinkedIn
+                                                    </option>
+                                                    <option value='github'>
+                                                        GitHub
+                                                    </option>
+                                                    <option value='twitter'>
+                                                        Twitter
+                                                    </option>
+                                                    <option value='instagram'>
+                                                        Instagram
+                                                    </option>
+                                                    <option value='telegram'>
+                                                        Telegram
+                                                    </option>
+                                                    <option value='other'>
+                                                        Other
+                                                    </option>
+                                                </select>
+                                                <input
+                                                    type='text'
+                                                    value={link.url}
+                                                    onChange={(e) =>
+                                                        updateSocialMediaLink(
+                                                            index,
+                                                            'url',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder='https://...'
+                                                    className='flex-1 px-3 py-2 border rounded-lg dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
+                                                />
+                                                <button
+                                                    type='button'
+                                                    onClick={() =>
+                                                        removeSocialMediaLink(
+                                                            index,
+                                                        )
+                                                    }
+                                                    className='p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg'
+                                                >
+                                                    <Trash2 className='h-4 w-4' />
+                                                </button>
+                                            </div>
+                                        ),
+                                    )}
                                 </div>
                             </div>
                         </div>

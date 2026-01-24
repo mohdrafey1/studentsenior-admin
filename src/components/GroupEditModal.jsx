@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-    X,
-    AlertTriangle,
-    Loader,
-} from 'lucide-react';
+import { X, AlertTriangle, Loader } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -124,11 +120,8 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
     return (
         <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
             <div className='flex items-center justify-center min-h-screen p-4'>
-                <div
-                    className='fixed inset-0'
-                    onClick={onClose}
-                ></div>
-                
+                <div className='fixed inset-0' onClick={onClose}></div>
+
                 <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
                     {/* Header */}
                     <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
@@ -151,12 +144,12 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
 
                     <form onSubmit={handleSubmit}>
                         <div className='p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto'>
-
                             {/* Status and Rejection Reason */}
                             <div className='space-y-4'>
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Status <span className='text-red-500'>*</span>
+                                        Status{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <select
                                         name='submissionStatus'
@@ -165,15 +158,22 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
                                         className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
                                     >
                                         <option value='pending'>Pending</option>
-                                        <option value='approved'>Approved</option>
-                                        <option value='rejected'>Rejected</option>
+                                        <option value='approved'>
+                                            Approved
+                                        </option>
+                                        <option value='rejected'>
+                                            Rejected
+                                        </option>
                                     </select>
                                 </div>
 
                                 {formData.submissionStatus === 'rejected' && (
                                     <div>
                                         <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                            Rejection Reason <span className='text-red-500'>*</span>
+                                            Rejection Reason{' '}
+                                            <span className='text-red-500'>
+                                                *
+                                            </span>
                                         </label>
                                         <textarea
                                             name='rejectionReason'
@@ -196,11 +196,12 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
                                     </div>
                                 )}
                             </div>
-                            
+
                             {/* Group Title */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Group Title <span className='text-red-500'>*</span>
+                                    Group Title{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <input
                                     type='text'
@@ -225,7 +226,8 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
                             {/* Info/Description */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Info / Description <span className='text-red-500'>*</span>
+                                    Info / Description{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <textarea
                                     name='info'
@@ -250,7 +252,8 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
                             {/* WhatsApp Link */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    WhatsApp Group Link <span className='text-red-500'>*</span>
+                                    WhatsApp Group Link{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <input
                                     type='url'
@@ -275,7 +278,8 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
                             {/* Domain */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Domain <span className='text-red-500'>*</span>
+                                    Domain{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <input
                                     type='text'
@@ -296,7 +300,6 @@ const GroupEditModal = ({ isOpen, onClose, group, onSuccess }) => {
                                     </p>
                                 )}
                             </div>
-
                         </div>
 
                         {/* Footer */}

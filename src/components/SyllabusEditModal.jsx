@@ -14,11 +14,8 @@ const SyllabusEditModal = ({
     return (
         <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
             <div className='flex items-center justify-center min-h-screen p-4'>
-                <div
-                    className='fixed inset-0'
-                    onClick={onClose}
-                ></div>
-                
+                <div className='fixed inset-0' onClick={onClose}></div>
+
                 <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
                     {/* Header */}
                     <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
@@ -124,13 +121,11 @@ const SyllabusEditModal = ({
                                         }
                                         className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
                                     >
-                                        {[1, 2, 3, 4, 5, 6, 7, 8].map(
-                                            (s) => (
-                                                <option key={s} value={s}>
-                                                    Semester {s}
-                                                </option>
-                                            ),
-                                        )}
+                                        {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                                            <option key={s} value={s}>
+                                                Semester {s}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>
@@ -170,17 +165,15 @@ const SyllabusEditModal = ({
                                               )
                                     }
                                     onChange={(e) =>
-                                        onFormChange(
-                                            'units',
-                                            e.target.value,
-                                        )
+                                        onFormChange('units', e.target.value)
                                     }
                                     className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white font-mono text-sm resize-none border-gray-300 dark:border-gray-600'
                                     placeholder='[{"unitNumber": 1, "title": "...", "content": "..."}]'
                                     rows='8'
                                 />
                                 <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
-                                    Enter units as a JSON array. Each unit should have: unitNumber, title, and content.
+                                    Enter units as a JSON array. Each unit
+                                    should have: unitNumber, title, and content.
                                 </p>
                             </div>
 

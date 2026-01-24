@@ -128,20 +128,20 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
     return (
         <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
             <div className='flex items-center justify-center min-h-screen p-4'>
-                <div
-                    className='fixed inset-0'
-                    onClick={onClose}
-                ></div>
-                
+                <div className='fixed inset-0' onClick={onClose}></div>
+
                 <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
                     {/* Header */}
                     <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
                         <div>
                             <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                {opportunity ? 'Edit Opportunity' : 'Create Opportunity'}
+                                {opportunity
+                                    ? 'Edit Opportunity'
+                                    : 'Create Opportunity'}
                             </h2>
                             <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                {opportunity?.college?.collegeName || 'Opportunities'}
+                                {opportunity?.college?.collegeName ||
+                                    'Opportunities'}
                             </p>
                         </div>
                         <button
@@ -160,7 +160,8 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                             <div className='space-y-4'>
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Status <span className='text-red-500'>*</span>
+                                        Status{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <select
                                         name='submissionStatus'
@@ -169,14 +170,21 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                                         className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
                                     >
                                         <option value='pending'>Pending</option>
-                                        <option value='approved'>Approved</option>
-                                        <option value='rejected'>Rejected</option>
+                                        <option value='approved'>
+                                            Approved
+                                        </option>
+                                        <option value='rejected'>
+                                            Rejected
+                                        </option>
                                     </select>
                                 </div>
                                 {formData.submissionStatus === 'rejected' && (
                                     <div>
                                         <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                            Rejection Reason <span className='text-red-500'>*</span>
+                                            Rejection Reason{' '}
+                                            <span className='text-red-500'>
+                                                *
+                                            </span>
                                         </label>
                                         <textarea
                                             name='rejectionReason'
@@ -203,7 +211,8 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                             {/* Opportunity Name */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Opportunity Name <span className='text-red-500'>*</span>
+                                    Opportunity Name{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <input
                                     type='text'
@@ -228,7 +237,8 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                             {/* Description */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Description <span className='text-red-500'>*</span>
+                                    Description{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <textarea
                                     name='description'
@@ -254,7 +264,8 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                             <div className='grid grid-cols-2 gap-4'>
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Email <span className='text-red-500'>*</span>
+                                        Email{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <input
                                         type='email'
@@ -337,8 +348,10 @@ const OpportunityEditModal = ({ isOpen, onClose, opportunity, onSuccess }) => {
                                         <Loader className='h-4 w-4 animate-spin' />
                                         Saving...
                                     </>
+                                ) : opportunity ? (
+                                    'Update'
                                 ) : (
-                                    opportunity ? 'Update' : 'Create'
+                                    'Create'
                                 )}
                             </button>
                         </div>

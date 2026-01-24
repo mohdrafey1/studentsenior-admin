@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
-import {
-    X,
-    AlertTriangle,
-    Loader,
-} from 'lucide-react';
+import { X, AlertTriangle, Loader } from 'lucide-react';
 
 const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -98,18 +94,18 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
-        
+
         setFormData((prev) => {
-            const newData = { 
-                ...prev, 
-                [name]: type === 'checkbox' ? checked : value 
+            const newData = {
+                ...prev,
+                [name]: type === 'checkbox' ? checked : value,
             };
 
             // Automatically manage slug suffix based on submission status
             if (name === 'submissionStatus') {
                 const currentSlug = prev.slug || '';
                 const baseSlug = currentSlug.replace(/-rejected$/, ''); // Remove existing -rejected suffix
-                
+
                 if (value === 'rejected') {
                     // Add -rejected suffix if not already present
                     newData.slug = baseSlug + '-rejected';
@@ -175,11 +171,8 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
     return (
         <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
             <div className='flex items-center justify-center min-h-screen p-4'>
-                <div
-                    className='fixed inset-0'
-                    onClick={onClose}
-                ></div>
-                
+                <div className='fixed inset-0' onClick={onClose}></div>
+
                 <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
                     {/* Header */}
                     <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
@@ -205,7 +198,8 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
                             {/* Status */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Status <span className='text-red-500'>*</span>
+                                    Status{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <select
                                     name='submissionStatus'
@@ -233,7 +227,8 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
                             {formData.submissionStatus === 'rejected' && (
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Rejection Reason <span className='text-red-500'>*</span>
+                                        Rejection Reason{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <textarea
                                         name='rejectionReason'
@@ -285,7 +280,8 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
                             <div className='grid grid-cols-2 gap-4'>
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Year <span className='text-red-500'>*</span>
+                                        Year{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <select
                                         name='year'
@@ -314,7 +310,8 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
 
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Exam Type <span className='text-red-500'>*</span>
+                                        Exam Type{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <select
                                         name='examType'
@@ -328,7 +325,10 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
                                     >
                                         <option value=''>Select type</option>
                                         {examTypes.map((type) => (
-                                            <option key={type.value} value={type.value}>
+                                            <option
+                                                key={type.value}
+                                                value={type.value}
+                                            >
                                                 {type.label}
                                             </option>
                                         ))}
@@ -375,7 +375,8 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
                             {formData.isPaid && (
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Price (₹) <span className='text-red-500'>*</span>
+                                        Price (₹){' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <input
                                         type='number'

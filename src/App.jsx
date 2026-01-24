@@ -13,43 +13,74 @@ import { lazy, Suspense } from 'react';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorBoundary from './components/ErrorBoundary';
 
-const Login = lazy(() => import('./pages/Login'));
-// const Signup = lazy(() => import('./pages/Signup'));
+// Auth
+const Login = lazy(() => import('./pages/Auth/Login'));
+// const Signup = lazy(() => import('./pages/Auth/Signup'));
+
+// Dashboard & Reports
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Reports = lazy(() => import('./pages/Reports'));
-const Payments = lazy(() => import('./pages/Payments'));
-const PaymentDetail = lazy(() => import('./pages/PaymentDetail'));
-const Order = lazy(() => import('./pages/Order'));
-const Redemptions = lazy(() => import('./pages/Redemptions'));
-const Transactions = lazy(() => import('./pages/Transactions'));
-const Contacts = lazy(() => import('./pages/Contacts'));
-const Users = lazy(() => import('./pages/Users'));
-const UserDetail = lazy(() => import('./pages/UserDetail'));
-const DashboardUsers = lazy(() => import('./pages/DashboardUsers'));
-const CollegeDetail = lazy(() => import('./pages/CollegeDetail'));
-const Courses = lazy(() => import('./pages/Courses'));
-const Branches = lazy(() => import('./pages/Branches'));
-const Subjects = lazy(() => import('./pages/Subjects'));
-const PyqList = lazy(() => import('./pages/PyqList'));
-const PyqDetail = lazy(() => import('./pages/PyqDetail'));
-const NotesList = lazy(() => import('./pages/NotesList'));
-const NotesDetail = lazy(() => import('./pages/NotesDetail'));
-const SyllabusList = lazy(() => import('./pages/SyllabusList'));
-const SyllabusDetail = lazy(() => import('./pages/SyllabusDetail'));
-const ProductList = lazy(() => import('./pages/ProductList'));
-const ProductDetail = lazy(() => import('./pages/ProductDetail'));
-const SeniorList = lazy(() => import('./pages/SeniorList'));
-const SeniorDetail = lazy(() => import('./pages/SeniorDetail'));
-const GroupList = lazy(() => import('./pages/GroupList'));
-const GroupDetail = lazy(() => import('./pages/GroupDetail'));
-const OpportunityList = lazy(() => import('./pages/OpportunityList'));
-const OpportunityDetail = lazy(() => import('./pages/OpportunityDetail'));
-const LostFoundList = lazy(() => import('./pages/LostFoundList'));
-const LostFoundDetail = lazy(() => import('./pages/LostFoundDetail'));
-const VideoList = lazy(() => import('./pages/VideoList'));
-const VideoDetail = lazy(() => import('./pages/VideoDetail'));
-const Analytics = lazy(() => import('./pages/Analytics'));
+const Analytics = lazy(() => import('./pages/Analytics/Analytics'));
 const Notifications = lazy(() => import('./pages/Notifications'));
+
+// Financial
+const Payments = lazy(() => import('./pages/Financial/Payments'));
+const PaymentDetail = lazy(() => import('./pages/Financial/PaymentDetail'));
+const Order = lazy(() => import('./pages/Financial/Order'));
+const Redemptions = lazy(() => import('./pages/Financial/Redemptions'));
+const Transactions = lazy(() => import('./pages/Financial/Transactions'));
+
+// Users
+const Contacts = lazy(() => import('./pages/Users/Contacts'));
+const Users = lazy(() => import('./pages/Users/Users'));
+const UserDetail = lazy(() => import('./pages/Users/UserDetail'));
+const DashboardUsers = lazy(() => import('./pages/Users/DashboardUsers'));
+
+// College & Resources
+const CollegeDetail = lazy(() => import('./pages/CollegeDetail'));
+const Courses = lazy(() => import('./pages/Resources/Courses'));
+const Branches = lazy(() => import('./pages/Resources/Branches'));
+const Subjects = lazy(() => import('./pages/Resources/Subjects'));
+
+// PYQs
+const PyqList = lazy(() => import('./pages/Pyqs/PyqList'));
+const PyqDetail = lazy(() => import('./pages/Pyqs/PyqDetail'));
+
+// Notes
+const NotesList = lazy(() => import('./pages/Notes/NotesList'));
+const NotesDetail = lazy(() => import('./pages/Notes/NotesDetail'));
+
+// Syllabus
+const SyllabusList = lazy(() => import('./pages/Syllabus/SyllabusList'));
+const SyllabusDetail = lazy(() => import('./pages/Syllabus/SyllabusDetail'));
+
+// Store/Products
+const ProductList = lazy(() => import('./pages/Store/ProductList'));
+const ProductDetail = lazy(() => import('./pages/Store/ProductDetail'));
+
+// Seniors
+const SeniorList = lazy(() => import('./pages/Senior/SeniorList'));
+const SeniorDetail = lazy(() => import('./pages/Senior/SeniorDetail'));
+
+// Groups
+const GroupList = lazy(() => import('./pages/Group/GroupList'));
+const GroupDetail = lazy(() => import('./pages/Group/GroupDetail'));
+
+// Opportunities
+const OpportunityList = lazy(
+    () => import('./pages/Opportunity/OpportunityList'),
+);
+const OpportunityDetail = lazy(
+    () => import('./pages/Opportunity/OpportunityDetail'),
+);
+
+// Lost & Found
+const LostFoundList = lazy(() => import('./pages/LostFound/LostFoundList'));
+const LostFoundDetail = lazy(() => import('./pages/LostFound/LostFoundDetail'));
+
+// Videos
+const VideoList = lazy(() => import('./pages/Videos/VideoList'));
+const VideoDetail = lazy(() => import('./pages/Videos/VideoDetail'));
 
 function App() {
     return (

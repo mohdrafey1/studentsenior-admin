@@ -91,7 +91,7 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
-        
+
         setFormData((prev) => {
             const newData = {
                 ...prev,
@@ -107,7 +107,7 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
             if (name === 'submissionStatus') {
                 const currentSlug = prev.slug || '';
                 const baseSlug = currentSlug.replace(/-rejected$/, '');
-                
+
                 if (value === 'rejected') {
                     newData.slug = baseSlug + '-rejected';
                 } else {
@@ -171,11 +171,8 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
     return (
         <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
             <div className='flex items-center justify-center min-h-screen p-4'>
-                <div
-                    className='fixed inset-0'
-                    onClick={onClose}
-                ></div>
-                
+                <div className='fixed inset-0' onClick={onClose}></div>
+
                 <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
                     {/* Header */}
                     <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
@@ -201,7 +198,8 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
                             {/* Status */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Status <span className='text-red-500'>*</span>
+                                    Status{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <select
                                     name='submissionStatus'
@@ -219,7 +217,8 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
                             {formData.submissionStatus === 'rejected' && (
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Rejection Reason <span className='text-red-500'>*</span>
+                                        Rejection Reason{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <textarea
                                         name='rejectionReason'
@@ -245,7 +244,8 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
                             {/* Name */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Product Name <span className='text-red-500'>*</span>
+                                    Product Name{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <input
                                     type='text'
@@ -270,7 +270,8 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
                             {/* Description */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Description <span className='text-red-500'>*</span>
+                                    Description{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <textarea
                                     name='description'
@@ -296,7 +297,8 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
                             <div className='grid grid-cols-2 gap-4'>
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Price (₹) <span className='text-red-500'>*</span>
+                                        Price (₹){' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <input
                                         type='number'

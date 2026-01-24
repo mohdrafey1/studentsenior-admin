@@ -1,30 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Header from '../components/Header';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import {
-    TrendingUp,
-    TrendingDown,
-    Users,
+    RefreshCw,
     FileText,
     BookOpen,
-    MessageSquare,
     Store,
+    Users,
+    MessageSquare,
     Briefcase,
     Package,
-    Video,
-    Eye,
-    Calendar,
-    ArrowLeft,
-    BarChart3,
-    PieChart,
-    Activity,
-    Download,
-    RefreshCw,
-    Bot,
-    Zap,
-    Target,
 } from 'lucide-react';
+import AnalyticsHeader from '../components/Analytics/AnalyticsHeader';
+import OverviewStats from '../components/Analytics/OverviewStats';
+import ContentDistribution from '../components/Analytics/ContentDistribution';
+import EngagementMetrics from '../components/Analytics/EngagementMetrics';
+import TopPerformers from '../components/Analytics/TopPerformers';
+import RecentActivity from '../components/Analytics/RecentActivity';
+import GrowthTrends from '../components/Analytics/GrowthTrends';
+import AnalyticsInsights from '../components/Analytics/AnalyticsInsights';
+import ChatbotAnalytics from '../components/Analytics/ChatbotAnalytics';
 
 function Analytics() {
     const [loading, setLoading] = useState(true);
@@ -32,16 +28,15 @@ function Analytics() {
     const [analyticsData, setAnalyticsData] = useState(null);
     const [collegeData, setCollegeData] = useState(null);
     const [chatbotData, setChatbotData] = useState(null);
-    const [timeRange, setTimeRange] = useState('30'); // 1, 7, 14, 30, 60, 90, 180, 365, all days
+    const [timeRange, setTimeRange] = useState('30');
 
     const fetchAnalytics = useCallback(async () => {
         try {
             setLoading(true);
-            const daysParam = timeRange === 'all' ? '' : `days=${timeRange}`;
-            const response = await api.get(`/analytics?${daysParam}`);
+            const response = await api.get(`/analytics?days=${timeRange}`);
             if (response.data.success) {
                 setAnalyticsData(response.data.data);
-                setCollegeData(response.data.data.totals);
+                setCollegeData(response.data.data.collegeData);
             }
         } catch (error) {
             console.error('Error fetching analytics:', error);
@@ -75,14 +70,12 @@ function Analytics() {
     };
 
     const handleExport = () => {
-        // Implement export functionality
         toast.success('Export functionality coming soon!');
     };
 
-    // Calculate total content and engagement
     const getTotalContent = () => {
         if (!collegeData) return 0;
-        return collegeData.totalContent || 0;
+        return collegeData.totals.totalContent || 0;
     };
 
     const getPercentageChange = (contentType) => {
@@ -104,14 +97,6 @@ function Analytics() {
               : 'stable';
     };
 
-    // Helper function to format numbers
-    const formatNumber = (num) => {
-        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-        return num.toString();
-    };
-
-    // Calculate engagement rate
     const calculateEngagementRate = () => {
         if (!analyticsData?.engagement) return '0%';
         let totalViews = 0;
@@ -120,28 +105,10 @@ function Analytics() {
         });
         const totalContent = getTotalContent();
         if (totalContent === 0) return '0%';
-        const rate = (totalViews / totalContent / 10).toFixed(0); // Rough calculation
+        const rate = (totalViews / totalContent / 10).toFixed(0);
         return Math.min(rate, 100) + '%';
     };
 
-    // Helper function for time ago
-    const getTimeAgo = (timestamp) => {
-        const now = new Date();
-        const then = new Date(timestamp);
-        const diffMs = now - then;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMins / 60);
-        const diffDays = Math.floor(diffHours / 24);
-
-        if (diffMins < 1) return 'Just now';
-        if (diffMins < 60)
-            return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
-        if (diffHours < 24)
-            return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-        return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    };
-
-    // Analytics cards configuration
     const analyticsCards = [
         {
             id: 'pyqs',
@@ -233,42 +200,11 @@ function Analytics() {
         },
     ];
 
-    // Overview stats
-    const overviewStats = [
-        {
-            label: 'Total Content',
-            value: getTotalContent(),
-            icon: BarChart3,
-            color: 'text-blue-600 dark:text-blue-400',
-            bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-        },
-
-        {
-            label: 'Total Views',
-            value: formatNumber(
-                analyticsData?.engagement?.PYQs?.totalViews || 0,
-            ),
-            icon: Eye,
-            color: 'text-purple-600 dark:text-purple-400',
-            bgColor: 'bg-purple-100 dark:bg-purple-900/30',
-        },
-        {
-            label: 'Engagement Rate',
-            value: calculateEngagementRate(),
-            icon: Activity,
-            color: 'text-orange-600 dark:text-orange-400',
-            bgColor: 'bg-orange-100 dark:bg-orange-900/30',
-        },
-    ];
-
     if (loading) {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
-
-                <div
-                    className={`flex items-center justify-center py-20 transition-all duration-300`}
-                >
+                <div className='flex items-center justify-center py-20'>
                     <div className='flex items-center space-x-2'>
                         <RefreshCw className='w-6 h-6 animate-spin text-blue-600' />
                         <span className='text-gray-600 dark:text-gray-400'>
@@ -284,804 +220,47 @@ function Analytics() {
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
 
-            <main className='pt-6 pb-12 transition-all duration-300'>
+            <main className='pt-4 md:pt-6 pb-8 md:pb-12'>
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-                    {/* Header Section */}
-                    <div className='mb-8'>
-                        <div className='flex items-center justify-between flex-wrap gap-4'>
-                            <div className='flex items-center space-x-4'>
-                                <div>
-                                    <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                        Analytics Dashboard
-                                    </h1>
-                                </div>
-                            </div>
+                    <AnalyticsHeader
+                        timeRange={timeRange}
+                        setTimeRange={setTimeRange}
+                        onRefresh={handleRefresh}
+                        onExport={handleExport}
+                        refreshing={refreshing}
+                    />
 
-                            <div className='flex items-center space-x-3'>
-                                {/* Time Range Filter */}
-                                <select
-                                    value={timeRange}
-                                    onChange={(e) =>
-                                        setTimeRange(e.target.value)
-                                    }
-                                    className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                                >
-                                    <option value='1'>Last 24 Hours</option>
-                                    <option value='7'>Last 7 Days</option>
-                                    <option value='14'>Last 14 Days</option>
-                                    <option value='30'>Last 30 Days</option>
-                                    <option value='60'>Last 60 Days</option>
-                                    <option value='90'>Last 90 Days</option>
-                                    <option value='180'>Last 6 Months</option>
-                                    <option value='365'>Last Year</option>
-                                    <option value='all'>All Time</option>
-                                </select>
+                    <OverviewStats
+                        totalContent={getTotalContent()}
+                        totalViews={
+                            analyticsData?.engagement?.PYQs?.totalViews || 0
+                        }
+                        engagementRate={calculateEngagementRate()}
+                    />
 
-                                {/* Refresh Button */}
-                                <button
-                                    onClick={handleRefresh}
-                                    disabled={refreshing}
-                                    className='inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50'
-                                >
-                                    <RefreshCw
-                                        className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`}
-                                    />
-                                    Refresh
-                                </button>
+                    <ContentDistribution
+                        analyticsCards={analyticsCards}
+                        totalContent={getTotalContent()}
+                    />
 
-                                {/* Export Button */}
-                                <button
-                                    onClick={handleExport}
-                                    className='inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-                                >
-                                    <Download className='w-4 h-4 mr-2' />
-                                    Export
-                                </button>
-                            </div>
-                        </div>
+                    <div className='grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 mb-6 md:mb-8'>
+                        <EngagementMetrics
+                            engagement={analyticsData?.engagement}
+                        />
+                        <TopPerformers
+                            topPerformers={analyticsData?.topPerformers}
+                        />
+                        <RecentActivity
+                            recentActivity={analyticsData?.recentActivity}
+                        />
+                        <GrowthTrends
+                            percentageChanges={analyticsData?.percentageChanges}
+                        />
                     </div>
 
-                    {/* Overview Stats */}
-                    <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'>
-                        {overviewStats.map((stat, index) => {
-                            const Icon = stat.icon;
-                            return (
-                                <div
-                                    key={index}
-                                    className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow'
-                                >
-                                    <div className='flex items-center justify-between'>
-                                        <div>
-                                            <p className='text-sm font-medium text-gray-600 dark:text-gray-400 mb-1'>
-                                                {stat.label}
-                                            </p>
-                                            <p className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                                {stat.value.toLocaleString()}
-                                            </p>
-                                        </div>
-                                        <div
-                                            className={`p-3 rounded-lg ${stat.bgColor}`}
-                                        >
-                                            <Icon
-                                                className={`w-6 h-6 ${stat.color}`}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                    <AnalyticsInsights />
 
-                    {/* Content Analytics Cards */}
-                    <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8'>
-                        <div className='flex items-center justify-between mb-6'>
-                            <h2 className='text-xl font-semibold text-gray-900 dark:text-white'>
-                                Content Distribution
-                            </h2>
-                            <PieChart className='w-5 h-5 text-gray-400' />
-                        </div>
-
-                        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6'>
-                            {analyticsCards.map((card) => {
-                                const Icon = card.icon;
-                                const ChangeIcon =
-                                    card.changeType === 'increase'
-                                        ? TrendingUp
-                                        : TrendingDown;
-                                return (
-                                    <div
-                                        key={card.id}
-                                        className='group relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-300 cursor-pointer'
-                                    >
-                                        {/* Gradient Background */}
-                                        <div
-                                            className={`absolute inset-0 bg-gradient-to-br ${card.color} opacity-5 group-hover:opacity-10 transition-opacity`}
-                                        ></div>
-
-                                        {/* Content */}
-                                        <div className='relative'>
-                                            <div className='flex items-center justify-between mb-4'>
-                                                <div
-                                                    className={`p-3 rounded-lg ${card.bgColor}`}
-                                                >
-                                                    <Icon
-                                                        className={`w-6 h-6 ${card.iconColor}`}
-                                                    />
-                                                </div>
-                                                <div
-                                                    className={`flex items-center space-x-1 text-sm font-medium ${
-                                                        card.changeType ===
-                                                        'increase'
-                                                            ? 'text-green-600 dark:text-green-400'
-                                                            : 'text-red-600 dark:text-red-400'
-                                                    }`}
-                                                >
-                                                    <ChangeIcon className='w-4 h-4' />
-                                                    <span>{card.change}</span>
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <p className='text-sm font-medium text-gray-600 dark:text-gray-400 mb-1'>
-                                                    {card.title}
-                                                </p>
-                                                <p className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                                    {card.value.toLocaleString()}
-                                                </p>
-                                            </div>
-
-                                            {/* Progress Bar */}
-                                            <div className='mt-4'>
-                                                <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2'>
-                                                    <div
-                                                        className={`bg-gradient-to-r ${card.color} h-2 rounded-full transition-all duration-300`}
-                                                        style={{
-                                                            width: `${Math.min((card.value / getTotalContent()) * 100, 100)}%`,
-                                                        }}
-                                                    ></div>
-                                                </div>
-                                                <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                                    {(
-                                                        (card.value /
-                                                            getTotalContent()) *
-                                                        100
-                                                    ).toFixed(1)}
-                                                    % of total content
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Detailed Analytics Sections */}
-                    <div className='grid grid-cols-1 lg:grid-cols-2 gap-8'>
-                        {/* Engagement Metrics */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <div className='flex items-center justify-between mb-6'>
-                                <h2 className='text-xl font-semibold text-gray-900 dark:text-white'>
-                                    Engagement Metrics
-                                </h2>
-                                <Activity className='w-5 h-5 text-gray-400' />
-                            </div>
-
-                            <div className='space-y-6'>
-                                {analyticsData?.engagement &&
-                                    Object.entries(analyticsData.engagement)
-                                        .slice(0, 10)
-                                        .map(([key, value], index) => {
-                                            const maxViews = Math.max(
-                                                ...Object.values(
-                                                    analyticsData.engagement,
-                                                ).map((e) => e.totalViews),
-                                            );
-                                            const percentage =
-                                                maxViews > 0
-                                                    ? (value.totalViews /
-                                                          maxViews) *
-                                                      100
-                                                    : 0;
-                                            const colors = [
-                                                'from-blue-500 to-cyan-500',
-                                                'from-green-500 to-emerald-500',
-                                                'from-purple-500 to-pink-500',
-                                                'from-orange-500 to-red-500',
-                                            ];
-                                            return (
-                                                <div key={key}>
-                                                    <div className='flex items-center justify-between mb-2'>
-                                                        <span className='text-sm font-medium text-gray-600 dark:text-gray-400'>
-                                                            {key} Views
-                                                        </span>
-                                                        <span className='text-sm font-bold text-gray-900 dark:text-white'>
-                                                            {formatNumber(
-                                                                value.totalViews,
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                    <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3'>
-                                                        <div
-                                                            className={`bg-gradient-to-r ${colors[index % 4]} h-3 rounded-full`}
-                                                            style={{
-                                                                width: `${percentage}%`,
-                                                            }}
-                                                        ></div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                            </div>
-                        </div>
-
-                        {/* Top Performers */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <div className='flex items-center justify-between mb-6'>
-                                <h2 className='text-xl font-semibold text-gray-900 dark:text-white'>
-                                    Top Performing Content
-                                </h2>
-                                <TrendingUp className='w-5 h-5 text-green-500' />
-                            </div>
-
-                            <div className='space-y-4'>
-                                {analyticsData?.topPerformers &&
-                                analyticsData.topPerformers.length > 0 ? (
-                                    analyticsData.topPerformers
-                                        .slice(0, 5)
-                                        .map((item, index) => (
-                                            <div
-                                                key={item.id}
-                                                className='flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'
-                                            >
-                                                <div className='flex items-center space-x-3 flex-1'>
-                                                    <div className='flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm'>
-                                                        {index + 1}
-                                                    </div>
-                                                    <div className='flex-1 min-w-0'>
-                                                        <p className='text-sm truncate max-w-80 font-medium text-gray-900 dark:text-white truncate'>
-                                                            {item.title}
-                                                        </p>
-                                                        <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                                            {item.type}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className='flex items-center space-x-4'>
-                                                    <div className='flex items-center space-x-1 text-gray-600 dark:text-gray-400'>
-                                                        <Eye className='w-4 h-4' />
-                                                        <span className='text-sm font-medium'>
-                                                            {formatNumber(
-                                                                item.views,
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))
-                                ) : (
-                                    <p className='text-center text-gray-500 dark:text-gray-400 py-4'>
-                                        No top performers data available
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Recent Activity */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <div className='flex items-center justify-between mb-6'>
-                                <h2 className='text-xl font-semibold text-gray-900 dark:text-white'>
-                                    Recent Activity
-                                </h2>
-                                <Calendar className='w-5 h-5 text-gray-400' />
-                            </div>
-
-                            <div className='space-y-4'>
-                                {analyticsData?.recentActivity &&
-                                analyticsData.recentActivity.length > 0 ? (
-                                    analyticsData.recentActivity
-                                        .slice(0, 5)
-                                        .map((activity) => {
-                                            const iconMap = {
-                                                PYQ: FileText,
-                                                Note: BookOpen,
-                                                Product: Store,
-                                                Group: MessageSquare,
-                                                Opportunity: Briefcase,
-                                            };
-                                            const colorMap = {
-                                                PYQ: 'text-yellow-600',
-                                                Note: 'text-blue-600',
-                                                Product: 'text-green-600',
-                                                Group: 'text-indigo-600',
-                                                Opportunity: 'text-red-600',
-                                            };
-                                            const Icon =
-                                                iconMap[activity.type] ||
-                                                FileText;
-                                            const color =
-                                                colorMap[activity.type] ||
-                                                'text-gray-600';
-                                            const timeAgo = getTimeAgo(
-                                                activity.timestamp,
-                                            );
-                                            return (
-                                                <div
-                                                    key={activity.id}
-                                                    className='flex items-center space-x-4 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors'
-                                                >
-                                                    <div className='p-2 rounded-lg bg-gray-100 dark:bg-gray-700'>
-                                                        <Icon
-                                                            className={`w-5 h-5 ${color}`}
-                                                        />
-                                                    </div>
-                                                    <div className='flex-1 min-w-0'>
-                                                        <p className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                            {activity.action}
-                                                        </p>
-                                                        <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                                            by {activity.user}
-                                                        </p>
-                                                    </div>
-                                                    <span className='text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap'>
-                                                        {timeAgo}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })
-                                ) : (
-                                    <p className='text-center text-gray-500 dark:text-gray-400 py-4'>
-                                        No recent activity
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Growth Trends */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                            <div className='flex items-center justify-between mb-6'>
-                                <h2 className='text-xl font-semibold text-gray-900 dark:text-white'>
-                                    Growth Trends (Last 7 Days)
-                                </h2>
-                                <TrendingUp className='w-5 h-5 text-green-500' />
-                            </div>
-
-                            <div className='space-y-6'>
-                                {analyticsData?.percentageChanges &&
-                                    Object.entries(
-                                        analyticsData.percentageChanges,
-                                    )
-                                        .slice(0, 4)
-                                        .map(([key, trend]) => {
-                                            const colors = [
-                                                'from-green-500 to-emerald-500',
-                                                'from-blue-500 to-cyan-500',
-                                                'from-purple-500 to-pink-500',
-                                                'from-orange-500 to-red-500',
-                                            ];
-                                            const index =
-                                                Object.keys(
-                                                    analyticsData.percentageChanges,
-                                                ).indexOf(key) % 4;
-                                            const TrendIcon =
-                                                trend.trend === 'up'
-                                                    ? TrendingUp
-                                                    : TrendingDown;
-                                            const trendColor =
-                                                trend.trend === 'up'
-                                                    ? 'text-green-600 dark:text-green-400'
-                                                    : 'text-red-600 dark:text-red-400';
-                                            return (
-                                                <div key={key}>
-                                                    <div className='flex items-center justify-between mb-2'>
-                                                        <span className='text-sm font-medium text-gray-600 dark:text-gray-400 capitalize'>
-                                                            {key}
-                                                        </span>
-                                                        <div className='flex items-center space-x-2'>
-                                                            <span
-                                                                className={`text-lg font-bold ${trendColor}`}
-                                                            >
-                                                                {trend.percentChange >
-                                                                0
-                                                                    ? '+'
-                                                                    : ''}
-                                                                {
-                                                                    trend.percentChange
-                                                                }
-                                                                %
-                                                            </span>
-                                                            <TrendIcon
-                                                                className={`w-4 h-4 ${trendColor}`}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3'>
-                                                        <div
-                                                            className={`bg-gradient-to-r ${colors[index]} h-3 rounded-full`}
-                                                            style={{
-                                                                width: `${Math.min(Math.abs(trend.percentChange), 100)}%`,
-                                                            }}
-                                                        ></div>
-                                                    </div>
-                                                    <div className='flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                                        <span>
-                                                            Previous:{' '}
-                                                            {trend.previous}
-                                                        </span>
-                                                        <span>
-                                                            Current:{' '}
-                                                            {trend.current}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Additional Info */}
-                    <div className='mt-8 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800'>
-                        <div className='flex items-start space-x-4'>
-                            <div className='flex-shrink-0'>
-                                <BarChart3 className='w-8 h-8 text-blue-600 dark:text-blue-400' />
-                            </div>
-                            <div>
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-white mb-2'>
-                                    Analytics Insights
-                                </h3>
-                                <p className='text-gray-600 dark:text-gray-400 text-sm leading-relaxed'>
-                                    Your platform is showing strong growth
-                                    across all content categories. PYQs and
-                                    Opportunities are the most engaged content
-                                    types. Consider promoting more interactive
-                                    features to boost community participation.
-                                    The engagement rate has increased by 32% in
-                                    the last month, indicating healthy platform
-                                    activity.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Chatbot Analytics Section */}
-                    {chatbotData && (
-                        <div className='mt-8'>
-                            <div className='flex items-center justify-between mb-6'>
-                                <div className='flex items-center space-x-3'>
-                                    <Bot className='w-8 h-8 text-indigo-600 dark:text-indigo-400' />
-                                    <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>
-                                        Chatbot Analytics
-                                    </h2>
-                                </div>
-                            </div>
-
-                            {/* Chatbot Overview Stats */}
-                            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'>
-                                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                                    <div className='flex items-center justify-between'>
-                                        <div>
-                                            <p className='text-sm font-medium text-gray-600 dark:text-gray-400 mb-1'>
-                                                Total Users
-                                            </p>
-                                            <p className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                                {chatbotData.totalUsers.toLocaleString()}
-                                            </p>
-                                            <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                                {chatbotData.guestUsers} guests
-                                                • {chatbotData.registeredUsers}{' '}
-                                                registered
-                                            </p>
-                                        </div>
-                                        <div className='p-3 rounded-lg bg-indigo-100 dark:bg-indigo-900/30'>
-                                            <Users className='w-6 h-6 text-indigo-600 dark:text-indigo-400' />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                                    <div className='flex items-center justify-between'>
-                                        <div>
-                                            <p className='text-sm font-medium text-gray-600 dark:text-gray-400 mb-1'>
-                                                Total Sessions
-                                            </p>
-                                            <p className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                                {chatbotData.totalSessions.toLocaleString()}
-                                            </p>
-                                        </div>
-                                        <div className='p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30'>
-                                            <MessageSquare className='w-6 h-6 text-blue-600 dark:text-blue-400' />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                                    <div className='flex items-center justify-between'>
-                                        <div>
-                                            <p className='text-sm font-medium text-gray-600 dark:text-gray-400 mb-1'>
-                                                Avg Interactions
-                                            </p>
-                                            <p className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                                {chatbotData.averageInteractionsPerSession.toFixed(
-                                                    1,
-                                                )}
-                                            </p>
-                                            <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                                per session
-                                            </p>
-                                        </div>
-                                        <div className='p-3 rounded-lg bg-green-100 dark:bg-green-900/30'>
-                                            <Zap className='w-6 h-6 text-green-600 dark:text-green-400' />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                                    <div className='flex items-center justify-between'>
-                                        <div>
-                                            <p className='text-sm font-medium text-gray-600 dark:text-gray-400 mb-1'>
-                                                Resources Viewed
-                                            </p>
-                                            <p className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                                {chatbotData.resourceStats.reduce(
-                                                    (sum, r) => sum + r.count,
-                                                    0,
-                                                )}
-                                            </p>
-                                        </div>
-                                        <div className='p-3 rounded-lg bg-purple-100 dark:bg-purple-900/30'>
-                                            <Target className='w-6 h-6 text-purple-600 dark:text-purple-400' />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Chatbot Detailed Metrics */}
-                            <div className='grid grid-cols-1 lg:grid-cols-2 gap-8'>
-                                {/* Popular Colleges */}
-                                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                                    <div className='flex items-center justify-between mb-6'>
-                                        <h3 className='text-xl font-semibold text-gray-900 dark:text-white'>
-                                            Popular Colleges
-                                        </h3>
-                                        <TrendingUp className='w-5 h-5 text-indigo-500' />
-                                    </div>
-
-                                    <div className='space-y-4'>
-                                        {chatbotData.popularColleges &&
-                                        chatbotData.popularColleges.length >
-                                            0 ? (
-                                            chatbotData.popularColleges.map(
-                                                (college, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className='flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg'
-                                                    >
-                                                        <div className='flex items-center space-x-3'>
-                                                            <div className='flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm'>
-                                                                {index + 1}
-                                                            </div>
-                                                            <p className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                                {college.name}
-                                                            </p>
-                                                        </div>
-                                                        <span className='text-sm font-semibold text-indigo-600 dark:text-indigo-400'>
-                                                            {college.count}{' '}
-                                                            searches
-                                                        </span>
-                                                    </div>
-                                                ),
-                                            )
-                                        ) : (
-                                            <p className='text-center text-gray-500 dark:text-gray-400 py-4'>
-                                                No college data available
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Popular Subjects */}
-                                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                                    <div className='flex items-center justify-between mb-6'>
-                                        <h3 className='text-xl font-semibold text-gray-900 dark:text-white'>
-                                            Popular Subjects
-                                        </h3>
-                                        <BookOpen className='w-5 h-5 text-blue-500' />
-                                    </div>
-
-                                    <div className='space-y-4'>
-                                        {chatbotData.popularSubjects &&
-                                        chatbotData.popularSubjects.length >
-                                            0 ? (
-                                            chatbotData.popularSubjects.map(
-                                                (subject, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className='flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg'
-                                                    >
-                                                        <div className='flex items-center space-x-3'>
-                                                            <div className='flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-sm'>
-                                                                {index + 1}
-                                                            </div>
-                                                            <div>
-                                                                <p className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                                    {
-                                                                        subject.name
-                                                                    }
-                                                                </p>
-                                                                <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                                                    {
-                                                                        subject.code
-                                                                    }
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <span className='text-sm font-semibold text-blue-600 dark:text-blue-400'>
-                                                            {subject.count}{' '}
-                                                            searches
-                                                        </span>
-                                                    </div>
-                                                ),
-                                            )
-                                        ) : (
-                                            <p className='text-center text-gray-500 dark:text-gray-400 py-4'>
-                                                No subject data available
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Resource Types Distribution */}
-                                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                                    <div className='flex items-center justify-between mb-6'>
-                                        <h3 className='text-xl font-semibold text-gray-900 dark:text-white'>
-                                            Resource Types
-                                        </h3>
-                                        <PieChart className='w-5 h-5 text-green-500' />
-                                    </div>
-
-                                    <div className='space-y-4'>
-                                        {chatbotData.resourceStats &&
-                                        chatbotData.resourceStats.length > 0 ? (
-                                            chatbotData.resourceStats.map(
-                                                (resource, index) => {
-                                                    const total =
-                                                        chatbotData.resourceStats.reduce(
-                                                            (sum, r) =>
-                                                                sum + r.count,
-                                                            0,
-                                                        );
-                                                    const percentage =
-                                                        total > 0
-                                                            ? (
-                                                                  (resource.count /
-                                                                      total) *
-                                                                  100
-                                                              ).toFixed(1)
-                                                            : 0;
-                                                    const colors = [
-                                                        'from-yellow-500 to-orange-500',
-                                                        'from-blue-500 to-cyan-500',
-                                                        'from-purple-500 to-pink-500',
-                                                    ];
-                                                    return (
-                                                        <div
-                                                            key={index}
-                                                            className='space-y-2'
-                                                        >
-                                                            <div className='flex items-center justify-between'>
-                                                                <span className='text-sm font-medium text-gray-700 dark:text-gray-300 capitalize'>
-                                                                    {
-                                                                        resource._id
-                                                                    }
-                                                                </span>
-                                                                <span className='text-sm font-semibold text-gray-900 dark:text-white'>
-                                                                    {
-                                                                        resource.count
-                                                                    }{' '}
-                                                                    (
-                                                                    {percentage}
-                                                                    %)
-                                                                </span>
-                                                            </div>
-                                                            <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2'>
-                                                                <div
-                                                                    className={`bg-gradient-to-r ${colors[index % 3]} h-2 rounded-full`}
-                                                                    style={{
-                                                                        width: `${percentage}%`,
-                                                                    }}
-                                                                ></div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                },
-                                            )
-                                        ) : (
-                                            <p className='text-center text-gray-500 dark:text-gray-400 py-4'>
-                                                No resource data available
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Daily Active Users */}
-                                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                                    <div className='flex items-center justify-between mb-6'>
-                                        <h3 className='text-xl font-semibold text-gray-900 dark:text-white'>
-                                            Daily Active Users (Last 30 Days)
-                                        </h3>
-                                        <Activity className='w-5 h-5 text-purple-500' />
-                                    </div>
-
-                                    <div className='space-y-3'>
-                                        {chatbotData.dailyUsers &&
-                                        chatbotData.dailyUsers.length > 0 ? (
-                                            <div className='max-h-64 overflow-y-auto'>
-                                                {chatbotData.dailyUsers
-                                                    .slice(-10)
-                                                    .reverse()
-                                                    .map((day, index) => {
-                                                        const maxCount =
-                                                            Math.max(
-                                                                ...chatbotData.dailyUsers.map(
-                                                                    (d) =>
-                                                                        d.count,
-                                                                ),
-                                                            );
-                                                        const percentage =
-                                                            maxCount > 0
-                                                                ? (
-                                                                      (day.count /
-                                                                          maxCount) *
-                                                                      100
-                                                                  ).toFixed(0)
-                                                                : 0;
-                                                        return (
-                                                            <div
-                                                                key={index}
-                                                                className='space-y-1'
-                                                            >
-                                                                <div className='flex items-center justify-between'>
-                                                                    <span className='text-xs text-gray-600 dark:text-gray-400'>
-                                                                        {new Date(
-                                                                            day._id,
-                                                                        ).toLocaleDateString(
-                                                                            'en-US',
-                                                                            {
-                                                                                month: 'short',
-                                                                                day: 'numeric',
-                                                                            },
-                                                                        )}
-                                                                    </span>
-                                                                    <span className='text-xs font-semibold text-gray-900 dark:text-white'>
-                                                                        {
-                                                                            day.count
-                                                                        }{' '}
-                                                                        users
-                                                                    </span>
-                                                                </div>
-                                                                <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2'>
-                                                                    <div
-                                                                        className='bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full'
-                                                                        style={{
-                                                                            width: `${percentage}%`,
-                                                                        }}
-                                                                    ></div>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                            </div>
-                                        ) : (
-                                            <p className='text-center text-gray-500 dark:text-gray-400 py-4'>
-                                                No daily user data available
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    <ChatbotAnalytics chatbotData={chatbotData} />
                 </div>
             </main>
         </div>
