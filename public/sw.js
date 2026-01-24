@@ -1,3 +1,4 @@
+/* eslint-env serviceworker */
 const CACHE_NAME = 'student-senior-admin-v1';
 const urlsToCache = [
     '/',

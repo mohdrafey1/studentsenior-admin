@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-    X,
-    AlertTriangle,
-    Loader,
-} from 'lucide-react';
+import { X, AlertTriangle, Loader } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -87,7 +83,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
-        
+
         setFormData((prev) => {
             const newData = {
                 ...prev,
@@ -98,7 +94,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
             if (name === 'submissionStatus') {
                 const currentSlug = prev.slug || '';
                 const baseSlug = currentSlug.replace(/-rejected$/, ''); // Remove existing -rejected suffix
-                
+
                 if (value === 'rejected') {
                     // Add -rejected suffix if not already present
                     newData.slug = baseSlug + '-rejected';
@@ -171,11 +167,8 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
     return (
         <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
             <div className='flex items-center justify-center min-h-screen p-4'>
-                <div
-                    className='fixed inset-0'
-                    onClick={onClose}
-                ></div>
-                
+                <div className='fixed inset-0' onClick={onClose}></div>
+
                 <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
                     {/* Header */}
                     <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
@@ -201,7 +194,8 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                             {/* Status */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Status <span className='text-red-500'>*</span>
+                                    Status{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <select
                                     name='submissionStatus'
@@ -229,7 +223,8 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                             {formData.submissionStatus === 'rejected' && (
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Rejection Reason <span className='text-red-500'>*</span>
+                                        Rejection Reason{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <textarea
                                         name='rejectionReason'
@@ -255,7 +250,8 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                             {/* Title */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Title <span className='text-red-500'>*</span>
+                                    Title{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <input
                                     type='text'
@@ -280,7 +276,8 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                             {/* Description */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Description <span className='text-red-500'>*</span>
+                                    Description{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <textarea
                                     name='description'
@@ -327,46 +324,46 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                                 )}
                             </div>
 
-                            
-                           <div className='flex gap-2'>
-                             {/* Paid Resource Checkbox */}
-                            <div className='space-y-2'>
-                                <label className='flex items-center gap-2'>
-                                    <input
-                                        type='checkbox'
-                                        name='isDownloadable'
-                                        checked={formData.isDownloadable}
-                                        onChange={handleInputChange}
-                                        className='w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
-                                    />
-                                    <span className='text-sm text-gray-700 dark:text-gray-300'>
-                                       Is Downloadable
-                                    </span>
-                                </label>
-                            </div>
+                            <div className='flex gap-2'>
+                                {/* Paid Resource Checkbox */}
+                                <div className='space-y-2'>
+                                    <label className='flex items-center gap-2'>
+                                        <input
+                                            type='checkbox'
+                                            name='isDownloadable'
+                                            checked={formData.isDownloadable}
+                                            onChange={handleInputChange}
+                                            className='w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
+                                        />
+                                        <span className='text-sm text-gray-700 dark:text-gray-300'>
+                                            Is Downloadable
+                                        </span>
+                                    </label>
+                                </div>
 
-                            {/* Paid Resource Checkbox */}
-                            <div className='space-y-2'>
-                                <label className='flex items-center gap-2'>
-                                    <input
-                                        type='checkbox'
-                                        name='isPaid'
-                                        checked={formData.isPaid}
-                                        onChange={handleInputChange}
-                                        className='w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
-                                    />
-                                    <span className='text-sm text-gray-700 dark:text-gray-300'>
-                                        Paid Resource
-                                    </span>
-                                </label>
+                                {/* Paid Resource Checkbox */}
+                                <div className='space-y-2'>
+                                    <label className='flex items-center gap-2'>
+                                        <input
+                                            type='checkbox'
+                                            name='isPaid'
+                                            checked={formData.isPaid}
+                                            onChange={handleInputChange}
+                                            className='w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
+                                        />
+                                        <span className='text-sm text-gray-700 dark:text-gray-300'>
+                                            Paid Resource
+                                        </span>
+                                    </label>
+                                </div>
                             </div>
-                           </div>
 
                             {/* Price */}
                             {formData.isPaid && (
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Price (₹) <span className='text-red-500'>*</span>
+                                        Price (₹){' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <input
                                         type='number'
@@ -425,4 +422,3 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
 };
 
 export default NotesEditModal;
-

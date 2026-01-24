@@ -205,11 +205,8 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
     return (
         <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
             <div className='flex items-center justify-center min-h-screen p-4'>
-                <div
-                    className='fixed inset-0'
-                    onClick={onClose}
-                ></div>
-                
+                <div className='fixed inset-0' onClick={onClose}></div>
+
                 <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
                     {/* Header */}
                     <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
@@ -235,7 +232,8 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                             {/* Status */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Status <span className='text-red-500'>*</span>
+                                    Status{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <select
                                     name='submissionStatus'
@@ -243,7 +241,9 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                                     onChange={handleChange}
                                     className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
                                 >
-                                    <option value='pending'>Pending Review</option>
+                                    <option value='pending'>
+                                        Pending Review
+                                    </option>
                                     <option value='approved'>Approved</option>
                                     <option value='rejected'>Rejected</option>
                                 </select>
@@ -280,7 +280,8 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                             {/* Video Title */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Video Title <span className='text-red-500'>*</span>
+                                    Video Title{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <input
                                     type='text'
@@ -305,7 +306,8 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                             {/* Description */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Description <span className='text-red-500'>*</span>
+                                    Description{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <textarea
                                     name='description'
@@ -330,7 +332,8 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                             {/* Video URL */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Video URL <span className='text-red-500'>*</span>
+                                    Video URL{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <input
                                     type='url'
@@ -351,7 +354,8 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                                     </p>
                                 )}
                                 <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
-                                    YouTube, Vimeo, or direct video links supported
+                                    YouTube, Vimeo, or direct video links
+                                    supported
                                 </p>
                             </div>
 
@@ -359,7 +363,8 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                             <div className='grid grid-cols-2 gap-4'>
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Subject <span className='text-red-500'>*</span>
+                                        Subject{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <select
                                         name='subject'
@@ -373,7 +378,10 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                                     >
                                         <option value=''>Select Subject</option>
                                         {subjects.map((subject) => (
-                                            <option key={subject} value={subject}>
+                                            <option
+                                                key={subject}
+                                                value={subject}
+                                            >
                                                 {subject}
                                             </option>
                                         ))}
@@ -388,7 +396,8 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
 
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Duration <span className='text-red-500'>*</span>
+                                        Duration{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <input
                                         type='text'
@@ -454,8 +463,10 @@ const VideoEditModal = ({ isOpen, onClose, video, onSuccess }) => {
                                         <Loader className='h-4 w-4 animate-spin' />
                                         Saving...
                                     </>
+                                ) : video ? (
+                                    'Update Video'
                                 ) : (
-                                    video ? 'Update Video' : 'Add Video'
+                                    'Add Video'
                                 )}
                             </button>
                         </div>

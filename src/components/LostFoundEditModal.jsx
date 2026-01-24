@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-    X,
-    Loader,
-    AlertTriangle,
-} from 'lucide-react';
+import { X, Loader, AlertTriangle } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -21,7 +17,7 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
         rejectionReason: '',
     });
     const [loading, setLoading] = useState(false);
- 
+
     const [errors, setErrors] = useState({});
 
     useEffect(() => {
@@ -72,7 +68,6 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
         }
     };
 
-
     const validateForm = () => {
         const newErrors = {};
 
@@ -121,7 +116,7 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                 // Update existing item
                 await api.put(`/lostandfound/edit/${item._id}`, formData);
                 toast.success('Item updated successfully');
-            } 
+            }
             onSuccess();
         } catch (error) {
             console.error('Error saving item:', error);
@@ -138,17 +133,16 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
     return (
         <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
             <div className='flex items-center justify-center min-h-screen p-4'>
-                <div
-                    className='fixed inset-0'
-                    onClick={onClose}
-                ></div>
-                
+                <div className='fixed inset-0' onClick={onClose}></div>
+
                 <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
                     {/* Header */}
                     <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
                         <div>
                             <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                {item ? 'Edit Lost & Found Item' : 'Create Lost & Found Item'}
+                                {item
+                                    ? 'Edit Lost & Found Item'
+                                    : 'Create Lost & Found Item'}
                             </h2>
                             <p className='text-sm text-gray-500 dark:text-gray-400'>
                                 {item?.college?.collegeName || 'Lost & Found'}
@@ -170,7 +164,8 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                             <div className='grid grid-cols-2 gap-4'>
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Type <span className='text-red-500'>*</span>
+                                        Type{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <select
                                         name='type'
@@ -203,7 +198,8 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                             <div className='space-y-4'>
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Submission Status <span className='text-red-500'>*</span>
+                                        Submission Status{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <select
                                         name='submissionStatus'
@@ -212,15 +208,22 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                                         className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
                                     >
                                         <option value='pending'>Pending</option>
-                                        <option value='approved'>Approved</option>
-                                        <option value='rejected'>Rejected</option>
+                                        <option value='approved'>
+                                            Approved
+                                        </option>
+                                        <option value='rejected'>
+                                            Rejected
+                                        </option>
                                     </select>
                                 </div>
 
                                 {formData.submissionStatus === 'rejected' && (
                                     <div>
                                         <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                            Rejection Reason <span className='text-red-500'>*</span>
+                                            Rejection Reason{' '}
+                                            <span className='text-red-500'>
+                                                *
+                                            </span>
                                         </label>
                                         <textarea
                                             name='rejectionReason'
@@ -247,7 +250,8 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                             {/* Title */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Item Title <span className='text-red-500'>*</span>
+                                    Item Title{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <input
                                     type='text'
@@ -272,7 +276,8 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                             {/* Description */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Description <span className='text-red-500'>*</span>
+                                    Description{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <textarea
                                     name='description'
@@ -298,7 +303,8 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                             <div className='grid grid-cols-2 gap-4'>
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Location <span className='text-red-500'>*</span>
+                                        Location{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <input
                                         type='text'
@@ -322,7 +328,8 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
 
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Date <span className='text-red-500'>*</span>
+                                        Date{' '}
+                                        <span className='text-red-500'>*</span>
                                     </label>
                                     <input
                                         type='date'
@@ -347,7 +354,8 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                             {/* WhatsApp Number */}
                             <div>
                                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    WhatsApp Number <span className='text-red-500'>*</span>
+                                    WhatsApp Number{' '}
+                                    <span className='text-red-500'>*</span>
                                 </label>
                                 <input
                                     type='text'
@@ -405,8 +413,10 @@ const LostFoundEditModal = ({ isOpen, onClose, item, onSuccess }) => {
                                         <Loader className='h-4 w-4 animate-spin' />
                                         Saving...
                                     </>
+                                ) : item ? (
+                                    'Update'
                                 ) : (
-                                    item ? 'Update' : 'Create'
+                                    'Create'
                                 )}
                             </button>
                         </div>
