@@ -701,14 +701,14 @@ const Subjects = () => {
                                                 Course:{' '}
                                                 <span className='font-semibold'>
                                                     {subject.course
-                                                        ?.courseName || 'N/A'}
+                                                        ?.courseCode || 'N/A'}
                                                 </span>
                                             </div>
                                             <div className='text-sm text-gray-700 dark:text-gray-300'>
                                                 Branch:{' '}
                                                 <span className='font-semibold'>
                                                     {subject.branch
-                                                        ?.branchName || 'N/A'}
+                                                        ?.branchCode || 'N/A'}
                                                 </span>
                                             </div>
                                             <div className='text-sm text-gray-700 dark:text-gray-300 mb-3'>
@@ -818,16 +818,16 @@ const Subjects = () => {
                                                         </td>
                                                         <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
                                                             {subject.course
-                                                                ?.courseName ||
+                                                                ?.courseCode ||
                                                                 'N/A'}
                                                         </td>
                                                         <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
                                                             {subject.branch
-                                                                ?.branchName ||
+                                                                ?.branchCode ||
                                                                 'N/A'}
                                                         </td>
                                                         <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
-                                                            Semester{' '}
+                                                            Sem{' '}
                                                             {subject.semester ||
                                                                 'N/A'}
                                                         </td>
