@@ -51,7 +51,6 @@ const Subjects = () => {
         useState(null);
     const [syllabusFormData, setSyllabusFormData] = useState({
         subjectCode: '',
-        collegeSlug: 'integral-university',
         year: 1,
         semester: 1,
         units: [
@@ -292,7 +291,6 @@ const Subjects = () => {
         setSelectedSubjectForSyllabus(subject);
         setSyllabusFormData({
             subjectCode: subject.subjectCode,
-            collegeSlug: 'integral-university',
             year: Math.ceil(subject.semester / 2) || 1,
             semester: subject.semester,
             units: [
@@ -351,7 +349,6 @@ const Subjects = () => {
         setSelectedSubjectForSyllabus(null);
         setSyllabusFormData({
             subjectCode: '',
-            collegeSlug: '',
             year: 1,
             semester: 1,
             units: [
@@ -371,7 +368,12 @@ const Subjects = () => {
 
         setSubmittingSyllabus(true);
         try {
-            await api.post(`/syllabus/create`, syllabusFormData);
+            // Always send the subject's college slug as collegeSlug
+            const collegeSlug = selectedSubjectForSyllabus?.college?.slug;
+            await api.post(`/syllabus/create`, {
+                ...syllabusFormData,
+                collegeSlug,
+            });
             toast.success('Syllabus created successfully');
             handleCloseSyllabusModal();
             fetchData(); // Refresh to get updated data

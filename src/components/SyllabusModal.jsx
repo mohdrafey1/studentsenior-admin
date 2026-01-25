@@ -92,34 +92,7 @@ const SyllabusModal = ({
                                     />
                                 </div>
 
-                                {/* College Selection */}
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        College *
-                                    </label>
-                                    <select
-                                        value={
-                                            formData.collegeSlug ||
-                                            'dr-apj-abdul-kalam-technical-university-aktu'
-                                        }
-                                        onChange={(e) =>
-                                            onFormChange(
-                                                'collegeSlug',
-                                                e.target.value,
-                                            )
-                                        }
-                                        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                        required
-                                    >
-                                        <option value='dr-apj-abdul-kalam-technical-university-aktu'>
-                                            Dr. APJ Abdul Kalam Technical
-                                            University
-                                        </option>
-                                        <option value='integral-university'>
-                                            Integral University
-                                        </option>
-                                    </select>
-                                </div>
+                                {/* College is now taken from the subject; selection removed */}
 
                                 {/* Description */}
                                 <div>
