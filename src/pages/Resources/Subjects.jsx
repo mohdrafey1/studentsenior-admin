@@ -540,6 +540,12 @@ const Subjects = () => {
                                 className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
                             >
                                 <option value=''>All Colleges</option>
+                                <option value='dr-apj-abdul-kalam-technical-university-aktu'>
+                                    Dr. APJ Abdul Kalam Technical University
+                                </option>
+                                <option value='integral-university'>
+                                    Integral University
+                                </option>
                                 {colleges.map((c) => (
                                     <option key={c._id} value={c._id}>
                                         {c.slug}
@@ -996,6 +1002,13 @@ const Subjects = () => {
                                             >
                                                 <option value=''>
                                                     Select a college
+                                                </option>
+                                                <option value='dr-apj-abdul-kalam-technical-university-aktu'>
+                                                    Dr. APJ Abdul Kalam
+                                                    Technical University
+                                                </option>
+                                                <option value='integral-university'>
+                                                    Integral University
                                                 </option>
                                                 {colleges.map((college) => (
                                                     <option
