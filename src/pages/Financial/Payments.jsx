@@ -15,10 +15,8 @@ import {
     List,
     SortAsc,
     SortDesc,
-    User,
-    Calendar,
-    Clock,
     X,
+    ChevronLeft,
 } from 'lucide-react';
 import Pagination from '../../components/Pagination';
 
@@ -269,28 +267,17 @@ const Payments = () => {
         }
     };
 
-    const getProviderColor = (provider) => {
-        switch (provider) {
-            case 'PhonePe':
-                return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
-            case 'Razorpay':
-                return 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-300';
-            default:
-                return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-        }
-    };
-
     if (loading) {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
                 <Sidebar />
                 <div
-                    className={`flex items-center justify-center py-20 ${mainContentMargin} transition-all duration-300`}
+                    className={`flex items-center justify-center py-12 ${mainContentMargin} transition-all duration-300`}
                 >
-                    <div className='flex items-center space-x-2'>
-                        <Loader className='w-6 h-6 animate-spin text-blue-600' />
-                        <span className='text-gray-600 dark:text-gray-400'>
+                    <div className='flex items-center gap-2'>
+                        <Loader className='w-4 h-4 animate-spin text-gray-400' />
+                        <span className='text-sm text-gray-500 dark:text-gray-400'>
                             Loading payments...
                         </span>
                     </div>
@@ -305,84 +292,68 @@ const Payments = () => {
             <Sidebar />
 
             <main
-                className={`pt-6 pb-12 ${mainContentMargin} transition-all duration-300`}
+                className={`py-4 ${mainContentMargin} transition-all duration-300`}
             >
-                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-                    {/* Header Section */}
-                    <div className='flex items-center justify-between mb-8'>
-                        <div className='flex items-center'>
-                            <button
-                                onClick={() => navigate('/reports')}
-                                className='mr-4 p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors'
-                            >
-                                <ArrowLeft className='w-5 h-5' />
-                            </button>
-                            <div className='flex items-center'>
-                                <div className='bg-green-600 text-white p-3 rounded-lg mr-4'>
-                                    <CreditCard className='w-6 h-6' />
-                                </div>
-                                <div>
-                                    <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                        Payment History
-                                    </h1>
-                                    <p className='text-gray-600 dark:text-gray-400 mt-1'>
-                                        Manage and view all payment transactions
-                                    </p>
-                                </div>
-                            </div>
+                <div className='max-w-7xl mx-auto px-4 sm:px-6'>
+                    {/* Compact Header */}
+                    <div className='flex items-center gap-3 mb-4'>
+                        <button
+                            onClick={() => navigate('/reports')}
+                            className='p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors'
+                        >
+                            <ChevronLeft className='w-4 h-4' />
+                        </button>
+                        <div className='flex items-center gap-2'>
+                            <CreditCard className='w-4 h-4 text-gray-400' />
+                            <h1 className='text-lg font-semibold text-gray-900 dark:text-white'>
+                                Payment History
+                            </h1>
                         </div>
-
-                        <div />
                     </div>
 
-                    {/* Search & Filters */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6'>
-                        {/* Total Amount Display */}
+                    {/* Compact Filters */}
+                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
+                        {/* Total Amount - Compact */}
                         {timeFilter && (
-                            <div className='mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg'>
-                                <div className='flex items-center justify-between'>
-                                    <div className='flex items-center gap-2'>
-                                        <Clock className='w-5 h-5 text-green-600 dark:text-green-400' />
-                                        <span className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                                            Total Amount (
-                                            {getTimeFilterLabel(timeFilter)}):
-                                        </span>
-                                    </div>
-                                    <span className='text-xl font-bold text-green-600 dark:text-green-400'>
-                                        ₹{totalAmount}
-                                    </span>
-                                </div>
+                            <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
+                                <span className='text-gray-600 dark:text-gray-400'>
+                                    Total ({getTimeFilterLabel(timeFilter)}):
+                                </span>
+                                <span className='font-semibold text-gray-900 dark:text-white'>
+                                    ₹{totalAmount.toLocaleString()}
+                                </span>
                             </div>
                         )}
-                        {/* Search Bar */}
-                        <div className='relative mb-4'>
-                            <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5' />
+
+                        {/* Search Bar - Compact */}
+                        <div className='relative'>
+                            <Search className='absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5' />
                             <input
                                 type='text'
                                 placeholder='Search by email or name...'
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className='w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
+                                className='w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white'
                             />
                         </div>
 
-                        {/* View Toggle, Filter & Sort Controls */}
-                        <div className='flex flex-wrap gap-3 items-center'>
+                        {/* Filters Row - Compact */}
+                        <div className='flex flex-wrap gap-2 items-center text-xs'>
                             {/* View Mode Toggle */}
-                            <div className='flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1'>
+                            <div className='flex bg-gray-100 dark:bg-gray-900 rounded p-0.5'>
                                 <button
                                     onClick={() => setViewMode('grid')}
-                                    className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
+                                    className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
                                     title='Grid view'
                                 >
-                                    <Grid3x3 className='w-4 h-4' />
+                                    <Grid3x3 className='w-3.5 h-3.5' />
                                 </button>
                                 <button
                                     onClick={() => setViewMode('table')}
-                                    className={`p-2 rounded ${viewMode === 'table' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
+                                    className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
                                     title='Table view'
                                 >
-                                    <List className='w-4 h-4' />
+                                    <List className='w-3.5 h-3.5' />
                                 </button>
                             </div>
 
@@ -392,7 +363,7 @@ const Payments = () => {
                                 onChange={(e) =>
                                     setFilterStatus(e.target.value)
                                 }
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
+                                className='px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white'
                             >
                                 <option value=''>All Statuses</option>
                                 <option value='captured'>Captured</option>
@@ -408,7 +379,7 @@ const Payments = () => {
                                     setTimeFilter(e.target.value);
                                     setPage(1);
                                 }}
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
+                                className='px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white'
                             >
                                 <option value=''>All Time</option>
                                 <option value='last24h'>Last 24 Hours</option>
@@ -423,7 +394,7 @@ const Payments = () => {
                             <select
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value)}
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
+                                className='px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white'
                             >
                                 <option value='createdAt'>Sort by Date</option>
                                 <option value='amount'>Sort by Amount</option>
@@ -436,7 +407,7 @@ const Payments = () => {
                                         sortOrder === 'asc' ? 'desc' : 'asc',
                                     )
                                 }
-                                className='p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
+                                className='p-1.5 border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors'
                                 title={
                                     sortOrder === 'asc'
                                         ? 'Ascending'
@@ -444,9 +415,9 @@ const Payments = () => {
                                 }
                             >
                                 {sortOrder === 'asc' ? (
-                                    <SortAsc className='w-4 h-4' />
+                                    <SortAsc className='w-3.5 h-3.5' />
                                 ) : (
-                                    <SortDesc className='w-4 h-4' />
+                                    <SortDesc className='w-3.5 h-3.5' />
                                 )}
                             </button>
 
@@ -459,10 +430,10 @@ const Payments = () => {
                                         setTimeFilter('');
                                         setPage(1);
                                     }}
-                                    className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium'
+                                    className='flex items-center gap-1 px-2 py-1.5 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors'
                                 >
-                                    <X className='w-4 h-4' />
-                                    Clear Filters
+                                    <X className='w-3 h-3' />
+                                    Clear
                                 </button>
                             )}
                         </div>
@@ -470,112 +441,91 @@ const Payments = () => {
 
                     {/* Error Message */}
                     {error && (
-                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8'>
-                            <div className='flex items-center'>
-                                <span>{error}</span>
-                            </div>
+                        <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded text-sm mb-3'>
+                            {error}
                         </div>
                     )}
 
                     {/* Payments Display */}
                     {currentPayments.length > 0 ? (
                         <>
-                            {/* Grid View */}
+                            {/* Compact Grid View */}
                             {viewMode === 'grid' && (
-                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6'>
+                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mb-3'>
                                     {currentPayments.map((payment) => (
                                         <div
                                             key={payment._id}
-                                            className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow'
+                                            className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 hover:border-gray-300 dark:hover:border-gray-600 transition-colors cursor-pointer'
+                                            onClick={() =>
+                                                navigate(
+                                                    `/reports/payments/${payment._id}`,
+                                                )
+                                            }
                                         >
-                                            {/* Status and Provider Badges */}
-                                            <div className='flex justify-between items-start mb-3'>
+                                            {/* Status and Provider */}
+                                            <div className='flex justify-between items-start mb-2'>
                                                 <span
-                                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(payment.status)}`}
+                                                    className={`px-1.5 py-0.5 text-xs rounded ${getStatusColor(payment.status)}`}
                                                 >
                                                     {payment.status}
                                                 </span>
-                                                <span
-                                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${getProviderColor(payment.provider)}`}
-                                                >
+                                                <span className='text-xs text-gray-500 dark:text-gray-400'>
                                                     {payment.provider || 'N/A'}
                                                 </span>
                                             </div>
 
                                             {/* User Info */}
-                                            <div className='flex items-start gap-2 mb-3'>
-                                                <User className='w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0' />
-                                                <div className='min-w-0 flex-1'>
-                                                    <div className='text-sm font-medium text-gray-900 dark:text-white truncate'>
-                                                        {payment.user
-                                                            ?.username || 'N/A'}
-                                                    </div>
-                                                    <div className='text-xs text-gray-500 dark:text-gray-400 truncate'>
-                                                        {payment.user?.email ||
-                                                            'N/A'}
-                                                    </div>
+                                            <div className='mb-2'>
+                                                <div className='text-sm font-medium text-gray-900 dark:text-white truncate'>
+                                                    {payment.user?.username ||
+                                                        'N/A'}
+                                                </div>
+                                                <div className='text-xs text-gray-500 dark:text-gray-400 truncate'>
+                                                    {payment.user?.email ||
+                                                        'N/A'}
                                                 </div>
                                             </div>
 
                                             {/* Amount */}
-                                            <div className='mb-3'>
-                                                <div className='text-2xl font-bold text-gray-900 dark:text-white'>
-                                                    {payment.currency || 'INR'}{' '}
-                                                    {payment.amount || 0}
-                                                </div>
+                                            <div className='text-lg font-semibold text-gray-900 dark:text-white mb-1'>
+                                                {payment.currency || 'INR'}{' '}
+                                                {payment.amount || 0}
                                             </div>
 
                                             {/* Date */}
-                                            <div className='flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-4'>
-                                                <Calendar className='w-4 h-4' />
+                                            <div className='text-xs text-gray-500 dark:text-gray-400'>
                                                 {payment.createdAt
                                                     ? new Date(
                                                           payment.createdAt,
                                                       ).toLocaleDateString()
                                                     : 'N/A'}
                                             </div>
-
-                                            {/* View Button */}
-                                            <button
-                                                onClick={() =>
-                                                    navigate(
-                                                        `/reports/payments/${payment._id}`,
-                                                    )
-                                                }
-                                                className='w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors'
-                                            >
-                                                <Eye className='w-4 h-4' />
-                                                View Details
-                                            </button>
                                         </div>
                                     ))}
                                 </div>
                             )}
 
-                            {/* Table View */}
+                            {/* Compact Table View */}
                             {viewMode === 'table' && (
-                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6'>
+                                <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden mb-3'>
                                     <div className='overflow-x-auto'>
                                         <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                            <thead className='bg-gray-50 dark:bg-gray-700'>
+                                            <thead className='bg-gray-50 dark:bg-gray-900'>
                                                 <tr>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
                                                         User
                                                     </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
                                                         Provider
                                                     </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
                                                         Amount
                                                     </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
                                                         Status
                                                     </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
                                                         Date
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Action
                                                     </th>
                                                 </tr>
                                             </thead>
@@ -584,65 +534,54 @@ const Payments = () => {
                                                     (payment) => (
                                                         <tr
                                                             key={payment._id}
-                                                            className='hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                            onClick={() =>
+                                                                navigate(
+                                                                    `/reports/payments/${payment._id}`,
+                                                                )
+                                                            }
+                                                            className='hover:bg-gray-50 dark:hover:bg-gray-900'
                                                         >
-                                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                                <div>
-                                                                    <div className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                                        {payment
-                                                                            .user
-                                                                            ?.username ||
-                                                                            'N/A'}
-                                                                    </div>
-                                                                    <div className='text-sm text-gray-500 dark:text-gray-400'>
-                                                                        {payment
-                                                                            .user
-                                                                            ?.email ||
-                                                                            'N/A'}
-                                                                    </div>
+                                                            <td className='px-3 py-2 whitespace-nowrap'>
+                                                                <div className='text-sm font-medium text-gray-900 dark:text-white'>
+                                                                    {payment
+                                                                        .user
+                                                                        ?.username ||
+                                                                        'N/A'}
+                                                                </div>
+                                                                <div className='text-xs text-gray-500 dark:text-gray-400'>
+                                                                    {payment
+                                                                        .user
+                                                                        ?.email ||
+                                                                        'N/A'}
                                                                 </div>
                                                             </td>
-                                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                                <span
-                                                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${getProviderColor(payment.provider)}`}
-                                                                >
+                                                            <td className='px-3 py-2 whitespace-nowrap'>
+                                                                <span className='text-xs text-gray-600 dark:text-gray-400'>
                                                                     {payment.provider ||
                                                                         'N/A'}
                                                                 </span>
                                                             </td>
-                                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                            <td className='px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white'>
                                                                 {payment.currency ||
                                                                     'INR'}{' '}
                                                                 {payment.amount ||
                                                                     0}
                                                             </td>
-                                                            <td className='px-6 py-4 whitespace-nowrap'>
+                                                            <td className='px-3 py-2 whitespace-nowrap'>
                                                                 <span
-                                                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(payment.status)}`}
+                                                                    className={`px-1.5 py-0.5 text-xs rounded ${getStatusColor(payment.status)}`}
                                                                 >
                                                                     {
                                                                         payment.status
                                                                     }
                                                                 </span>
                                                             </td>
-                                                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                            <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400'>
                                                                 {payment.createdAt
                                                                     ? new Date(
                                                                           payment.createdAt,
                                                                       ).toLocaleDateString()
                                                                     : 'N/A'}
-                                                            </td>
-                                                            <td className='px-6 py-4 whitespace-nowrap text-sm font-medium'>
-                                                                <button
-                                                                    onClick={() =>
-                                                                        navigate(
-                                                                            `/reports/payments/${payment._id}`,
-                                                                        )
-                                                                    }
-                                                                    className='text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300'
-                                                                >
-                                                                    <Eye className='w-4 h-4' />
-                                                                </button>
                                                             </td>
                                                         </tr>
                                                     ),
@@ -653,9 +592,9 @@ const Payments = () => {
                                 </div>
                             )}
 
-                            {/* Pagination */}
+                            {/* Compact Pagination */}
                             {totalItems > 0 && (
-                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 px-4 py-3'>
+                                <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 px-3 py-2'>
                                     <Pagination
                                         currentPage={page}
                                         pageSize={pageSize}
@@ -670,12 +609,12 @@ const Payments = () => {
                             )}
                         </>
                     ) : (
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-center p-12'>
-                            <CreditCard className='w-16 h-16 mx-auto text-gray-400 mb-4' />
-                            <h3 className='text-xl font-medium text-gray-900 dark:text-white mb-2'>
+                        <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-center py-12'>
+                            <CreditCard className='w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3' />
+                            <h3 className='text-sm font-medium text-gray-900 dark:text-white mb-1'>
                                 No Payments Found
                             </h3>
-                            <p className='text-gray-600 dark:text-gray-400'>
+                            <p className='text-xs text-gray-500 dark:text-gray-400'>
                                 No payments match your current filters.
                             </p>
                         </div>

@@ -6,7 +6,7 @@ import { useSidebarLayout } from '../../hooks/useSidebarLayout';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import {
-    ArrowLeft,
+    ChevronLeft,
     CreditCard,
     CheckCircle2,
     XCircle,
@@ -163,56 +163,45 @@ const PaymentDetail = () => {
             <Header />
             <Sidebar />
             <main
-                className={`py-8 ${mainContentMargin} transition-all duration-300`}
+                className={`py-4 ${mainContentMargin} transition-all duration-300`}
             >
-                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-                    {/* Navigation */}
-                    <nav className='flex mb-8' aria-label='Breadcrumb'>
-                        <ol className='flex items-center space-x-4'>
-                            <li>
-                                <div>
-                                    <button
-                                        onClick={() => navigate(-1)}
-                                        className='text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors'
-                                    >
-                                        <ArrowLeft
-                                            className='flex-shrink-0 h-5 w-5'
-                                            aria-hidden='true'
-                                        />
-                                        <span className='sr-only'>Back</span>
-                                    </button>
-                                </div>
-                            </li>
-                        </ol>
-                    </nav>
+                <div className='max-w-7xl mx-auto px-4 sm:px-6'>
+                    {/* Compact Navigation */}
+                    <div className='flex items-center gap-3 mb-4'>
+                        <button
+                            onClick={() => navigate(-1)}
+                            className='p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors'
+                        >
+                            <ChevronLeft className='w-4 h-4' />
+                        </button>
+                        <div className='flex items-center gap-2'>
+                            <CreditCard className='w-4 h-4 text-gray-400' />
+                            <h1 className='text-lg font-semibold text-gray-900 dark:text-white'>
+                                Payment Details
+                            </h1>
+                        </div>
+                    </div>
 
-                    {/* Header */}
-                    <div className='md:flex md:items-center md:justify-between mb-8'>
-                        <div className='flex-1 min-w-0'>
-                            <div className='flex items-center'>
+                    {/* Compact Header */}
+                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3'>
+                        <div className='flex items-center justify-between'>
+                            <div className='flex items-center gap-2'>
                                 <span
-                                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mr-4 ${
+                                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${
                                         payment.status === 'captured'
                                             ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                                             : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
                                     }`}
                                 >
-                                    <StatusIcon className='w-4 h-4 mr-1.5' />
+                                    <StatusIcon className='w-3 h-3 mr-1' />
                                     {payment.status}
                                 </span>
-                                <span className='text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1'>
-                                    <CalendarDays className='w-4 h-4' />
+                                <span className='text-xs text-gray-500 dark:text-gray-400'>
                                     {new Date(
                                         payment.createdAt,
                                     ).toLocaleDateString()}
                                 </span>
                             </div>
-                            <h2 className='mt-2 text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl sm:truncate'>
-                                {payment.currency || 'INR'}{' '}
-                                {payment.amount?.toLocaleString() || 0}
-                            </h2>
-                        </div>
-                        <div className='mt-4 flex-shrink-0 flex md:mt-0 md:ml-4 space-x-3'>
                             <button
                                 type='button'
                                 onClick={() =>
@@ -222,64 +211,70 @@ const PaymentDetail = () => {
                                             : 'formatted',
                                     )
                                 }
-                                className='inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors'
+                                className='inline-flex items-center px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors'
                             >
                                 {viewMode === 'formatted' ? (
                                     <>
-                                        <Code className='-ml-1 mr-2 h-4 w-4 text-gray-500 dark:text-gray-400' />
-                                        Raw Data
+                                        <Code className='mr-1 h-3 w-3' />
+                                        Raw
                                     </>
                                 ) : (
                                     <>
-                                        <Eye className='-ml-1 mr-2 h-4 w-4 text-gray-500 dark:text-gray-400' />
-                                        Formatted View
+                                        <Eye className='mr-1 h-3 w-3' />
+                                        Formatted
                                     </>
                                 )}
                             </button>
                         </div>
+                        <div className='mt-2'>
+                            <div className='text-lg font-semibold text-gray-900 dark:text-white'>
+                                {payment.currency || 'INR'}{' '}
+                                {payment.amount?.toLocaleString() || 0}
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Content */}
-                    <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
+                    {/* Compact Content */}
+                    <div className='grid grid-cols-1 lg:grid-cols-3 gap-3'>
                         {/* Main Info (Left Column) */}
-                        <div className='lg:col-span-2 space-y-6'>
+                        <div className='lg:col-span-2 space-y-3'>
                             {viewMode === 'formatted' ? (
                                 <>
                                     {/* Transaction Info */}
-                                    <div className='bg-white dark:bg-gray-800 shadow rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                        <div className='px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700'>
-                                            <h3 className='text-lg leading-6 font-medium text-gray-900 dark:text-white flex items-center gap-2'>
-                                                <CreditCard className='w-5 h-5 text-indigo-500' />
+                                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                                        <div className='px-3 py-2 border-b border-gray-200 dark:border-gray-700'>
+                                            <h3 className='text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1.5'>
+                                                <CreditCard className='w-3.5 h-3.5 text-gray-400' />
                                                 Transaction Details
                                             </h3>
                                         </div>
-                                        <div className='px-4 py-5 sm:p-6'>
-                                            <dl className='grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6'>
+                                        <div className='px-3 py-2'>
+                                            <dl className='grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2'>
                                                 <div>
-                                                    <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2'>
-                                                        <Wallet className='w-4 h-4' />
+                                                    <dt className='text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1'>
+                                                        <Wallet className='w-3 h-3' />
                                                         Provider
                                                     </dt>
-                                                    <dd className='mt-1 text-base text-gray-900 dark:text-white'>
+                                                    <dd className='mt-0.5 text-sm text-gray-900 dark:text-white'>
                                                         {payment.provider ||
                                                             'N/A'}
                                                     </dd>
                                                 </div>
                                                 <div>
-                                                    <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2'>
-                                                        <Hash className='w-4 h-4' />
+                                                    <dt className='text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1'>
+                                                        <Hash className='w-3 h-3' />
                                                         Payment ID
                                                     </dt>
-                                                    <dd className='mt-1 font-mono text-gray-900 dark:text-white break-all text-xs sm:text-sm'>
+                                                    <dd className='mt-0.5 font-mono text-gray-900 dark:text-white break-all text-xs'>
                                                         {payment._id}
                                                     </dd>
                                                 </div>
                                                 <div className='sm:col-span-2'>
-                                                    <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2'>
-                                                        <Hash className='w-4 h-4' />
+                                                    <dt className='text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1'>
+                                                        <Hash className='w-3 h-3' />
                                                         Merchant Order ID
                                                     </dt>
-                                                    <dd className='mt-1 font-mono text-gray-900 dark:text-white break-all text-xs sm:text-sm'>
+                                                    <dd className='mt-0.5 font-mono text-gray-900 dark:text-white break-all text-xs'>
                                                         {payment.merchantOrderId ||
                                                             'N/A'}
                                                     </dd>
@@ -287,7 +282,7 @@ const PaymentDetail = () => {
                                                 {payment.gatewayResponse
                                                     ?.state && (
                                                     <div className='sm:col-span-2'>
-                                                        <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2'>
+                                                        <dt className='text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1'>
                                                             <AlertTriangle className='w-4 h-4' />
                                                             Gateway Status
                                                         </dt>
@@ -316,7 +311,7 @@ const PaymentDetail = () => {
                                                     payment.orderId?.metadata
                                                         ?.returnUrl) && (
                                                     <div className='sm:col-span-2'>
-                                                        <dt className='text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2'>
+                                                        <dt className='text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1'>
                                                             <LinkIcon className='w-4 h-4' />
                                                             Links
                                                         </dt>
@@ -348,14 +343,14 @@ const PaymentDetail = () => {
 
                                     {/* Purchased Item */}
                                     {payment.orderId?.resourceId && (
-                                        <div className='bg-white dark:bg-gray-800 shadow rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                                        <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden'>
                                             <div className='px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700'>
                                                 <h3 className='text-lg leading-6 font-medium text-gray-900 dark:text-white flex items-center gap-2'>
-                                                    <ShoppingBag className='w-5 h-5 text-indigo-500' />
+                                                    <ShoppingBag className='w-3.5 h-3.5 text-gray-400' />
                                                     Purchased Item
                                                 </h3>
                                             </div>
-                                            <div className='px-4 py-5 sm:p-6'>
+                                            <div className='px-3 py-2'>
                                                 <div className='flex items-center gap-4'>
                                                     <div className='h-12 w-12 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400'>
                                                         <ShoppingBag className='w-6 h-6' />
@@ -380,15 +375,15 @@ const PaymentDetail = () => {
                                     )}
                                 </>
                             ) : (
-                                <div className='bg-white dark:bg-gray-800 shadow rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                    <div className='px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700'>
-                                        <h3 className='text-lg leading-6 font-medium text-gray-900 dark:text-white flex items-center gap-2'>
-                                            <Code className='w-5 h-5 text-indigo-500' />
+                                <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                                    <div className='px-3 py-2 border-b border-gray-200 dark:border-gray-700'>
+                                        <h3 className='text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1.5'>
+                                            <Code className='w-3.5 h-3.5 text-gray-400' />
                                             Raw JSON Data
                                         </h3>
                                     </div>
-                                    <div className='px-4 py-5 sm:p-6'>
-                                        <pre className='bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-sm font-mono'>
+                                    <div className='px-3 py-2'>
+                                        <pre className='bg-gray-900 text-green-400 p-2 rounded overflow-x-auto text-xs font-mono'>
                                             {JSON.stringify(payment, null, 2)}
                                         </pre>
                                     </div>
@@ -396,20 +391,20 @@ const PaymentDetail = () => {
                             )}
                         </div>
 
-                        {/* Details (Right Column) */}
-                        <div className='space-y-6'>
+                        {/* Compact Details (Right Column) */}
+                        <div className='space-y-3'>
                             {/* User Info */}
-                            <div className='bg-white dark:bg-gray-800 shadow rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                <div className='px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700'>
-                                    <h3 className='text-lg leading-6 font-medium text-gray-900 dark:text-white flex items-center gap-2'>
-                                        <User2 className='w-5 h-5 text-indigo-500' />
+                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                                <div className='px-3 py-2 border-b border-gray-200 dark:border-gray-700'>
+                                    <h3 className='text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1.5'>
+                                        <User2 className='w-3.5 h-3.5 text-gray-400' />
                                         User Details
                                     </h3>
                                 </div>
-                                <div className='px-4 py-5 sm:p-6'>
-                                    <div className='flex items-center gap-4'>
-                                        <div className='h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-300'>
-                                            <span className='text-sm font-bold'>
+                                <div className='px-3 py-2'>
+                                    <div className='flex items-center gap-2'>
+                                        <div className='h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-300'>
+                                            <span className='text-xs font-bold'>
                                                 {payment.user?.username?.[0]?.toUpperCase() ||
                                                     'U'}
                                             </span>
@@ -420,7 +415,7 @@ const PaymentDetail = () => {
                                                     payment.user?.name ||
                                                     'Unknown User'}
                                             </p>
-                                            <p className='text-sm text-gray-500 dark:text-gray-400 truncate'>
+                                            <p className='text-xs text-gray-500 dark:text-gray-400 truncate'>
                                                 {payment.user?.email || 'N/A'}
                                             </p>
                                         </div>
@@ -429,21 +424,21 @@ const PaymentDetail = () => {
                             </div>
 
                             {/* Order Info */}
-                            <div className='bg-white dark:bg-gray-800 shadow rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                <div className='px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700'>
-                                    <h3 className='text-lg leading-6 font-medium text-gray-900 dark:text-white flex items-center gap-2'>
-                                        <ShoppingBag className='w-5 h-5 text-indigo-500' />
+                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                                <div className='px-3 py-2 border-b border-gray-200 dark:border-gray-700'>
+                                    <h3 className='text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1.5'>
+                                        <ShoppingBag className='w-3.5 h-3.5 text-gray-400' />
                                         Order Details
                                     </h3>
                                 </div>
-                                <div className='px-4 py-5 sm:p-0'>
+                                <div className='px-3 py-2'>
                                     {payment.orderId ? (
                                         <dl>
-                                            <div className='py-4 sm:py-5 grid grid-cols-2 gap-4 px-6 border-b border-gray-200 dark:border-gray-700'>
-                                                <dt className='text-sm font-medium text-gray-500 dark:text-gray-400'>
+                                            <div className='py-2 grid grid-cols-2 gap-2 border-b border-gray-200 dark:border-gray-700'>
+                                                <dt className='text-xs font-medium text-gray-500 dark:text-gray-400'>
                                                     Status
                                                 </dt>
-                                                <dd className='text-sm text-gray-900 dark:text-white text-right'>
+                                                <dd className='text-xs text-gray-900 dark:text-white text-right'>
                                                     <Badge
                                                         color={
                                                             payment.orderId
@@ -457,16 +452,16 @@ const PaymentDetail = () => {
                                                     </Badge>
                                                 </dd>
                                             </div>
-                                            <div className='py-4 sm:py-5 grid grid-cols-2 gap-4 px-6 border-b border-gray-200 dark:border-gray-700'>
-                                                <dt className='text-sm font-medium text-gray-500 dark:text-gray-400'>
+                                            <div className='py-2 grid grid-cols-2 gap-2 border-b border-gray-200 dark:border-gray-700'>
+                                                <dt className='text-xs font-medium text-gray-500 dark:text-gray-400'>
                                                     Type
                                                 </dt>
                                                 <dd className='text-sm text-gray-900 dark:text-white text-right capitalize'>
                                                     {payment.orderId.orderType}
                                                 </dd>
                                             </div>
-                                            <div className='py-4 sm:py-5 grid grid-cols-2 gap-4 px-6 border-b border-gray-200 dark:border-gray-700'>
-                                                <dt className='text-sm font-medium text-gray-500 dark:text-gray-400'>
+                                            <div className='py-2 grid grid-cols-2 gap-2 border-b border-gray-200 dark:border-gray-700'>
+                                                <dt className='text-xs font-medium text-gray-500 dark:text-gray-400'>
                                                     Method
                                                 </dt>
                                                 <dd className='text-sm text-gray-900 dark:text-white text-right font-medium'>
@@ -476,11 +471,11 @@ const PaymentDetail = () => {
                                                     }
                                                 </dd>
                                             </div>
-                                            <div className='py-4 sm:py-5 grid grid-cols-2 gap-4 px-6'>
-                                                <dt className='text-sm font-medium text-gray-500 dark:text-gray-400'>
+                                            <div className='py-2 grid grid-cols-2 gap-2'>
+                                                <dt className='text-xs font-medium text-gray-500 dark:text-gray-400'>
                                                     Order Created
                                                 </dt>
-                                                <dd className='text-sm text-gray-900 dark:text-white text-right'>
+                                                <dd className='text-xs text-gray-900 dark:text-white text-right'>
                                                     {payment.orderId.createdAt
                                                         ? new Date(
                                                               payment.orderId.createdAt,
