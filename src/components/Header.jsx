@@ -13,6 +13,7 @@ import {
     Moon,
     BarChart2,
     Bell,
+    CheckSquare,
 } from 'lucide-react';
 
 const Header = () => {
@@ -39,6 +40,7 @@ const Header = () => {
         { path: '/reports', label: 'Reports', icon: BarChart2 },
         { path: '/analytics', label: 'Analytics', icon: BarChart3 },
         { path: '/notifications', label: 'Notifications', icon: Bell },
+        { path: '/tasks', label: 'Tasks', icon: CheckSquare },
     ];
 
     const getRoleColor = (role) => {
@@ -72,7 +74,7 @@ const Header = () => {
                         {shouldShowSidebar && (
                             <button
                                 onClick={toggleMobileSidebar}
-                                className='md:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 mr-2'
+                                className='lg:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 mr-2'
                                 aria-label='Toggle sidebar'
                             >
                                 <Menu className='w-6 h-6' />
@@ -83,7 +85,7 @@ const Header = () => {
                             <GraduationCap className='h-8 w-8 text-blue-600 dark:text-blue-400' />
                             <h1 className='ml-2 text-xl sm:text-2xl font-bold text-gray-900 dark:text-white'>
                                 <span className='hidden sm:inline'>
-                                    Student Senior
+                                    SS Admin
                                 </span>
                                 <span className='sm:hidden'>SS Admin</span>
                             </h1>
@@ -91,7 +93,7 @@ const Header = () => {
                     </div>
 
                     {/* Desktop Navigation */}
-                    <nav className='hidden md:flex items-center space-x-4'>
+                    <nav className='hidden lg:flex items-center space-x-4'>
                         {navigationItems.map((item) => {
                             const Icon = item.icon;
                             return (
@@ -112,7 +114,7 @@ const Header = () => {
                     </nav>
 
                     {/* Right side - User info, theme toggle, logout */}
-                    <div className='hidden md:flex items-center space-x-4'>
+                    <div className='hidden lg:flex items-center space-x-4'>
                         {/* Theme Toggle */}
                         <button
                             onClick={toggleDarkMode}

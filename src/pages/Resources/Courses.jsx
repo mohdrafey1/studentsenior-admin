@@ -8,11 +8,8 @@ import toast from 'react-hot-toast';
 import {
     GraduationCap,
     ArrowLeft,
-    Loader,
     Search,
     Plus,
-    Edit2,
-    Trash2,
     X,
     Grid3x3,
     List,
@@ -23,6 +20,8 @@ import {
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import { Link } from 'react-router-dom';
+import Loader from '../../components/Common/Loader';
+import BackButton from '../../components/Common/BackButton';
 
 const Courses = () => {
     const [courses, setCourses] = useState([]);
@@ -241,22 +240,7 @@ const Courses = () => {
     const current = filteredAndSorted.slice(start, start + pageSize);
 
     if (loading) {
-        return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div
-                    className={`flex items-center justify-center py-20 ${mainContentMargin} transition-all duration-300`}
-                >
-                    <div className='flex items-center space-x-2'>
-                        <Loader className='w-6 h-6 animate-spin text-blue-600' />
-                        <span className='text-gray-600 dark:text-gray-400'>
-                            Loading courses...
-                        </span>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Loader />;
     }
 
     return (
@@ -268,36 +252,7 @@ const Courses = () => {
             >
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
                     {/* Header */}
-                    <div className='flex items-center justify-between mb-8'>
-                        <div className='flex items-center'>
-                            <button
-                                onClick={() => navigate('/reports')}
-                                className='mr-4 p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors'
-                            >
-                                <ArrowLeft className='w-5 h-5' />
-                            </button>
-                            <div className='flex items-center'>
-                                <div className='bg-emerald-600 text-white p-3 rounded-lg mr-4'>
-                                    <GraduationCap className='w-6 h-6' />
-                                </div>
-                                <div>
-                                    <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                        Courses
-                                    </h1>
-                                    <p className='text-gray-600 dark:text-gray-400 mt-1'>
-                                        Manage course offerings
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => setShowModal(true)}
-                            className='inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors'
-                        >
-                            <Plus className='w-4 h-4 mr-2' />
-                            Add Course
-                        </button>
-                    </div>
+                    <BackButton title='Courses' TitleIcon={GraduationCap} />
 
                     {/* Search, View & Sort */}
                     <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6'>

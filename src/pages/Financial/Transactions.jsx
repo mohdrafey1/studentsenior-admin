@@ -5,21 +5,15 @@ import Sidebar from '../../components/Sidebar';
 import { useSidebarLayout } from '../../hooks/useSidebarLayout';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
+import { BarChart3 } from 'lucide-react';
+import FilterBar from '../../components/Common/FilterBar';
 import {
-    BarChart3,
-    ArrowLeft,
-    Loader,
-    Search,
-    Grid3x3,
-    List,
-    SortAsc,
-    SortDesc,
-    User,
-    Calendar,
-    Clock,
-    X,
-} from 'lucide-react';
+    filterByTime,
+    getTimeFilterLabel,
+} from '../../components/Common/timeFilterUtils';
 import Pagination from '../../components/Pagination';
+import BackButton from '../../components/Common/BackButton';
+import Loader from '../../components/Common/Loader';
 
 const Transactions = () => {
     const [items, setItems] = useState([]);
@@ -29,7 +23,7 @@ const Transactions = () => {
     // Filters
     const [type, setType] = useState(''); // credit | debit
     const [resourceType, setResourceType] = useState(''); // e.g., pyq, notes
-    const [timeFilter, setTimeFilter] = useState(''); // last24h, last7d, last28d, thisWeek, thisMonth, thisYear, all
+    const [timeFilter, setTimeFilter] = useState('all');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(12);
     const [sortBy, setSortBy] = useState('createdAt'); // createdAt | amount
@@ -124,73 +118,6 @@ const Transactions = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Helper to get readable time filter label
-    const getTimeFilterLabel = (filter) => {
-        switch (filter) {
-            case 'last24h':
-                return 'Last 24 Hours';
-            case 'last7d':
-                return 'Last 7 Days';
-            case 'last28d':
-                return 'Last 28 Days';
-            case 'thisWeek':
-                return 'This Week';
-            case 'thisMonth':
-                return 'This Month';
-            case 'thisYear':
-                return 'This Year';
-            default:
-                return 'All Time';
-        }
-    };
-
-    // Helper function to filter by time
-    const filterByTime = (item, filter) => {
-        if (!filter) return true;
-        const itemDate = new Date(item.createdAt);
-        const now = new Date();
-
-        switch (filter) {
-            case 'last24h': {
-                const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                return itemDate >= last24h;
-            }
-            case 'last7d': {
-                const last7d = new Date(
-                    now.getTime() - 7 * 24 * 60 * 60 * 1000,
-                );
-                return itemDate >= last7d;
-            }
-            case 'last28d': {
-                const last28d = new Date(
-                    now.getTime() - 28 * 24 * 60 * 60 * 1000,
-                );
-                return itemDate >= last28d;
-            }
-            case 'thisWeek': {
-                const startOfWeek = new Date(now);
-                startOfWeek.setDate(now.getDate() - now.getDay());
-                startOfWeek.setHours(0, 0, 0, 0);
-                return itemDate >= startOfWeek;
-            }
-            case 'thisMonth': {
-                const startOfMonth = new Date(
-                    now.getFullYear(),
-                    now.getMonth(),
-                    1,
-                );
-                return itemDate >= startOfMonth;
-            }
-            case 'thisYear': {
-                const startOfYear = new Date(now.getFullYear(), 0, 1);
-                return itemDate >= startOfYear;
-            }
-            case 'all':
-            default:
-                return true;
-        }
-    };
-
     const filteredAndSorted = useMemo(() => {
         const q = search.trim().toLowerCase();
         let list = items.filter((t) => {
@@ -263,22 +190,7 @@ const Transactions = () => {
         'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300';
 
     if (loading) {
-        return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div
-                    className={`flex items-center justify-center py-20 ${mainContentMargin} transition-all duration-300`}
-                >
-                    <div className='flex items-center space-x-2'>
-                        <Loader className='w-6 h-6 animate-spin text-blue-600' />
-                        <span className='text-gray-600 dark:text-gray-400'>
-                            Loading transactions...
-                        </span>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Loader />;
     }
 
     return (
@@ -286,189 +198,108 @@ const Transactions = () => {
             <Header />
             <Sidebar />
             <main
-                className={`pt-6 pb-12 ${mainContentMargin} transition-all duration-300`}
+                className={`py-4 ${mainContentMargin} transition-all duration-300`}
             >
-                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-                    <div className='flex items-center mb-8'>
-                        <button
-                            onClick={() => navigate('/reports')}
-                            className='mr-4 p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors'
-                        >
-                            <ArrowLeft className='w-5 h-5' />
-                        </button>
-                        <div className='flex items-center'>
-                            <div className='bg-blue-600 text-white p-3 rounded-lg mr-4'>
-                                <BarChart3 className='w-6 h-6' />
-                            </div>
-                            <div>
-                                <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                    Transactions
-                                </h1>
-                                <p className='text-gray-600 dark:text-gray-400 mt-1'>
-                                    All platform transactions
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                <div className='max-w-7xl mx-auto px-4 sm:px-6'>
+                    {/* Compact Header */}
+                    <BackButton title='Transactions' TitleIcon={BarChart3} />
 
-                    {/* Search, Filters, View & Sort */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6'>
-                        {/* Total Amount Display */}
+                    {/* Compact Filters */}
+                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
+                        {/* Total Amount - Compact */}
                         {timeFilter && (
-                            <div className='mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg'>
-                                <div className='flex items-center justify-between'>
-                                    <div className='flex items-center gap-2'>
-                                        <Clock className='w-5 h-5 text-blue-600 dark:text-blue-400' />
-                                        <span className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                                            Total Amount (
-                                            {getTimeFilterLabel(timeFilter)}):
-                                        </span>
-                                    </div>
-                                    <span className='text-xl font-bold text-blue-600 dark:text-blue-400'>
-                                        {totalAmount} points
-                                    </span>
-                                </div>
+                            <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
+                                <span className='text-gray-600 dark:text-gray-400'>
+                                    Total ({getTimeFilterLabel(timeFilter)}):
+                                </span>
+                                <span className='font-semibold text-gray-900 dark:text-white'>
+                                    {totalAmount} pts / ₹
+                                    {(totalAmount / 5).toFixed(2)}
+                                </span>
                             </div>
                         )}
-                        {/* Search */}
-                        <div className='relative mb-4'>
-                            <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5' />
-                            <input
-                                type='text'
-                                placeholder='Search by user (email/name)'
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className='w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                            />
-                        </div>
-
-                        <div className='flex flex-wrap items-center gap-3'>
-                            {/* View toggle */}
-                            <div className='flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1'>
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
-                                    title='Grid view'
-                                >
-                                    <Grid3x3 className='w-4 h-4' />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('table')}
-                                    className={`p-2 rounded ${viewMode === 'table' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
-                                    title='Table view'
-                                >
-                                    <List className='w-4 h-4' />
-                                </button>
-                            </div>
-
-                            {/* Type filter */}
-                            <select
-                                value={type}
-                                onChange={(e) => setType(e.target.value)}
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
-                            >
-                                <option value=''>All Types</option>
-                                {uniqueTypes.map((t) => (
-                                    <option
-                                        key={t}
-                                        value={t}
-                                        className='capitalize'
-                                    >
-                                        {t}
-                                    </option>
-                                ))}
-                            </select>
-
-                            {/* Resource Type filter */}
-                            <select
-                                value={resourceType}
-                                onChange={(e) =>
-                                    setResourceType(e.target.value)
-                                }
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
-                            >
-                                <option value=''>All Resource Types</option>
-                                {uniqueResourceTypes.map((rt) => (
-                                    <option
-                                        key={rt}
-                                        value={rt}
-                                        className='capitalize'
-                                    >
-                                        {rt || '-'}
-                                    </option>
-                                ))}
-                            </select>
-
-                            {/* Time filter */}
-                            <select
-                                value={timeFilter}
-                                onChange={(e) => {
-                                    setTimeFilter(e.target.value);
+                        <FilterBar
+                            search={search}
+                            onSearch={setSearch}
+                            filters={[
+                                {
+                                    label: 'Type',
+                                    value: type,
+                                    onChange: setType,
+                                    options: [
+                                        { value: '', label: 'All Types' },
+                                        ...uniqueTypes.map((t) => ({
+                                            value: t,
+                                            label: t,
+                                        })),
+                                    ],
+                                },
+                                {
+                                    label: 'Resource Type',
+                                    value: resourceType,
+                                    onChange: setResourceType,
+                                    options: [
+                                        { value: '', label: 'All Resources' },
+                                        ...uniqueResourceTypes.map((rt) => ({
+                                            value: rt,
+                                            label: rt || '-',
+                                        })),
+                                    ],
+                                },
+                            ]}
+                            timeFilter={{
+                                value: timeFilter,
+                                onChange: (v) => {
+                                    setTimeFilter(v);
                                     setPage(1);
-                                }}
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
-                            >
-                                <option value=''>All Time</option>
-                                <option value='last24h'>Last 24 Hours</option>
-                                <option value='last7d'>Last 7 Days</option>
-                                <option value='last28d'>Last 28 Days</option>
-                                <option value='thisWeek'>This Week</option>
-                                <option value='thisMonth'>This Month</option>
-                                <option value='thisYear'>This Year</option>
-                            </select>
-
-                            {/* Sort By */}
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
-                            >
-                                <option value='createdAt'>Sort by Date</option>
-                                <option value='amount'>Sort by Amount</option>
-                            </select>
-
-                            {/* Sort Order */}
-                            <button
-                                onClick={() =>
+                                },
+                            }}
+                            sortBy={{
+                                value: sortBy,
+                                onChange: setSortBy,
+                                options: [
+                                    {
+                                        value: 'createdAt',
+                                        label: 'Sort by Date',
+                                    },
+                                    {
+                                        value: 'amount',
+                                        label: 'Sort by Amount',
+                                    },
+                                ],
+                            }}
+                            sortOrder={{
+                                value: sortOrder,
+                                onToggle: () =>
                                     setSortOrder(
                                         sortOrder === 'asc' ? 'desc' : 'asc',
-                                    )
-                                }
-                                className='p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
-                                title={
-                                    sortOrder === 'asc'
-                                        ? 'Ascending'
-                                        : 'Descending'
-                                }
-                            >
-                                {sortOrder === 'asc' ? (
-                                    <SortAsc className='w-4 h-4' />
-                                ) : (
-                                    <SortDesc className='w-4 h-4' />
-                                )}
-                            </button>
-
-                            {/* Clear Filters */}
-                            {(search || type || resourceType || timeFilter) && (
-                                <button
-                                    onClick={() => {
-                                        setSearch('');
-                                        setType('');
-                                        setResourceType('');
-                                        setTimeFilter('');
-                                        setPage(1);
-                                    }}
-                                    className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium'
-                                >
-                                    <X className='w-4 h-4' />
-                                    Clear Filters
-                                </button>
-                            )}
-                        </div>
+                                    ),
+                            }}
+                            viewMode={{
+                                value: viewMode,
+                                onChange: setViewMode,
+                            }}
+                            onClear={() => {
+                                setSearch('');
+                                setType('');
+                                setResourceType('');
+                                setTimeFilter('all');
+                                setPage(1);
+                            }}
+                            showClear={
+                                !!(
+                                    search ||
+                                    type ||
+                                    resourceType ||
+                                    (timeFilter && timeFilter !== 'all')
+                                )
+                            }
+                        />
                     </div>
 
+                    {/* Error */}
                     {error && (
-                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8'>
+                        <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded text-sm mb-3'>
                             {error}
                         </div>
                     )}
@@ -476,84 +307,74 @@ const Transactions = () => {
                     {/* Grid/Table Views */}
                     {current.length > 0 ? (
                         <>
-                            {/* Grid View */}
+                            {/* Compact Grid View */}
                             {viewMode === 'grid' && (
-                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6'>
+                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mb-3'>
                                     {current.map((t) => (
                                         <div
                                             key={t._id}
-                                            className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow'
+                                            className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 hover:border-gray-300 dark:hover:border-gray-600 transition-colors'
                                         >
-                                            <div className='flex justify-between items-start mb-3'>
+                                            <div className='flex justify-between items-start gap-1 mb-2'>
                                                 <span
-                                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${typeBadge(t.type)}`}
+                                                    className={`px-1.5 py-0.5 text-xs rounded ${typeBadge(t.type)}`}
                                                 >
                                                     {t.type || 'N/A'}
                                                 </span>
                                                 <span
-                                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${resTypeBadge(t.resourceType)}`}
+                                                    className={`px-1.5 py-0.5 text-xs rounded ${resTypeBadge(t.resourceType)}`}
                                                 >
                                                     {t.resourceType || '-'}
                                                 </span>
                                             </div>
-                                            <div className='flex items-start gap-2 mb-3'>
-                                                <User className='w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0' />
-                                                <div className='min-w-0'>
-                                                    <div className='text-sm font-medium text-gray-900 dark:text-white truncate'>
-                                                        {t.user?.username ||
-                                                            t.user?.name ||
-                                                            'N/A'}
-                                                    </div>
-                                                    <div className='text-xs text-gray-500 dark:text-gray-400 truncate'>
-                                                        {t.user?.email || 'N/A'}
-                                                    </div>
+                                            <div className='mb-2'>
+                                                <div className='text-sm font-medium text-gray-900 dark:text-white truncate'>
+                                                    {t.user?.username ||
+                                                        t.user?.name ||
+                                                        'N/A'}
+                                                </div>
+                                                <div className='text-xs text-gray-500 dark:text-gray-400 truncate'>
+                                                    {t.user?.email || 'N/A'}
                                                 </div>
                                             </div>
-                                            <div className='mb-3'>
-                                                <div className='text-2xl font-bold text-gray-900 dark:text-white'>
-                                                    {t.points || 0}
+                                            <div className='mb-1'>
+                                                <div className='text-lg font-semibold text-gray-900 dark:text-white'>
+                                                    {t.points || 0} pts
                                                 </div>
                                             </div>
-                                            <div className='flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2'>
-                                                <Calendar className='w-4 h-4' />
+                                            <div className='text-xs text-gray-500 dark:text-gray-400'>
                                                 {t.createdAt
                                                     ? new Date(
                                                           t.createdAt,
-                                                      ).toLocaleString()
+                                                      ).toLocaleDateString()
                                                     : 'N/A'}
-                                            </div>
-                                            <div className='text-xs text-gray-500 dark:text-gray-400 break-all'>
-                                                Ref: {t.reference || t._id}
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
 
-                            {/* Table View */}
+                            {/* Compact Table View */}
                             {viewMode === 'table' && (
-                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
+                                <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden mb-3'>
                                     <div className='overflow-x-auto'>
                                         <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                            <thead className='bg-gray-50 dark:bg-gray-700'>
+                                            <thead className='bg-gray-50 dark:bg-gray-900'>
                                                 <tr>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
                                                         User
                                                     </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
                                                         Type
                                                     </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
                                                         Amount
                                                     </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Res Type
+                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
+                                                        Resource
                                                     </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
                                                         Date
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Ref Id
                                                     </th>
                                                 </tr>
                                             </thead>
@@ -561,9 +382,9 @@ const Transactions = () => {
                                                 {current.map((t) => (
                                                     <tr
                                                         key={t._id}
-                                                        className='hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                        className='hover:bg-gray-50 dark:hover:bg-gray-900'
                                                     >
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
+                                                        <td className='px-3 py-2 whitespace-nowrap'>
                                                             <div className='text-sm font-medium text-gray-900 dark:text-white'>
                                                                 {t.user
                                                                     ?.username ||
@@ -571,32 +392,28 @@ const Transactions = () => {
                                                                         ?.name ||
                                                                     'N/A'}
                                                             </div>
-                                                            <div className='text-sm text-gray-500 dark:text-gray-400'>
+                                                            <div className='text-xs text-gray-500 dark:text-gray-400'>
                                                                 {t.user
                                                                     ?.email ||
                                                                     'N/A'}
                                                             </div>
                                                         </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white capitalize'>
+                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-900 dark:text-white capitalize'>
                                                             {t.type || 'N/A'}
                                                         </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            {t.points || 0}
+                                                        <td className='px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white'>
+                                                            {t.points || 0} pts
                                                         </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400'>
                                                             {t.resourceType ||
                                                                 '-'}
                                                         </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
+                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400'>
                                                             {t.createdAt
                                                                 ? new Date(
                                                                       t.createdAt,
-                                                                  ).toLocaleString()
+                                                                  ).toLocaleDateString()
                                                                 : 'N/A'}
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white break-all'>
-                                                            {t.reference ||
-                                                                t._id}
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -606,8 +423,8 @@ const Transactions = () => {
                                 </div>
                             )}
 
-                            {/* Pagination */}
-                            <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 px-4 py-3'>
+                            {/* Compact Pagination */}
+                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 px-3 py-2'>
                                 <Pagination
                                     currentPage={page}
                                     pageSize={pageSize}
@@ -621,12 +438,12 @@ const Transactions = () => {
                             </div>
                         </>
                     ) : (
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-center p-12'>
-                            <BarChart3 className='w-16 h-16 mx-auto text-gray-400 mb-4' />
-                            <h3 className='text-xl font-medium text-gray-900 dark:text-white mb-2'>
+                        <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-center py-12'>
+                            <BarChart3 className='w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3' />
+                            <h3 className='text-sm font-medium text-gray-900 dark:text-white mb-1'>
                                 No Transactions Found
                             </h3>
-                            <p className='text-gray-600 dark:text-gray-400'>
+                            <p className='text-xs text-gray-500 dark:text-gray-400'>
                                 No transactions match your current filters.
                             </p>
                         </div>

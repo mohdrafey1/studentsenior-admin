@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 import {
     User,
     ArrowLeft,
-    Loader,
     Mail,
     Phone,
     MapPin,
@@ -25,6 +24,7 @@ import {
     Search,
 } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
+import Loader from '../../components/Common/Loader';
 
 const UserDetail = () => {
     const [user, setUser] = useState(null);
@@ -209,19 +209,7 @@ const UserDetail = () => {
     };
 
     if (loading) {
-        return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <div className='flex items-center justify-center min-h-[60vh]'>
-                    <div className='text-center'>
-                        <Loader className='w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4' />
-                        <p className='text-gray-600 dark:text-gray-400'>
-                            Loading user details...
-                        </p>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Loader />;
     }
 
     if (error || !user) {

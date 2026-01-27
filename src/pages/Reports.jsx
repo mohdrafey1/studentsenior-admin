@@ -18,9 +18,8 @@ import {
     CreditCard,
     PhoneCall,
     AlertCircle,
-    Plus,
-    Loader,
 } from 'lucide-react';
+import Loader from '../components/Common/Loader';
 
 const Reports = () => {
     const [data, setData] = useState(null);
@@ -204,22 +203,7 @@ const Reports = () => {
     ];
 
     if (loading) {
-        return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div
-                    className={`flex items-center justify-center py-20 ${mainContentMargin} transition-all duration-300`}
-                >
-                    <div className='flex items-center space-x-2'>
-                        <Loader className='w-6 h-6 animate-spin text-blue-600' />
-                        <span className='text-gray-600 dark:text-gray-400'>
-                            Loading statistics...
-                        </span>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Loader />;
     }
 
     return (

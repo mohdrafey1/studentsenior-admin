@@ -35,6 +35,7 @@ const Contacts = lazy(() => import('./pages/Users/Contacts'));
 const Users = lazy(() => import('./pages/Users/Users'));
 const UserDetail = lazy(() => import('./pages/Users/UserDetail'));
 const DashboardUsers = lazy(() => import('./pages/Users/DashboardUsers'));
+const Tasks = lazy(() => import('./pages/Tasks/Tasks'));
 
 // College & Resources
 const CollegeDetail = lazy(() => import('./pages/CollegeDetail'));
@@ -138,6 +139,15 @@ function App() {
                                     element={
                                         <ProtectedRoute>
                                             <Analytics />
+                                        </ProtectedRoute>
+                                    }
+                                />
+
+                                <Route
+                                    path='/tasks'
+                                    element={
+                                        <ProtectedRoute>
+                                            <Tasks />
                                         </ProtectedRoute>
                                     }
                                 />
