@@ -9,7 +9,6 @@ import {
     PhoneCall,
     Search,
     ArrowLeft,
-    Loader,
     Mail,
     MessageSquare,
     Calendar,
@@ -30,6 +29,8 @@ import {
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import ContactDetailModal from '../../components/ContactDetailModal';
+import Loader from '../../components/Common/Loader';
+import BackButton from '../../components/Common/BackButton';
 
 const Contacts = () => {
     const location = useLocation();
@@ -313,22 +314,7 @@ const Contacts = () => {
     };
 
     if (loading) {
-        return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div
-                    className={`flex items-center justify-center py-20 ${mainContentMargin} transition-all duration-300`}
-                >
-                    <div className='flex items-center space-x-2'>
-                        <Loader className='w-6 h-6 animate-spin text-blue-600' />
-                        <span className='text-gray-600 dark:text-gray-400'>
-                            Loading contact requests...
-                        </span>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Loader />;
     }
 
     return (
@@ -340,39 +326,10 @@ const Contacts = () => {
                 className={`pt-6 pb-12 ${mainContentMargin} transition-all duration-300`}
             >
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-                    {/* Header Section */}
-                    <div className='flex items-center justify-between mb-8'>
-                        <div className='flex items-center'>
-                            <button
-                                onClick={() => navigate('/reports')}
-                                className='mr-4 p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors'
-                            >
-                                <ArrowLeft className='w-5 h-5' />
-                            </button>
-                            <div className='flex items-center'>
-                                <div className='bg-pink-600 text-white p-3 rounded-lg mr-4'>
-                                    <PhoneCall className='w-6 h-6' />
-                                </div>
-                                <div>
-                                    <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                        Contact Requests
-                                    </h1>
-                                    <p className='text-gray-600 dark:text-gray-400 mt-1'>
-                                        Manage and respond to user inquiries
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className='bg-pink-50 dark:bg-pink-900/30 px-6 py-3 rounded-lg'>
-                            <div className='text-sm text-pink-600 dark:text-pink-400'>
-                                Total Requests:
-                            </div>
-                            <div className='text-2xl font-bold text-pink-800 dark:text-pink-300'>
-                                {contacts.length}
-                            </div>
-                        </div>
-                    </div>
+                    <BackButton
+                        title='Contact Requests'
+                        TitleIcon={PhoneCall}
+                    />
 
                     {/* Total Contacts Banner */}
                     {timeFilter && (

@@ -6,14 +6,12 @@ import { useSidebarLayout } from '../../hooks/useSidebarLayout';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import {
-    ChevronLeft,
     CreditCard,
     CheckCircle2,
     XCircle,
     Clock,
     Wallet,
     Hash,
-    CalendarDays,
     User2,
     Code,
     Eye,
@@ -21,6 +19,8 @@ import {
     ShoppingBag,
     Link as LinkIcon,
 } from 'lucide-react';
+import BackButton from '../../components/Common/BackButton';
+import Loader from '../../components/Common/Loader';
 
 const Badge = ({ color = 'gray', children }) => {
     const map = {
@@ -114,22 +114,7 @@ const PaymentDetail = () => {
     );
 
     if (loading) {
-        return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <main
-                    className={`flex items-center justify-center py-20 ${mainContentMargin} transition-all duration-300`}
-                >
-                    <div className='flex flex-col items-center'>
-                        <CreditCard className='w-12 h-12 animate-pulse text-indigo-500 mb-4' />
-                        <p className='text-gray-600 dark:text-gray-400'>
-                            Loading payment details...
-                        </p>
-                    </div>
-                </main>
-            </div>
-        );
+        return <Loader />;
     }
 
     if (error) {
@@ -167,20 +152,10 @@ const PaymentDetail = () => {
             >
                 <div className='max-w-7xl mx-auto px-4 sm:px-6'>
                     {/* Compact Navigation */}
-                    <div className='flex items-center gap-3 mb-4'>
-                        <button
-                            onClick={() => navigate(-1)}
-                            className='p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors'
-                        >
-                            <ChevronLeft className='w-4 h-4' />
-                        </button>
-                        <div className='flex items-center gap-2'>
-                            <CreditCard className='w-4 h-4 text-gray-400' />
-                            <h1 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                Payment Details
-                            </h1>
-                        </div>
-                    </div>
+                    <BackButton
+                        title='Payment Details'
+                        TitleIcon={CreditCard}
+                    />
 
                     {/* Compact Header */}
                     <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3'>

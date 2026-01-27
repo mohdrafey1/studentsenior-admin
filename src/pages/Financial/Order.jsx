@@ -7,8 +7,6 @@ import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import {
     FileText,
-    ChevronLeft,
-    Loader,
     Search,
     Grid3x3,
     List,
@@ -17,6 +15,8 @@ import {
     X,
 } from 'lucide-react';
 import Pagination from '../../components/Pagination';
+import BackButton from '../../components/Common/BackButton';
+import Loader from '../../components/Common/Loader';
 
 const statusClass = (status) => {
     switch ((status || '').toLowerCase()) {
@@ -298,22 +298,7 @@ export default function OrderPage() {
     // total pages handled inside Pagination component
 
     if (loading) {
-        return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div
-                    className={`flex items-center justify-center py-12 ${mainContentMargin} transition-all duration-300`}
-                >
-                    <div className='flex items-center gap-2'>
-                        <Loader className='w-4 h-4 animate-spin text-gray-400' />
-                        <span className='text-sm text-gray-500 dark:text-gray-400'>
-                            Loading orders...
-                        </span>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Loader />;
     }
 
     return (
@@ -325,20 +310,7 @@ export default function OrderPage() {
             >
                 <div className='max-w-7xl mx-auto px-4 sm:px-6'>
                     {/* Compact Header */}
-                    <div className='flex items-center gap-3 mb-4'>
-                        <button
-                            onClick={() => navigate('/reports')}
-                            className='p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors'
-                        >
-                            <ChevronLeft className='w-4 h-4' />
-                        </button>
-                        <div className='flex items-center gap-2'>
-                            <FileText className='w-4 h-4 text-gray-400' />
-                            <h1 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                Orders
-                            </h1>
-                        </div>
-                    </div>
+                    <BackButton title='Orders' TitleIcon={FileText} />
 
                     {/* Compact Filters */}
                     <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>

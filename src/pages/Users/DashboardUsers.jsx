@@ -7,8 +7,6 @@ import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import {
     Shield,
-    ArrowLeft,
-    Loader,
     Search,
     Grid3x3,
     List,
@@ -20,6 +18,8 @@ import {
     X,
 } from 'lucide-react';
 import Pagination from '../../components/Pagination';
+import Loader from '../../components/Common/Loader';
+import BackButton from '../../components/Common/BackButton';
 
 const DashboardUsersPage = () => {
     const location = useLocation();
@@ -183,22 +183,7 @@ const DashboardUsersPage = () => {
     };
 
     if (loading) {
-        return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div
-                    className={`flex items-center justify-center py-20 ${mainContentMargin} transition-all duration-300`}
-                >
-                    <div className='flex items-center space-x-2'>
-                        <Loader className='w-6 h-6 animate-spin text-blue-600' />
-                        <span className='text-gray-600 dark:text-gray-400'>
-                            Loading dashboard users...
-                        </span>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Loader />;
     }
 
     return (
@@ -209,27 +194,7 @@ const DashboardUsersPage = () => {
                 className={`pt-6 pb-12 ${mainContentMargin} transition-all duration-300`}
             >
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-                    <div className='flex items-center mb-8'>
-                        <button
-                            onClick={() => navigate('/reports')}
-                            className='mr-4 p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors'
-                        >
-                            <ArrowLeft className='w-5 h-5' />
-                        </button>
-                        <div className='flex items-center'>
-                            <div className='bg-rose-600 text-white p-3 rounded-lg mr-4'>
-                                <Shield className='w-6 h-6' />
-                            </div>
-                            <div>
-                                <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                    Dashboard Users
-                                </h1>
-                                <p className='text-gray-600 dark:text-gray-400 mt-1'>
-                                    Admins and moderators with dashboard access
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                    <BackButton title='Dashboard Users' TitleIcon={Shield} />
 
                     {/* Total Users Banner */}
                     {timeFilter && (
