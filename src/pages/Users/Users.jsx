@@ -7,22 +7,20 @@ import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import {
     Users,
-    Search,
     ShieldBan,
     ShieldCheck,
-    Grid3x3,
-    List,
-    SortAsc,
-    SortDesc,
     User as UserIcon,
     Calendar,
-    Clock,
-    X,
 } from 'lucide-react';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
+import FilterBar from '../../components/Common/FilterBar';
+import {
+    filterByTime,
+    getTimeFilterLabel,
+} from '../../components/Common/timeFilterUtils';
 
 const UsersPage = () => {
     const [items, setItems] = useState([]);
@@ -32,7 +30,7 @@ const UsersPage = () => {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(12);
     const [blockedFilter, setBlockedFilter] = useState(''); // '', 'true', 'false'
-    const [timeFilter, setTimeFilter] = useState('');
+    const [timeFilter, setTimeFilter] = useState('all');
     const [sortBy, setSortBy] = useState('createdAt'); // 'createdAt' | 'points'
     const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
     const [viewMode, setViewMode] = useState(() =>
@@ -187,61 +185,6 @@ const UsersPage = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const getTimeFilterLabel = (filter) => {
-        switch (filter) {
-            case 'last24h':
-                return 'Last 24 Hours';
-            case 'last7d':
-                return 'Last 7 Days';
-            case 'last28d':
-                return 'Last 28 Days';
-            case 'thisWeek':
-                return 'This Week';
-            case 'thisMonth':
-                return 'This Month';
-            case 'thisYear':
-                return 'This Year';
-            default:
-                return 'All Time';
-        }
-    };
-
-    const filterByTime = (item, filter) => {
-        if (!filter) return true;
-        const itemDate = new Date(item.createdAt);
-        const now = new Date();
-        switch (filter) {
-            case 'last24h':
-                return (
-                    itemDate >= new Date(now.getTime() - 24 * 60 * 60 * 1000)
-                );
-            case 'last7d':
-                return (
-                    itemDate >=
-                    new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-                );
-            case 'last28d':
-                return (
-                    itemDate >=
-                    new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000)
-                );
-            case 'thisWeek': {
-                const startOfWeek = new Date(now);
-                startOfWeek.setDate(now.getDate() - now.getDay());
-                startOfWeek.setHours(0, 0, 0, 0);
-                return itemDate >= startOfWeek;
-            }
-            case 'thisMonth':
-                return (
-                    itemDate >= new Date(now.getFullYear(), now.getMonth(), 1)
-                );
-            case 'thisYear':
-                return itemDate >= new Date(now.getFullYear(), 0, 1);
-            default:
-                return true;
-        }
-    };
-
     const filteredAndSorted = useMemo(() => {
         const q = search.trim().toLowerCase();
         const list = items
@@ -277,12 +220,7 @@ const UsersPage = () => {
     const start = (page - 1) * pageSize;
     const current = filteredAndSorted.slice(start, start + pageSize);
 
-    const totalPoints = useMemo(() => {
-        return filteredAndSorted.reduce(
-            (sum, u) => sum + (Number(u.wallet?.currentBalance) || 0),
-            0,
-        );
-    }, [filteredAndSorted]);
+    const totalUsers = timeFilter ? filteredAndSorted.length : 0;
 
     if (loading) {
         return <Loader />;
@@ -298,121 +236,78 @@ const UsersPage = () => {
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
                     <BackButton title='Users' TitleIcon={UserIcon} />
 
-                    {/* Search, View, Filters & Sort */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-2 mb-4'>
-                        {/* Total Points Display */}
-                        {timeFilter && (
-                            <div className='mb-2 p-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded'>
-                                <div className='flex items-center justify-between'>
-                                    <div className='flex items-center gap-1'>
-                                        <Clock className='w-4 h-4 text-indigo-600 dark:text-indigo-400' />
-                                        <span className='text-xs font-medium text-gray-700 dark:text-gray-300'>
-                                            Total Points (
-                                            {getTimeFilterLabel(timeFilter)}):
-                                        </span>
-                                    </div>
-                                    <span className='text-base font-bold text-indigo-600 dark:text-indigo-400'>
-                                        {totalPoints} pts
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                        <div className='flex flex-wrap items-center gap-2'>
-                            <div className='relative max-w-xs flex-1'>
-                                <Search className='absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4' />
-                                <input
-                                    type='text'
-                                    placeholder='Search email or name'
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className='w-full pl-8 pr-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-xs'
-                                />
-                            </div>
-                            <div className='flex bg-gray-100 dark:bg-gray-700 rounded p-0.5'>
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`p-1 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
-                                    title='Grid view'
-                                >
-                                    <Grid3x3 className='w-3.5 h-3.5' />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('table')}
-                                    className={`p-1 rounded ${viewMode === 'table' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
-                                    title='Table view'
-                                >
-                                    <List className='w-3.5 h-3.5' />
-                                </button>
-                            </div>
-                            <select
-                                value={blockedFilter}
-                                onChange={(e) =>
-                                    setBlockedFilter(e.target.value)
-                                }
-                                className='px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-xs'
-                            >
-                                <option value=''>All Users</option>
-                                <option value='true'>Blocked</option>
-                                <option value='false'>Active</option>
-                            </select>
-                            <select
-                                value={timeFilter}
-                                onChange={(e) => {
-                                    setTimeFilter(e.target.value);
+                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
+                        <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
+                            <span className='text-gray-600 dark:text-gray-400'>
+                                Total ({getTimeFilterLabel(timeFilter)}):
+                            </span>
+                            <span className='font-semibold text-gray-900 dark:text-white'>
+                                {totalUsers}
+                            </span>
+                        </div>
+
+                        {/* Search, View, Filters & Sort */}
+                        <FilterBar
+                            search={search}
+                            onSearch={setSearch}
+                            filters={[
+                                {
+                                    label: 'Status',
+                                    value: blockedFilter,
+                                    onChange: setBlockedFilter,
+                                    options: [
+                                        { value: '', label: 'All Users' },
+                                        { value: 'true', label: 'Blocked' },
+                                        { value: 'false', label: 'Active' },
+                                    ],
+                                },
+                            ]}
+                            timeFilter={{
+                                value: timeFilter,
+                                onChange: (v) => {
+                                    setTimeFilter(v);
                                     setPage(1);
-                                }}
-                                className='px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-xs'
-                            >
-                                <option value=''>All Time</option>
-                                <option value='last24h'>Last 24 Hours</option>
-                                <option value='last7d'>Last 7 Days</option>
-                                <option value='last28d'>Last 28 Days</option>
-                                <option value='thisWeek'>This Week</option>
-                                <option value='thisMonth'>This Month</option>
-                                <option value='thisYear'>This Year</option>
-                            </select>
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className='px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-xs'
-                            >
-                                <option value='createdAt'>Sort by Date</option>
-                                <option value='points'>Sort by Points</option>
-                            </select>
-                            <button
-                                onClick={() =>
+                                },
+                            }}
+                            sortBy={{
+                                value: sortBy,
+                                onChange: setSortBy,
+                                options: [
+                                    {
+                                        value: 'createdAt',
+                                        label: 'Sort by Date',
+                                    },
+                                    {
+                                        value: 'points',
+                                        label: 'Sort by Points',
+                                    },
+                                ],
+                            }}
+                            sortOrder={{
+                                value: sortOrder,
+                                onToggle: () =>
                                     setSortOrder(
                                         sortOrder === 'asc' ? 'desc' : 'asc',
-                                    )
-                                }
-                                className='p-1 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
-                                title={
-                                    sortOrder === 'asc'
-                                        ? 'Ascending'
-                                        : 'Descending'
-                                }
-                            >
-                                {sortOrder === 'asc' ? (
-                                    <SortAsc className='w-3.5 h-3.5' />
-                                ) : (
-                                    <SortDesc className='w-3.5 h-3.5' />
-                                )}
-                            </button>
-                            {(search || blockedFilter || timeFilter) && (
-                                <button
-                                    onClick={() => {
-                                        setSearch('');
-                                        setBlockedFilter('');
-                                        setTimeFilter('');
-                                        setPage(1);
-                                    }}
-                                    className='flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-xs font-medium'
-                                >
-                                    <X className='w-3 h-3' />
-                                    Clear
-                                </button>
-                            )}
-                        </div>
+                                    ),
+                            }}
+                            viewMode={{
+                                value: viewMode,
+                                onChange: setViewMode,
+                            }}
+                            onClear={() => {
+                                setSearch('');
+                                setBlockedFilter('');
+                                setTimeFilter('all');
+                                setPage(1);
+                            }}
+                            showClear={
+                                !!(
+                                    search ||
+                                    blockedFilter ||
+                                    (timeFilter && timeFilter !== 'all')
+                                )
+                            }
+                        />
                     </div>
 
                     {error && (

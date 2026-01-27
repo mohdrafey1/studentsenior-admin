@@ -5,15 +5,12 @@ import Sidebar from '../../components/Sidebar';
 import { useSidebarLayout } from '../../hooks/useSidebarLayout';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
+import { BarChart3 } from 'lucide-react';
+import FilterBar from '../../components/Common/FilterBar';
 import {
-    BarChart3,
-    Search,
-    Grid3x3,
-    List,
-    SortAsc,
-    SortDesc,
-    X,
-} from 'lucide-react';
+    filterByTime,
+    getTimeFilterLabel,
+} from '../../components/Common/timeFilterUtils';
 import Pagination from '../../components/Pagination';
 import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
@@ -26,7 +23,7 @@ const Transactions = () => {
     // Filters
     const [type, setType] = useState(''); // credit | debit
     const [resourceType, setResourceType] = useState(''); // e.g., pyq, notes
-    const [timeFilter, setTimeFilter] = useState(''); // last24h, last7d, last28d, thisWeek, thisMonth, thisYear, all
+    const [timeFilter, setTimeFilter] = useState('all');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(12);
     const [sortBy, setSortBy] = useState('createdAt'); // createdAt | amount
@@ -120,73 +117,6 @@ const Transactions = () => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
-
-    // Helper to get readable time filter label
-    const getTimeFilterLabel = (filter) => {
-        switch (filter) {
-            case 'last24h':
-                return 'Last 24 Hours';
-            case 'last7d':
-                return 'Last 7 Days';
-            case 'last28d':
-                return 'Last 28 Days';
-            case 'thisWeek':
-                return 'This Week';
-            case 'thisMonth':
-                return 'This Month';
-            case 'thisYear':
-                return 'This Year';
-            default:
-                return 'All Time';
-        }
-    };
-
-    // Helper function to filter by time
-    const filterByTime = (item, filter) => {
-        if (!filter) return true;
-        const itemDate = new Date(item.createdAt);
-        const now = new Date();
-
-        switch (filter) {
-            case 'last24h': {
-                const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                return itemDate >= last24h;
-            }
-            case 'last7d': {
-                const last7d = new Date(
-                    now.getTime() - 7 * 24 * 60 * 60 * 1000,
-                );
-                return itemDate >= last7d;
-            }
-            case 'last28d': {
-                const last28d = new Date(
-                    now.getTime() - 28 * 24 * 60 * 60 * 1000,
-                );
-                return itemDate >= last28d;
-            }
-            case 'thisWeek': {
-                const startOfWeek = new Date(now);
-                startOfWeek.setDate(now.getDate() - now.getDay());
-                startOfWeek.setHours(0, 0, 0, 0);
-                return itemDate >= startOfWeek;
-            }
-            case 'thisMonth': {
-                const startOfMonth = new Date(
-                    now.getFullYear(),
-                    now.getMonth(),
-                    1,
-                );
-                return itemDate >= startOfMonth;
-            }
-            case 'thisYear': {
-                const startOfYear = new Date(now.getFullYear(), 0, 1);
-                return itemDate >= startOfYear;
-            }
-            case 'all':
-            default:
-                return true;
-        }
-    };
 
     const filteredAndSorted = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -283,140 +213,88 @@ const Transactions = () => {
                                     Total ({getTimeFilterLabel(timeFilter)}):
                                 </span>
                                 <span className='font-semibold text-gray-900 dark:text-white'>
-                                    {totalAmount} pts
+                                    {totalAmount} pts / ₹
+                                    {(totalAmount / 5).toFixed(2)}
                                 </span>
                             </div>
                         )}
-                        {/* Search - Compact */}
-                        <div className='relative'>
-                            <Search className='absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5' />
-                            <input
-                                type='text'
-                                placeholder='Search by user (email/name)'
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className='w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white'
-                            />
-                        </div>
-
-                        {/* Filters Row - Compact */}
-                        <div className='flex flex-wrap gap-2 items-center text-xs'>
-                            {/* View toggle */}
-                            <div className='flex bg-gray-100 dark:bg-gray-900 rounded p-0.5'>
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
-                                    title='Grid view'
-                                >
-                                    <Grid3x3 className='w-3.5 h-3.5' />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('table')}
-                                    className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
-                                    title='Table view'
-                                >
-                                    <List className='w-3.5 h-3.5' />
-                                </button>
-                            </div>
-
-                            <select
-                                value={type}
-                                onChange={(e) => setType(e.target.value)}
-                                className='px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white'
-                            >
-                                <option value=''>All Types</option>
-                                {uniqueTypes.map((t) => (
-                                    <option
-                                        key={t}
-                                        value={t}
-                                        className='capitalize'
-                                    >
-                                        {t}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <select
-                                value={resourceType}
-                                onChange={(e) =>
-                                    setResourceType(e.target.value)
-                                }
-                                className='px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white'
-                            >
-                                <option value=''>All Resources</option>
-                                {uniqueResourceTypes.map((rt) => (
-                                    <option
-                                        key={rt}
-                                        value={rt}
-                                        className='capitalize'
-                                    >
-                                        {rt || '-'}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <select
-                                value={timeFilter}
-                                onChange={(e) => {
-                                    setTimeFilter(e.target.value);
+                        <FilterBar
+                            search={search}
+                            onSearch={setSearch}
+                            filters={[
+                                {
+                                    label: 'Type',
+                                    value: type,
+                                    onChange: setType,
+                                    options: [
+                                        { value: '', label: 'All Types' },
+                                        ...uniqueTypes.map((t) => ({
+                                            value: t,
+                                            label: t,
+                                        })),
+                                    ],
+                                },
+                                {
+                                    label: 'Resource Type',
+                                    value: resourceType,
+                                    onChange: setResourceType,
+                                    options: [
+                                        { value: '', label: 'All Resources' },
+                                        ...uniqueResourceTypes.map((rt) => ({
+                                            value: rt,
+                                            label: rt || '-',
+                                        })),
+                                    ],
+                                },
+                            ]}
+                            timeFilter={{
+                                value: timeFilter,
+                                onChange: (v) => {
+                                    setTimeFilter(v);
                                     setPage(1);
-                                }}
-                                className='px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white'
-                            >
-                                <option value=''>All Time</option>
-                                <option value='last24h'>Last 24 Hours</option>
-                                <option value='last7d'>Last 7 Days</option>
-                                <option value='last28d'>Last 28 Days</option>
-                                <option value='thisWeek'>This Week</option>
-                                <option value='thisMonth'>This Month</option>
-                                <option value='thisYear'>This Year</option>
-                            </select>
-
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className='px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white'
-                            >
-                                <option value='createdAt'>Sort by Date</option>
-                                <option value='amount'>Sort by Amount</option>
-                            </select>
-
-                            <button
-                                onClick={() =>
+                                },
+                            }}
+                            sortBy={{
+                                value: sortBy,
+                                onChange: setSortBy,
+                                options: [
+                                    {
+                                        value: 'createdAt',
+                                        label: 'Sort by Date',
+                                    },
+                                    {
+                                        value: 'amount',
+                                        label: 'Sort by Amount',
+                                    },
+                                ],
+                            }}
+                            sortOrder={{
+                                value: sortOrder,
+                                onToggle: () =>
                                     setSortOrder(
                                         sortOrder === 'asc' ? 'desc' : 'asc',
-                                    )
-                                }
-                                className='p-1.5 border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors'
-                                title={
-                                    sortOrder === 'asc'
-                                        ? 'Ascending'
-                                        : 'Descending'
-                                }
-                            >
-                                {sortOrder === 'asc' ? (
-                                    <SortAsc className='w-3.5 h-3.5' />
-                                ) : (
-                                    <SortDesc className='w-3.5 h-3.5' />
-                                )}
-                            </button>
-
-                            {(search || type || resourceType || timeFilter) && (
-                                <button
-                                    onClick={() => {
-                                        setSearch('');
-                                        setType('');
-                                        setResourceType('');
-                                        setTimeFilter('');
-                                        setPage(1);
-                                    }}
-                                    className='flex items-center gap-1 px-2 py-1.5 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors'
-                                >
-                                    <X className='w-3 h-3' />
-                                    Clear
-                                </button>
-                            )}
-                        </div>
+                                    ),
+                            }}
+                            viewMode={{
+                                value: viewMode,
+                                onChange: setViewMode,
+                            }}
+                            onClear={() => {
+                                setSearch('');
+                                setType('');
+                                setResourceType('');
+                                setTimeFilter('all');
+                                setPage(1);
+                            }}
+                            showClear={
+                                !!(
+                                    search ||
+                                    type ||
+                                    resourceType ||
+                                    (timeFilter && timeFilter !== 'all')
+                                )
+                            }
+                        />
                     </div>
 
                     {/* Error */}

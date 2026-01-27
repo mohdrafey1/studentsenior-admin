@@ -5,27 +5,12 @@ import Sidebar from '../../components/Sidebar';
 import { useSidebarLayout } from '../../hooks/useSidebarLayout';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
+import { PhoneCall, Clock, CheckCircle, AlertCircle, Eye } from 'lucide-react';
+import FilterBar from '../../components/Common/FilterBar';
 import {
-    PhoneCall,
-    Search,
-    ArrowLeft,
-    Mail,
-    MessageSquare,
-    Calendar,
-    Trash2,
-    ChevronDown,
-    ChevronUp,
-    Grid3x3,
-    List,
-    SortAsc,
-    SortDesc,
-    User,
-    Clock,
-    X,
-    Eye,
-    CheckCircle,
-    AlertCircle,
-} from 'lucide-react';
+    filterByTime,
+    getTimeFilterLabel,
+} from '../../components/Common/timeFilterUtils';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import ContactDetailModal from '../../components/ContactDetailModal';
@@ -39,7 +24,7 @@ const Contacts = () => {
     // Read URL params
     const params = new URLSearchParams(location.search);
     const initialSearch = params.get('search') || '';
-    const initialTimeFilter = params.get('time') || '';
+    const initialTimeFilter = params.get('time') || 'all';
     const initialPage = parseInt(params.get('page')) || 1;
     const initialStatusFilter = params.get('status') || '';
 
@@ -175,27 +160,6 @@ const Contacts = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const getTimeFilterLabel = () => {
-        switch (timeFilter) {
-            case 'last24h':
-                return 'Last 24 Hours';
-            case 'last7d':
-                return 'Last 7 Days';
-            case 'last28d':
-                return 'Last 28 Days';
-            case 'thisWeek':
-                return 'This Week';
-            case 'thisMonth':
-                return 'This Month';
-            case 'thisYear':
-                return 'This Year';
-            case 'all':
-                return 'All Time';
-            default:
-                return '';
-        }
-    };
-
     const handleDelete = async (contactId) => {
         const ok = await showConfirm({
             title: 'Delete Contact Request',
@@ -231,48 +195,9 @@ const Contacts = () => {
                 name.includes(q) ||
                 email.includes(q) ||
                 message.includes(q);
-
-            // Time filter
-            const matchesTime = (() => {
-                if (!timeFilter) return true;
-                const itemDate = new Date(contact.createdAt || 0);
-                const now = new Date();
-
-                switch (timeFilter) {
-                    case 'last24h':
-                        return now - itemDate <= 24 * 60 * 60 * 1000;
-                    case 'last7d':
-                        return now - itemDate <= 7 * 24 * 60 * 60 * 1000;
-                    case 'last28d':
-                        return now - itemDate <= 28 * 24 * 60 * 60 * 1000;
-                    case 'thisWeek': {
-                        const startOfWeek = new Date(now);
-                        startOfWeek.setDate(now.getDate() - now.getDay());
-                        startOfWeek.setHours(0, 0, 0, 0);
-                        return itemDate >= startOfWeek;
-                    }
-                    case 'thisMonth': {
-                        const startOfMonth = new Date(
-                            now.getFullYear(),
-                            now.getMonth(),
-                            1,
-                        );
-                        return itemDate >= startOfMonth;
-                    }
-                    case 'thisYear': {
-                        const startOfYear = new Date(now.getFullYear(), 0, 1);
-                        return itemDate >= startOfYear;
-                    }
-                    case 'all':
-                    default:
-                        return true;
-                }
-            })();
-
-            // Status filter
+            const matchesTime = filterByTime(contact, timeFilter);
             const matchesStatus =
                 !statusFilter || (contact.status || 'pending') === statusFilter;
-
             return matchesSearch && matchesTime && matchesStatus;
         })
         .sort((a, b) => {
@@ -308,7 +233,7 @@ const Contacts = () => {
 
     const clearFilters = () => {
         setSearchQuery('');
-        setTimeFilter('');
+        setTimeFilter('all');
         setStatusFilter('');
         setCurrentPage(1);
     };
@@ -331,145 +256,83 @@ const Contacts = () => {
                         TitleIcon={PhoneCall}
                     />
 
-                    {/* Total Contacts Banner */}
-                    {timeFilter && (
-                        <div className='bg-gradient-to-r from-pink-500 to-pink-600 rounded-lg shadow-lg p-6 mb-6 text-white'>
-                            <div className='flex items-center justify-between'>
-                                <div>
-                                    <p className='text-pink-100 text-sm font-medium mb-1'>
-                                        {getTimeFilterLabel()}
-                                    </p>
-                                    <p className='text-3xl font-bold'>
-                                        {totalContacts} Requests
-                                    </p>
-                                </div>
-                                <div className='bg-white/20 p-3 rounded-lg'>
-                                    <PhoneCall className='w-8 h-8' />
-                                </div>
-                            </div>
+                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
+                        <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
+                            <span className='text-gray-600 dark:text-gray-400'>
+                                Total ({getTimeFilterLabel(timeFilter)}):
+                            </span>
+                            <span className='font-semibold text-gray-900 dark:text-white'>
+                                {totalContacts}
+                            </span>
                         </div>
-                    )}
 
-                    {/* Search, View, Sort */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6'>
-                        <div className='relative mb-4 max-w-xl'>
-                            <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5' />
-                            <input
-                                type='text'
-                                placeholder='Search by name, email, or message...'
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className='w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                            />
-                        </div>
-                        <div className='flex flex-wrap items-center gap-3'>
-                            {/* View toggle */}
-                            <div className='flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1'>
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
-                                    title='Grid view'
-                                >
-                                    <Grid3x3 className='w-4 h-4' />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('table')}
-                                    className={`p-2 rounded ${viewMode === 'table' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
-                                    title='Table view'
-                                >
-                                    <List className='w-4 h-4' />
-                                </button>
-                            </div>
-
-                            {/* Sort By */}
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
-                            >
-                                <option value='createdAt'>Sort by Date</option>
-                                <option value='name'>Sort by Name</option>
-                                <option value='email'>Sort by Email</option>
-                            </select>
-
-                            {/* Time Filter */}
-                            <div className='relative'>
-                                <Clock className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none' />
-                                <select
-                                    value={timeFilter}
-                                    onChange={(e) =>
-                                        setTimeFilter(e.target.value)
-                                    }
-                                    className='pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm appearance-none'
-                                >
-                                    <option value=''>Time Filter</option>
-                                    <option value='last24h'>
-                                        Last 24 Hours
-                                    </option>
-                                    <option value='last7d'>Last 7 Days</option>
-                                    <option value='last28d'>
-                                        Last 28 Days
-                                    </option>
-                                    <option value='thisWeek'>This Week</option>
-                                    <option value='thisMonth'>
-                                        This Month
-                                    </option>
-                                    <option value='thisYear'>This Year</option>
-                                    <option value='all'>All Time</option>
-                                </select>
-                            </div>
-
-                            {/* Status Filter */}
-                            <div className='relative'>
-                                <AlertCircle className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none' />
-                                <select
-                                    value={statusFilter}
-                                    onChange={(e) =>
-                                        setStatusFilter(e.target.value)
-                                    }
-                                    className='pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm appearance-none'
-                                >
-                                    <option value=''>All Status</option>
-                                    <option value='pending'>Pending</option>
-                                    <option value='in-progress'>
-                                        In Progress
-                                    </option>
-                                    <option value='resolved'>Resolved</option>
-                                </select>
-                            </div>
-
-                            {/* Sort Order */}
-                            <button
-                                onClick={() =>
+                        <FilterBar
+                            search={searchQuery}
+                            onSearch={setSearchQuery}
+                            filters={[
+                                {
+                                    label: 'Status',
+                                    value: statusFilter,
+                                    onChange: setStatusFilter,
+                                    options: [
+                                        { value: '', label: 'All Status' },
+                                        {
+                                            value: 'pending',
+                                            label: 'Pending',
+                                        },
+                                        {
+                                            value: 'in-progress',
+                                            label: 'In Progress',
+                                        },
+                                        {
+                                            value: 'resolved',
+                                            label: 'Resolved',
+                                        },
+                                    ],
+                                },
+                            ]}
+                            timeFilter={{
+                                value: timeFilter,
+                                onChange: setTimeFilter,
+                            }}
+                            sortBy={{
+                                value: sortBy,
+                                onChange: setSortBy,
+                                options: [
+                                    {
+                                        value: 'createdAt',
+                                        label: 'Sort by Date',
+                                    },
+                                    {
+                                        value: 'name',
+                                        label: 'Sort by Name',
+                                    },
+                                    {
+                                        value: 'email',
+                                        label: 'Sort by Email',
+                                    },
+                                ],
+                            }}
+                            sortOrder={{
+                                value: sortOrder,
+                                onToggle: () =>
                                     setSortOrder(
                                         sortOrder === 'asc' ? 'desc' : 'asc',
-                                    )
-                                }
-                                className='p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
-                                title={
-                                    sortOrder === 'asc'
-                                        ? 'Ascending'
-                                        : 'Descending'
-                                }
-                            >
-                                {sortOrder === 'asc' ? (
-                                    <SortAsc className='w-4 h-4' />
-                                ) : (
-                                    <SortDesc className='w-4 h-4' />
-                                )}
-                            </button>
-
-                            {/* Clear Filters Button */}
-                            {(searchQuery || timeFilter || statusFilter) && (
-                                <button
-                                    onClick={clearFilters}
-                                    className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors text-sm font-medium'
-                                >
-                                    <X className='w-4 h-4' />
-                                    Clear Filters
-                                </button>
-                            )}
-                        </div>
+                                    ),
+                            }}
+                            viewMode={{
+                                value: viewMode,
+                                onChange: setViewMode,
+                            }}
+                            onClear={clearFilters}
+                            showClear={
+                                !!(
+                                    searchQuery ||
+                                    statusFilter ||
+                                    (timeFilter && timeFilter !== 'all')
+                                )
+                            }
+                        />
                     </div>
 
                     {/* Error Message */}
@@ -798,7 +661,7 @@ const Contacts = () => {
                                                                 </td>
                                                                 <td className='px-6 py-4 whitespace-nowrap'>
                                                                     <div className='flex items-start gap-2'>
-                                                                        <User className='w-4 h-4 text-gray-400 mt-1' />
+                                                                        {/* <User className='w-4 h-4 text-gray-400 mt-1' /> */}
                                                                         <div>
                                                                             {/* <div className='text-sm font-medium text-gray-900 dark:text-white'>
                                                                             {contact.name ||
