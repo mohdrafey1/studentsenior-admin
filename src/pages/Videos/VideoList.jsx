@@ -7,9 +7,6 @@ import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import {
     Play,
-    ArrowLeft,
-    Loader,
-    Search,
     Edit2,
     Trash2,
     Eye,
@@ -19,17 +16,18 @@ import {
     Clock,
     CheckCircle,
     XCircle,
-    ThumbsUp,
     ExternalLink,
-    Grid3x3,
-    List,
-    Filter,
-    X,
     Video,
 } from 'lucide-react';
-import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import VideoEditModal from '../../components/VideoEditModal';
+import FilterBar from '../../components/Common/FilterBar';
+import BackButton from '../../components/Common/BackButton';
+import Loader from '../../components/Common/Loader';
+import {
+    filterByTime,
+    getTimeFilterLabel,
+} from '../../components/Common/timeFilterUtils';
 
 const VideoList = () => {
     const location = useLocation();
@@ -61,7 +59,6 @@ const VideoList = () => {
     });
 
     // Filters state
-    const [showFilters, setShowFilters] = useState(false);
     const [filters, setFilters] = useState({
         submissionStatus: initialSubmissionStatus,
         deleted: initialDeleted,
@@ -79,11 +76,6 @@ const VideoList = () => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
-
-    // Toggle view mode (user can still manually switch)
-    const toggleViewMode = (mode) => {
-        setViewMode(mode);
-    };
 
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -229,41 +221,7 @@ const VideoList = () => {
             !filters.deleted || video.deleted?.toString() === filters.deleted;
 
         // Time filter
-        const matchesTime = (() => {
-            if (!timeFilter) return true;
-            const itemDate = new Date(video.createdAt || 0);
-            const now = new Date();
-
-            switch (timeFilter) {
-                case 'last24h':
-                    return now - itemDate <= 24 * 60 * 60 * 1000;
-                case 'last7d':
-                    return now - itemDate <= 7 * 24 * 60 * 60 * 1000;
-                case 'last28d':
-                    return now - itemDate <= 28 * 24 * 60 * 60 * 1000;
-                case 'thisWeek': {
-                    const startOfWeek = new Date(now);
-                    startOfWeek.setDate(now.getDate() - now.getDay());
-                    startOfWeek.setHours(0, 0, 0, 0);
-                    return itemDate >= startOfWeek;
-                }
-                case 'thisMonth': {
-                    const startOfMonth = new Date(
-                        now.getFullYear(),
-                        now.getMonth(),
-                        1,
-                    );
-                    return itemDate >= startOfMonth;
-                }
-                case 'thisYear': {
-                    const startOfYear = new Date(now.getFullYear(), 0, 1);
-                    return itemDate >= startOfYear;
-                }
-                case 'all':
-                default:
-                    return true;
-            }
-        })();
+        const matchesTime = filterByTime(video, timeFilter);
 
         return (
             matchesSearch &&
@@ -296,32 +254,11 @@ const VideoList = () => {
     const totalPages = Math.ceil(totalItems / pageSize);
     const current = sorted.slice((page - 1) * pageSize, page * pageSize);
 
-    const totalVideos = timeFilter ? sorted.length : 0;
+    const totalVideos = sorted.length;
 
     const uniqueStatuses = [
         ...new Set(videos.map((video) => video.submissionStatus)),
     ].filter(Boolean);
-
-    const getTimeFilterLabel = () => {
-        switch (timeFilter) {
-            case 'last24h':
-                return 'Last 24 Hours';
-            case 'last7d':
-                return 'Last 7 Days';
-            case 'last28d':
-                return 'Last 28 Days';
-            case 'thisWeek':
-                return 'This Week';
-            case 'thisMonth':
-                return 'This Month';
-            case 'thisYear':
-                return 'This Year';
-            case 'all':
-                return 'All Time';
-            default:
-                return '';
-        }
-    };
 
     const clearAllFilters = () => {
         setSearch('');
@@ -337,20 +274,7 @@ const VideoList = () => {
         (filters.submissionStatus ? 1 : 0) + (filters.deleted ? 1 : 0);
 
     if (loading) {
-        return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div className='flex items-center justify-center min-h-[60vh]'>
-                    <div className='text-center'>
-                        <Loader className='h-8 w-8 animate-spin text-blue-600 mx-auto mb-4' />
-                        <p className='text-gray-600 dark:text-gray-400'>
-                            Loading videos...
-                        </p>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Loader />;
     }
 
     if (error) {
@@ -389,252 +313,104 @@ const VideoList = () => {
                     className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
                 >
                     {/* Header */}
-                    <div className='flex items-center justify-between mb-8'>
-                        <div className='flex items-center space-x-4'>
-                            <button
-                                onClick={() => navigate(-1)}
-                                className='p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors'
-                            >
-                                <ArrowLeft className='h-5 w-5 text-gray-600 dark:text-gray-400' />
-                            </button>
-                            <div>
-                                <h1 className='text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3'>
-                                    <div className='p-2 bg-gradient-to-r from-red-500 to-pink-500 rounded-xl'>
-                                        <Video className='h-8 w-8 text-white' />
-                                    </div>
-                                    Educational Videos
-                                </h1>
-                                <p className='text-gray-600 dark:text-gray-400 mt-1'>
-                                    Manage educational video content for this
-                                    college
-                                </p>
-                            </div>
+                    <BackButton
+                        title={`Educational Videos for ${collegeslug}`}
+                        TitleIcon={Video}
+                    />
+
+                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
+                        <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
+                            <span className='text-gray-600 dark:text-gray-400'>
+                                Total ({getTimeFilterLabel(timeFilter)}):
+                            </span>
+                            <span className='font-semibold text-gray-900 dark:text-white'>
+                                {totalVideos}
+                            </span>
                         </div>
-                    </div>
 
-                    {/* Total Videos Banner */}
-                    {timeFilter && (
-                        <div className='bg-gradient-to-r from-red-500 to-pink-500 rounded-lg shadow-lg p-6 mb-6 text-white'>
-                            <div className='flex items-center justify-between'>
-                                <div>
-                                    <p className='text-red-100 text-sm font-medium mb-1'>
-                                        {getTimeFilterLabel()}
-                                    </p>
-                                    <p className='text-3xl font-bold'>
-                                        {totalVideos} Videos
-                                    </p>
-                                </div>
-                                <div className='bg-white/20 p-3 rounded-lg'>
-                                    <Video className='w-8 h-8' />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className='space-y-6'>
-                        {/* Search and Controls */}
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4'>
-                            <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4'>
-                                {/* Search Bar */}
-                                <div className='relative flex-1 max-w-md'>
-                                    <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5' />
-                                    <input
-                                        type='text'
-                                        placeholder='Search videos...'
-                                        value={search}
-                                        onChange={(e) => {
-                                            setSearch(e.target.value);
-                                            setPage(1);
-                                        }}
-                                        className='w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                    />
-                                </div>
-
-                                {/* Controls */}
-                                <div className='flex items-center gap-3'>
-                                    {/* View Mode Toggle */}
-                                    <div className='flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1'>
-                                        <button
-                                            onClick={() =>
-                                                toggleViewMode('grid')
-                                            }
-                                            className={`p-2 rounded transition-colors ${
-                                                viewMode === 'grid'
-                                                    ? 'bg-white dark:bg-gray-600 text-red-600 dark:text-red-400 shadow-sm'
-                                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                                            }`}
-                                            title='Grid View'
-                                        >
-                                            <Grid3x3 className='h-5 w-5' />
-                                        </button>
-                                        <button
-                                            onClick={() =>
-                                                toggleViewMode('table')
-                                            }
-                                            className={`p-2 rounded transition-colors ${
-                                                viewMode === 'table'
-                                                    ? 'bg-white dark:bg-gray-600 text-red-600 dark:text-red-400 shadow-sm'
-                                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                                            }`}
-                                            title='Table View'
-                                        >
-                                            <List className='h-5 w-5' />
-                                        </button>
-                                    </div>
-
-                                    {/* Filter Toggle */}
-                                    <button
-                                        onClick={() =>
-                                            setShowFilters(!showFilters)
-                                        }
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-                                            showFilters
-                                                ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-700 dark:text-red-300'
-                                                : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
-                                        }`}
-                                    >
-                                        <Filter className='h-4 w-4' />
-                                        Filters
-                                        {activeFiltersCount > 0 && (
-                                            <span className='bg-red-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center'>
-                                                {activeFiltersCount}
-                                            </span>
-                                        )}
-                                    </button>
-
-                                    {/* Time Filter */}
-                                    <div className='relative'>
-                                        <Clock className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none' />
-                                        <select
-                                            value={timeFilter}
-                                            onChange={(e) =>
-                                                setTimeFilter(e.target.value)
-                                            }
-                                            className='pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white text-sm appearance-none'
-                                        >
-                                            <option value=''>
-                                                Time Filter
-                                            </option>
-                                            <option value='last24h'>
-                                                Last 24 Hours
-                                            </option>
-                                            <option value='last7d'>
-                                                Last 7 Days
-                                            </option>
-                                            <option value='last28d'>
-                                                Last 28 Days
-                                            </option>
-                                            <option value='thisWeek'>
-                                                This Week
-                                            </option>
-                                            <option value='thisMonth'>
-                                                This Month
-                                            </option>
-                                            <option value='thisYear'>
-                                                This Year
-                                            </option>
-                                            <option value='all'>
-                                                All Time
-                                            </option>
-                                        </select>
-                                    </div>
-
-                                    {/* Sort Dropdown */}
-                                    <select
-                                        value={`${sortBy}-${sortOrder}`}
-                                        onChange={(e) => {
-                                            const [field, order] =
-                                                e.target.value.split('-');
-                                            setSortBy(field);
-                                            setSortOrder(order);
-                                        }}
-                                        className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                    >
-                                        <option value='createdAt-desc'>
-                                            Newest First
-                                        </option>
-                                        <option value='createdAt-asc'>
-                                            Oldest First
-                                        </option>
-                                        <option value='clickCounts-desc'>
-                                            Most Views
-                                        </option>
-                                        <option value='clickCounts-asc'>
-                                            Least Views
-                                        </option>
-                                    </select>
-
-                                    {/* Clear Filters */}
-                                    {/* Clear Filters */}
-                                    {(activeFiltersCount > 0 ||
-                                        search ||
-                                        timeFilter) && (
-                                        <button
-                                            onClick={clearAllFilters}
-                                            className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors'
-                                        >
-                                            <X className='h-4 w-4' />
-                                            Clear All
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Filter Panel */}
-                            {showFilters && (
-                                <div className='mt-4 pt-4 border-t border-gray-200 dark:border-gray-700'>
-                                    <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4'>
-                                        <select
-                                            value={filters.submissionStatus}
-                                            onChange={(e) =>
-                                                setFilters({
-                                                    ...filters,
-                                                    submissionStatus:
-                                                        e.target.value,
-                                                })
-                                            }
-                                            className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                        >
-                                            <option value=''>
-                                                All Submission Statuses
-                                            </option>
-                                            {uniqueStatuses.map((status) => (
-                                                <option
-                                                    key={status}
-                                                    value={status}
-                                                >
-                                                    {status
-                                                        .charAt(0)
-                                                        .toUpperCase() +
-                                                        status.slice(1)}
-                                                </option>
-                                            ))}
-                                        </select>
-
-                                        <select
-                                            value={filters.deleted}
-                                            onChange={(e) =>
-                                                setFilters({
-                                                    ...filters,
-                                                    deleted: e.target.value,
-                                                })
-                                            }
-                                            className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                        >
-                                            <option value=''>
-                                                All (Deleted Status)
-                                            </option>
-                                            <option value='true'>
-                                                Deleted
-                                            </option>
-                                            <option value='false'>
-                                                Not Deleted
-                                            </option>
-                                        </select>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        {/* FilterBar */}
+                        <FilterBar
+                            search={search}
+                            onSearch={(v) => {
+                                setSearch(v);
+                                setPage(1);
+                            }}
+                            searchPlaceholder='Search videos...'
+                            filters={[
+                                {
+                                    label: 'Status',
+                                    value: filters.submissionStatus,
+                                    onChange: (v) =>
+                                        setFilters({
+                                            ...filters,
+                                            submissionStatus: v,
+                                        }),
+                                    options: [
+                                        { value: '', label: 'All Statuses' },
+                                        ...uniqueStatuses.map((s) => ({
+                                            value: s,
+                                            label:
+                                                s.charAt(0).toUpperCase() +
+                                                s.slice(1),
+                                        })),
+                                    ],
+                                },
+                                {
+                                    label: 'Deleted',
+                                    value: filters.deleted,
+                                    onChange: (v) =>
+                                        setFilters({ ...filters, deleted: v }),
+                                    options: [
+                                        { value: '', label: 'All (Deleted)' },
+                                        { value: 'true', label: 'Deleted' },
+                                        {
+                                            value: 'false',
+                                            label: 'Not Deleted',
+                                        },
+                                    ],
+                                },
+                            ]}
+                            timeFilter={{
+                                value: timeFilter,
+                                onChange: (v) => {
+                                    setTimeFilter(v);
+                                    setPage(1);
+                                },
+                            }}
+                            sortBy={{
+                                value: sortBy,
+                                onChange: setSortBy,
+                                options: [
+                                    {
+                                        value: 'createdAt',
+                                        label: 'Sort by Date',
+                                    },
+                                    {
+                                        value: 'clickCounts',
+                                        label: 'Sort by Views',
+                                    },
+                                ],
+                            }}
+                            sortOrder={{
+                                value: sortOrder,
+                                onToggle: () =>
+                                    setSortOrder(
+                                        sortOrder === 'asc' ? 'desc' : 'asc',
+                                    ),
+                            }}
+                            viewMode={{
+                                value: viewMode,
+                                onChange: setViewMode,
+                            }}
+                            onClear={clearAllFilters}
+                            showClear={
+                                !!(
+                                    search ||
+                                    timeFilter ||
+                                    activeFiltersCount > 0
+                                )
+                            }
+                        />
                     </div>
 
                     {error && (

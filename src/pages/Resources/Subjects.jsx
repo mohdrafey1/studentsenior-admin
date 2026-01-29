@@ -5,22 +5,14 @@ import Sidebar from '../../components/Sidebar';
 import { useSidebarLayout } from '../../hooks/useSidebarLayout';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import {
-    BookOpen,
-    Search,
-    X,
-    Grid3x3,
-    List,
-    SortAsc,
-    SortDesc,
-    Calendar,
-    BookMarked,
-} from 'lucide-react';
+import { BookOpen, Calendar, X, BookMarked } from 'lucide-react';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import SyllabusModal from '../../components/SyllabusModal';
 import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
+import FilterBar from '../../components/Common/FilterBar';
+import { filterByTime } from '../../components/Common/timeFilterUtils';
 
 const Subjects = () => {
     const [subjects, setSubjects] = useState([]);
@@ -38,6 +30,7 @@ const Subjects = () => {
     const [filterSemester, setFilterSemester] = useState('');
     const [sortBy, setSortBy] = useState('createdAt'); // 'createdAt' | 'name'
     const [sortOrder, setSortOrder] = useState('desc');
+    const [timeFilter, setTimeFilter] = useState('');
     const [viewMode, setViewMode] = useState(() =>
         window.innerWidth >= 1024 ? 'table' : 'grid',
     );
@@ -136,6 +129,7 @@ const Subjects = () => {
         const fc = params.get('course') || '';
         const fb = params.get('branch') || '';
         const fs = params.get('semester') || '';
+        const tf = params.get('timeFilter') || '';
         const sb = params.get('sortBy') || 'createdAt';
         const so = params.get('sortOrder') || 'desc';
         const vm =
@@ -148,6 +142,7 @@ const Subjects = () => {
         setFilterCourse(fc);
         setFilterBranch(fb);
         setFilterSemester(fs);
+        setTimeFilter(tf);
         setSortBy(sb === 'name' ? 'name' : 'createdAt');
         setSortOrder(so === 'asc' ? 'asc' : 'desc');
         setViewMode(vm === 'grid' ? 'grid' : 'table');
@@ -164,6 +159,7 @@ const Subjects = () => {
         params.set('course', filterCourse || '');
         params.set('branch', filterBranch || '');
         params.set('semester', filterSemester || '');
+        params.set('timeFilter', timeFilter || '');
         params.set('sortBy', sortBy);
         params.set('sortOrder', sortOrder);
         params.set('view', viewMode);
@@ -179,6 +175,7 @@ const Subjects = () => {
         filterCourse,
         filterBranch,
         filterSemester,
+        timeFilter,
         sortBy,
         sortOrder,
         viewMode,
@@ -412,6 +409,8 @@ const Subjects = () => {
                     matchesSemester
                 );
             })
+            // Apply time filter
+            .filter((s) => filterByTime(s, timeFilter))
             .sort((a, b) => {
                 if (sortBy === 'createdAt') {
                     const aVal = new Date(a.createdAt || 0).getTime();
@@ -432,6 +431,7 @@ const Subjects = () => {
         filterCourse,
         filterBranch,
         filterSemester,
+        timeFilter,
         sortBy,
         sortOrder,
     ]);
@@ -455,169 +455,134 @@ const Subjects = () => {
                     {/* Header */}
                     <BackButton title='Subjects' TitleIcon={BookOpen} />
 
-                    {/* Search, Filters, View & Sort */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6'>
-                        <div className='relative mb-4 max-w-xl'>
-                            <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5' />
-                            <input
-                                type='text'
-                                placeholder='Search by subject name, code, course, branch, or semester...'
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className='w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                            />
-                        </div>
-                        <div className='flex flex-wrap items-center gap-3'>
-                            {/* View toggle */}
-                            <div className='flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1'>
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
-                                    title='Grid view'
-                                >
-                                    <Grid3x3 className='w-4 h-4' />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('table')}
-                                    className={`p-2 rounded ${viewMode === 'table' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
-                                    title='Table view'
-                                >
-                                    <List className='w-4 h-4' />
-                                </button>
-                            </div>
-
-                            {/* College Filter */}
-                            <select
-                                value={filterCollege}
-                                onChange={(e) => {
-                                    setFilterCollege(e.target.value);
-                                }}
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
-                            >
-                                <option value=''>All Colleges</option>
-                                <option value='dr-apj-abdul-kalam-technical-university-aktu'>
-                                    Dr. APJ Abdul Kalam Technical University
-                                </option>
-                                <option value='integral-university'>
-                                    Integral University
-                                </option>
-                                {colleges.map((c) => (
-                                    <option key={c._id} value={c._id}>
-                                        {c.slug}
-                                    </option>
-                                ))}
-                            </select>
-
-                            {/* Course Filter */}
-                            <select
-                                value={filterCourse}
-                                onChange={(e) => {
-                                    setFilterCourse(e.target.value);
-                                    setFilterBranch('');
-                                }}
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
-                            >
-                                <option value=''>All Courses</option>
-                                {courses.map((c) => (
-                                    <option key={c._id} value={c._id}>
-                                        {c.courseCode}
-                                    </option>
-                                ))}
-                            </select>
-
-                            {/* Branch Filter (depends on course, but allow all when no course) */}
-                            <select
-                                value={filterBranch}
-                                onChange={(e) =>
-                                    setFilterBranch(e.target.value)
-                                }
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
-                            >
-                                <option value=''>All Branches</option>
-                                {(filterCourse
-                                    ? branches.filter(
-                                          (b) =>
-                                              (b.course?._id || '') ===
-                                              filterCourse,
-                                      )
-                                    : branches
-                                ).map((b) => (
-                                    <option key={b._id} value={b._id}>
-                                        {b.branchCode}
-                                    </option>
-                                ))}
-                            </select>
-
-                            {/* Semester Filter */}
-                            <select
-                                value={filterSemester}
-                                onChange={(e) =>
-                                    setFilterSemester(e.target.value)
-                                }
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
-                            >
-                                <option value=''>All Semesters</option>
-                                {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
-                                    <option key={sem} value={String(sem)}>
-                                        Semester {sem}
-                                    </option>
-                                ))}
-                            </select>
-
-                            {/* Sort By */}
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
-                            >
-                                <option value='createdAt'>Sort by Date</option>
-                                <option value='name'>Sort by Name</option>
-                            </select>
-
-                            {/* Sort Order */}
-                            <button
-                                onClick={() =>
+                    {/* Compact Filters */}
+                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
+                        <FilterBar
+                            search={search}
+                            onSearch={setSearch}
+                            searchPlaceholder='Search by subject name, code, course, branch, or semester...'
+                            filters={[
+                                {
+                                    label: 'College',
+                                    value: filterCollege,
+                                    onChange: setFilterCollege,
+                                    options: [
+                                        { value: '', label: 'All Colleges' },
+                                        {
+                                            value: 'dr-apj-abdul-kalam-technical-university-aktu',
+                                            label: 'AKTU',
+                                        },
+                                        {
+                                            value: 'integral-university',
+                                            label: 'Integral University',
+                                        },
+                                        ...colleges.map((c) => ({
+                                            value: c._id,
+                                            label: c.slug,
+                                        })),
+                                    ],
+                                },
+                                {
+                                    label: 'Course',
+                                    value: filterCourse,
+                                    onChange: (v) => {
+                                        setFilterCourse(v);
+                                        setFilterBranch('');
+                                    },
+                                    options: [
+                                        { value: '', label: 'All Courses' },
+                                        ...courses.map((c) => ({
+                                            value: c._id,
+                                            label: c.courseCode,
+                                        })),
+                                    ],
+                                },
+                                {
+                                    label: 'Branch',
+                                    value: filterBranch,
+                                    onChange: setFilterBranch,
+                                    options: [
+                                        { value: '', label: 'All Branches' },
+                                        ...(filterCourse
+                                            ? branches.filter(
+                                                  (b) =>
+                                                      (b.course?._id || '') ===
+                                                      filterCourse,
+                                              )
+                                            : branches
+                                        ).map((b) => ({
+                                            value: b._id,
+                                            label: b.branchCode,
+                                        })),
+                                    ],
+                                },
+                                {
+                                    label: 'Semester',
+                                    value: filterSemester,
+                                    onChange: setFilterSemester,
+                                    options: [
+                                        { value: '', label: 'All Semesters' },
+                                        ...[1, 2, 3, 4, 5, 6, 7, 8].map(
+                                            (sem) => ({
+                                                value: String(sem),
+                                                label: `Semester ${sem}`,
+                                            }),
+                                        ),
+                                    ],
+                                },
+                            ]}
+                            timeFilter={{
+                                value: timeFilter,
+                                onChange: (v) => {
+                                    setTimeFilter(v);
+                                    setPage(1);
+                                },
+                            }}
+                            sortBy={{
+                                value: sortBy,
+                                onChange: setSortBy,
+                                options: [
+                                    {
+                                        value: 'createdAt',
+                                        label: 'Sort by Date',
+                                    },
+                                    {
+                                        value: 'name',
+                                        label: 'Sort by Name',
+                                    },
+                                ],
+                            }}
+                            sortOrder={{
+                                value: sortOrder,
+                                onToggle: () =>
                                     setSortOrder(
                                         sortOrder === 'asc' ? 'desc' : 'asc',
-                                    )
-                                }
-                                className='p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
-                                title={
-                                    sortOrder === 'asc'
-                                        ? 'Ascending'
-                                        : 'Descending'
-                                }
-                            >
-                                {sortOrder === 'asc' ? (
-                                    <SortAsc className='w-4 h-4' />
-                                ) : (
-                                    <SortDesc className='w-4 h-4' />
-                                )}
-                            </button>
-
-                            {/* Clear Filters (shows when any filter active) */}
-                            {(search.trim().length > 0 ||
-                                filterCollege ||
-                                filterCourse ||
-                                filterBranch ||
-                                filterSemester) && (
-                                <button
-                                    onClick={() => {
-                                        setSearch('');
-                                        setFilterCollege('');
-                                        setFilterCourse('');
-                                        setFilterBranch('');
-                                        setFilterSemester('');
-                                        setPage(1);
-                                    }}
-                                    className='inline-flex items-center gap-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                    title='Clear filters'
-                                >
-                                    <X className='w-4 h-4' />
-                                    Clear
-                                </button>
-                            )}
-                        </div>
+                                    ),
+                            }}
+                            viewMode={{
+                                value: viewMode,
+                                onChange: setViewMode,
+                            }}
+                            onClear={() => {
+                                setSearch('');
+                                setFilterCollege('');
+                                setFilterCourse('');
+                                setFilterBranch('');
+                                setFilterSemester('');
+                                setTimeFilter('');
+                                setPage(1);
+                            }}
+                            showClear={
+                                !!(
+                                    search ||
+                                    filterCollege ||
+                                    filterCourse ||
+                                    filterBranch ||
+                                    filterSemester ||
+                                    timeFilter
+                                )
+                            }
+                        />
                     </div>
 
                     {error && (

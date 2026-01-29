@@ -7,28 +7,22 @@ import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import {
     ShoppingBag,
-    ArrowLeft,
-    Loader,
-    Search,
     Edit2,
     Trash2,
     Eye,
-    Calendar,
-    DollarSign,
-    Building,
-    User,
     Package,
-    Grid3x3,
-    List,
-    Filter,
-    X,
-    SortAsc,
     CheckCircle,
-    Clock,
 } from 'lucide-react';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import ProductEditModal from '../../components/ProductEditModal';
+import FilterBar from '../../components/Common/FilterBar';
+import BackButton from '../../components/Common/BackButton';
+import {
+    filterByTime,
+    getTimeFilterLabel,
+} from '../../components/Common/timeFilterUtils';
+import Loader from '../../components/Common/Loader';
 
 const ProductList = () => {
     const location = useLocation();
@@ -68,7 +62,6 @@ const ProductList = () => {
     });
     const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState('desc');
-    const [showFilters, setShowFilters] = useState(false);
 
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -126,27 +119,6 @@ const ProductList = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const getTimeFilterLabel = () => {
-        switch (timeFilter) {
-            case 'last24h':
-                return 'Last 24 Hours';
-            case 'last7d':
-                return 'Last 7 Days';
-            case 'last28d':
-                return 'Last 28 Days';
-            case 'thisWeek':
-                return 'This Week';
-            case 'thisMonth':
-                return 'This Month';
-            case 'thisYear':
-                return 'This Year';
-            case 'all':
-                return 'All Time';
-            default:
-                return '';
-        }
-    };
-
     const fetchProducts = async () => {
         try {
             setLoading(true);
@@ -200,11 +172,6 @@ const ProductList = () => {
         handleModalClose();
     };
 
-    // Toggle view mode (user can still manually switch)
-    const toggleViewMode = (mode) => {
-        setViewMode(mode);
-    };
-
     // Get unique values for filters
     const uniqueStatuses = ['pending', 'approved', 'rejected'];
 
@@ -230,42 +197,8 @@ const ProductList = () => {
             filters.deleted === '' ||
             (filters.deleted === 'true' ? product.deleted : !product.deleted);
 
-        // Time filter
-        const matchesTime = (() => {
-            if (!timeFilter) return true;
-            const itemDate = new Date(product.createdAt || 0);
-            const now = new Date();
-
-            switch (timeFilter) {
-                case 'last24h':
-                    return now - itemDate <= 24 * 60 * 60 * 1000;
-                case 'last7d':
-                    return now - itemDate <= 7 * 24 * 60 * 60 * 1000;
-                case 'last28d':
-                    return now - itemDate <= 28 * 24 * 60 * 60 * 1000;
-                case 'thisWeek': {
-                    const startOfWeek = new Date(now);
-                    startOfWeek.setDate(now.getDate() - now.getDay());
-                    startOfWeek.setHours(0, 0, 0, 0);
-                    return itemDate >= startOfWeek;
-                }
-                case 'thisMonth': {
-                    const startOfMonth = new Date(
-                        now.getFullYear(),
-                        now.getMonth(),
-                        1,
-                    );
-                    return itemDate >= startOfMonth;
-                }
-                case 'thisYear': {
-                    const startOfYear = new Date(now.getFullYear(), 0, 1);
-                    return itemDate >= startOfYear;
-                }
-                case 'all':
-                default:
-                    return true;
-            }
-        })();
+        // Time filter using the utility
+        const matchesTime = filterByTime(product, timeFilter);
 
         return (
             matchesSearch &&
@@ -296,7 +229,7 @@ const ProductList = () => {
 
     const totalItems = sorted.length;
     const totalPages = Math.ceil(totalItems / pageSize) || 1;
-    const totalProducts = timeFilter ? sorted.length : 0;
+    const totalProducts = sorted.length;
 
     const resetFilters = () => {
         setFilters({
@@ -318,20 +251,7 @@ const ProductList = () => {
     const activeFiltersCount = Object.values(filters).filter(Boolean).length;
 
     if (loading) {
-        return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div className='flex items-center justify-center min-h-[60vh]'>
-                    <div className='text-center'>
-                        <Loader className='h-8 w-8 animate-spin text-blue-600 mx-auto mb-4' />
-                        <p className='text-gray-600 dark:text-gray-400'>
-                            Loading products...
-                        </p>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Loader />;
     }
 
     return (
@@ -343,267 +263,118 @@ const ProductList = () => {
                     className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
                 >
                     {/* Header */}
-                    <div className='flex items-center justify-between mb-8'>
-                        <div className='flex items-center'>
-                            <button
-                                onClick={() => navigate(`/${collegeslug}`)}
-                                className='mr-4 p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors'
-                            >
-                                <ArrowLeft className='w-5 h-5' />
-                            </button>
-                            <div className='flex items-center'>
-                                <div className='bg-green-600 text-white p-3 rounded-lg mr-4'>
-                                    <ShoppingBag className='w-6 h-6' />
-                                </div>
-                                <div>
-                                    <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                        Store Products
-                                    </h1>
-                                    <p className='text-gray-600 dark:text-gray-400 mt-1'>
-                                        Manage products for {collegeslug}
-                                    </p>
-                                </div>
-                            </div>
+                    <BackButton
+                        title={`Products for ${collegeslug}`}
+                        TitleIcon={ShoppingBag}
+                    />
+                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
+                        <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
+                            <span className='text-gray-600 dark:text-gray-400'>
+                                Total ({getTimeFilterLabel(timeFilter)}):
+                            </span>
+                            <span className='font-semibold text-gray-900 dark:text-white'>
+                                {totalProducts}
+                            </span>
                         </div>
-                    </div>
 
-                    {/* Total Products Banner */}
-                    {timeFilter && (
-                        <div className='bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 mb-6 text-white'>
-                            <div className='flex items-center justify-between'>
-                                <div>
-                                    <p className='text-orange-100 text-sm font-medium mb-1'>
-                                        {getTimeFilterLabel()}
-                                    </p>
-                                    <p className='text-3xl font-bold'>
-                                        {totalProducts} Products
-                                    </p>
-                                </div>
-                                <div className='bg-white/20 p-3 rounded-lg'>
-                                    <ShoppingBag className='w-8 h-8' />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Search and Controls */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8'>
-                        <div className='flex flex-col gap-4'>
-                            {/* Search Bar */}
-                            <div className='relative flex-1'>
-                                <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
-                                <input
-                                    type='text'
-                                    placeholder='Search by name or description...'
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className='w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                />
-                            </div>
-
-                            {/* View Toggle, Filters, and Sort Controls */}
-                            <div className='flex flex-wrap items-center gap-3'>
-                                {/* View Mode Toggle */}
-                                <div className='flex gap-2'>
-                                    <button
-                                        onClick={() => toggleViewMode('grid')}
-                                        className={`p-2 rounded-lg border ${
-                                            viewMode === 'grid'
-                                                ? 'bg-blue-500 text-white border-blue-500'
-                                                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                                        }`}
-                                        title='Grid View'
-                                    >
-                                        <Grid3x3 className='w-5 h-5' />
-                                    </button>
-                                    <button
-                                        onClick={() => toggleViewMode('table')}
-                                        className={`p-2 rounded-lg border ${
-                                            viewMode === 'table'
-                                                ? 'bg-blue-500 text-white border-blue-500'
-                                                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                                        }`}
-                                        title='Table View'
-                                    >
-                                        <List className='w-5 h-5' />
-                                    </button>
-                                </div>
-
-                                {/* Filter Toggle Button */}
-                                <button
-                                    onClick={() => setShowFilters(!showFilters)}
-                                    className={`px-4 py-2 rounded-lg border flex items-center gap-2 ${
-                                        showFilters
-                                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700'
-                                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                                    }`}
-                                >
-                                    <Filter className='w-5 h-5' />
-                                    Filters
-                                    {activeFiltersCount > 0 && (
-                                        <span className='bg-blue-500 text-white text-xs rounded-full px-2 py-0.5'>
-                                            {activeFiltersCount}
-                                        </span>
-                                    )}
-                                </button>
-
-                                {/* Time Filter */}
-                                <div className='relative'>
-                                    <Clock className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none' />
-                                    <select
-                                        value={timeFilter}
-                                        onChange={(e) =>
-                                            setTimeFilter(e.target.value)
-                                        }
-                                        className='pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm appearance-none'
-                                    >
-                                        <option value=''>Time Filter</option>
-                                        <option value='last24h'>
-                                            Last 24 Hours
-                                        </option>
-                                        <option value='last7d'>
-                                            Last 7 Days
-                                        </option>
-                                        <option value='last28d'>
-                                            Last 28 Days
-                                        </option>
-                                        <option value='thisWeek'>
-                                            This Week
-                                        </option>
-                                        <option value='thisMonth'>
-                                            This Month
-                                        </option>
-                                        <option value='thisYear'>
-                                            This Year
-                                        </option>
-                                        <option value='all'>All Time</option>
-                                    </select>
-                                </div>
-
-                                {/* Sort Controls */}
-                                <select
-                                    value={sortBy}
-                                    onChange={(e) => setSortBy(e.target.value)}
-                                    className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                >
-                                    <option value='createdAt'>
-                                        Sort by Date
-                                    </option>
-                                    <option value='clickCounts'>
-                                        Sort by Views
-                                    </option>
-                                </select>
-                                <button
-                                    onClick={() =>
-                                        setSortOrder(
-                                            sortOrder === 'asc'
-                                                ? 'desc'
-                                                : 'asc',
-                                        )
-                                    }
-                                    className='p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 dark:bg-gray-700 dark:text-white'
-                                    title={
-                                        sortOrder === 'asc'
-                                            ? 'Ascending'
-                                            : 'Descending'
-                                    }
-                                >
-                                    <SortAsc
-                                        className={`w-5 h-5 transition-transform ${
-                                            sortOrder === 'desc'
-                                                ? 'rotate-180'
-                                                : ''
-                                        }`}
-                                    />
-                                </button>
-
-                                {/* Clear Filters */}
-                                {(activeFiltersCount > 0 ||
+                        {/* FilterBar */}
+                        <FilterBar
+                            search={search}
+                            onSearch={setSearch}
+                            searchPlaceholder='Search by name or description...'
+                            filters={[
+                                {
+                                    label: 'Status',
+                                    value: filters.submissionStatus,
+                                    onChange: (v) =>
+                                        setFilters({
+                                            ...filters,
+                                            submissionStatus: v,
+                                        }),
+                                    options: [
+                                        { value: '', label: 'All Statuses' },
+                                        ...uniqueStatuses.map((s) => ({
+                                            value: s,
+                                            label: s,
+                                        })),
+                                    ],
+                                },
+                                {
+                                    label: 'Availability',
+                                    value: filters.available,
+                                    onChange: (v) =>
+                                        setFilters({
+                                            ...filters,
+                                            available: v,
+                                        }),
+                                    options: [
+                                        {
+                                            value: '',
+                                            label: 'All (Availability)',
+                                        },
+                                        { value: 'true', label: 'Available' },
+                                        {
+                                            value: 'false',
+                                            label: 'Unavailable',
+                                        },
+                                    ],
+                                },
+                                {
+                                    label: 'Deleted',
+                                    value: filters.deleted,
+                                    onChange: (v) =>
+                                        setFilters({ ...filters, deleted: v }),
+                                    options: [
+                                        { value: '', label: 'All (Deleted)' },
+                                        { value: 'true', label: 'Deleted' },
+                                        {
+                                            value: 'false',
+                                            label: 'Not Deleted',
+                                        },
+                                    ],
+                                },
+                            ]}
+                            timeFilter={{
+                                value: timeFilter,
+                                onChange: (v) => {
+                                    setTimeFilter(v);
+                                    setPage(1);
+                                },
+                            }}
+                            sortBy={{
+                                value: sortBy,
+                                onChange: setSortBy,
+                                options: [
+                                    {
+                                        value: 'createdAt',
+                                        label: 'Sort by Date',
+                                    },
+                                    {
+                                        value: 'clickCounts',
+                                        label: 'Sort by Views',
+                                    },
+                                ],
+                            }}
+                            sortOrder={{
+                                value: sortOrder,
+                                onToggle: () =>
+                                    setSortOrder(
+                                        sortOrder === 'asc' ? 'desc' : 'asc',
+                                    ),
+                            }}
+                            viewMode={{
+                                value: viewMode,
+                                onChange: setViewMode,
+                            }}
+                            onClear={clearAllFilters}
+                            showClear={
+                                !!(
                                     search ||
-                                    timeFilter) && (
-                                    <button
-                                        onClick={clearAllFilters}
-                                        className='px-4 py-2 rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2'
-                                    >
-                                        <X className='w-4 h-4' />
-                                        Clear All
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Filter Panel */}
-                            {showFilters && (
-                                <div className='p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600'>
-                                    <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-                                        <select
-                                            value={filters.submissionStatus}
-                                            onChange={(e) =>
-                                                setFilters({
-                                                    ...filters,
-                                                    submissionStatus:
-                                                        e.target.value,
-                                                })
-                                            }
-                                            className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                        >
-                                            <option value=''>
-                                                All Statuses
-                                            </option>
-                                            {uniqueStatuses.map((status) => (
-                                                <option
-                                                    key={status}
-                                                    value={status}
-                                                >
-                                                    {status}
-                                                </option>
-                                            ))}
-                                        </select>
-
-                                        <select
-                                            value={filters.available}
-                                            onChange={(e) =>
-                                                setFilters({
-                                                    ...filters,
-                                                    available: e.target.value,
-                                                })
-                                            }
-                                            className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                        >
-                                            <option value=''>
-                                                All (Availability)
-                                            </option>
-                                            <option value='true'>
-                                                Available
-                                            </option>
-                                            <option value='false'>
-                                                Unavailable
-                                            </option>
-                                        </select>
-
-                                        <select
-                                            value={filters.deleted}
-                                            onChange={(e) =>
-                                                setFilters({
-                                                    ...filters,
-                                                    deleted: e.target.value,
-                                                })
-                                            }
-                                            className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                        >
-                                            <option value=''>
-                                                All (Deleted Status)
-                                            </option>
-                                            <option value='true'>
-                                                Deleted
-                                            </option>
-                                            <option value='false'>
-                                                Not Deleted
-                                            </option>
-                                        </select>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                                    timeFilter ||
+                                    activeFiltersCount > 0
+                                )
+                            }
+                        />
                     </div>
 
                     {error && (
