@@ -5,23 +5,14 @@ import Sidebar from '../../components/Sidebar';
 import { useSidebarLayout } from '../../hooks/useSidebarLayout';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import {
-    Building,
-    ArrowLeft,
-    Search,
-    Plus,
-    X,
-    Grid3x3,
-    List,
-    SortAsc,
-    SortDesc,
-    Calendar,
-} from 'lucide-react';
+import { Building, Calendar, X } from 'lucide-react';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import { Link } from 'react-router-dom';
 import Loader from '../../components/Common/Loader';
 import BackButton from '../../components/Common/BackButton';
+import FilterBar from '../../components/Common/FilterBar';
+import { filterByTime } from '../../components/Common/timeFilterUtils';
 
 const Branches = () => {
     const [branches, setBranches] = useState([]);
@@ -32,8 +23,9 @@ const Branches = () => {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(12);
     const [filterCourse, setFilterCourse] = useState('');
-    const [sortBy, setSortBy] = useState('createdAt'); // 'createdAt' | 'name'
+    const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState('desc');
+    const [timeFilter, setTimeFilter] = useState('');
     const [viewMode, setViewMode] = useState(() =>
         window.innerWidth >= 1024 ? 'table' : 'grid',
     );
@@ -103,6 +95,7 @@ const Branches = () => {
         const p = parseInt(params.get('page') || '1', 10);
         const ps = parseInt(params.get('pageSize') || '12', 10);
         const fc = params.get('course') || '';
+        const tf = params.get('timeFilter') || '';
         const sb = params.get('sortBy') || 'createdAt';
         const so = params.get('sortOrder') || 'desc';
         const vm =
@@ -112,6 +105,7 @@ const Branches = () => {
         setPage(Number.isFinite(p) && p > 0 ? p : 1);
         setPageSize(Number.isFinite(ps) && ps > 0 ? ps : 12);
         setFilterCourse(fc);
+        setTimeFilter(tf);
         setSortBy(sb === 'name' ? 'name' : 'createdAt');
         setSortOrder(so === 'asc' ? 'asc' : 'desc');
         setViewMode(vm === 'grid' ? 'grid' : 'table');
@@ -125,6 +119,7 @@ const Branches = () => {
         params.set('page', String(page));
         params.set('pageSize', String(pageSize));
         params.set('course', filterCourse || '');
+        params.set('timeFilter', timeFilter || '');
         params.set('sortBy', sortBy);
         params.set('sortOrder', sortOrder);
         params.set('view', viewMode);
@@ -137,6 +132,7 @@ const Branches = () => {
         page,
         pageSize,
         filterCourse,
+        timeFilter,
         sortBy,
         sortOrder,
         viewMode,
@@ -233,6 +229,8 @@ const Branches = () => {
                     !filterCourse || (b.course?._id || '') === filterCourse;
                 return matchesSearch && matchesCourse;
             })
+            // Apply time filter
+            .filter((b) => filterByTime(b, timeFilter))
             .sort((a, b) => {
                 if (sortBy === 'createdAt') {
                     const aVal = new Date(a.createdAt || 0).getTime();
@@ -246,7 +244,7 @@ const Branches = () => {
                 }
             });
         return list;
-    }, [branches, search, filterCourse, sortBy, sortOrder]);
+    }, [branches, search, filterCourse, timeFilter, sortBy, sortOrder]);
 
     const totalItems = filteredAndSorted.length;
     const start = (page - 1) * pageSize;
@@ -267,100 +265,66 @@ const Branches = () => {
                     {/* Header */}
                     <BackButton title='Branches' TitleIcon={Building} />
 
-                    {/* Search, Filters, View & Sort */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6'>
-                        <div className='relative mb-4 max-w-xl'>
-                            <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5' />
-                            <input
-                                type='text'
-                                placeholder='Search by branch name, code, or course...'
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className='w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                            />
-                        </div>
-                        <div className='flex flex-wrap items-center gap-3'>
-                            {/* View toggle */}
-                            <div className='flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1'>
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
-                                    title='Grid view'
-                                >
-                                    <Grid3x3 className='w-4 h-4' />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('table')}
-                                    className={`p-2 rounded ${viewMode === 'table' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
-                                    title='Table view'
-                                >
-                                    <List className='w-4 h-4' />
-                                </button>
-                            </div>
-
-                            {/* Course Filter */}
-                            <select
-                                value={filterCourse}
-                                onChange={(e) =>
-                                    setFilterCourse(e.target.value)
-                                }
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
-                            >
-                                <option value=''>All Courses</option>
-                                {courses.map((c) => (
-                                    <option key={c._id} value={c._id}>
-                                        {c.courseCode}
-                                    </option>
-                                ))}
-                            </select>
-
-                            {/* Sort By */}
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm'
-                            >
-                                <option value='createdAt'>Sort by Date</option>
-                                <option value='name'>Sort by Name</option>
-                            </select>
-
-                            {/* Sort Order */}
-                            <button
-                                onClick={() =>
+                    {/* Compact Filters */}
+                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
+                        <FilterBar
+                            search={search}
+                            onSearch={setSearch}
+                            searchPlaceholder='Search by branch name, code, or course...'
+                            filters={[
+                                {
+                                    label: 'Course',
+                                    value: filterCourse,
+                                    onChange: setFilterCourse,
+                                    options: [
+                                        { value: '', label: 'All Courses' },
+                                        ...courses.map((c) => ({
+                                            value: c._id,
+                                            label: c.courseCode,
+                                        })),
+                                    ],
+                                },
+                            ]}
+                            timeFilter={{
+                                value: timeFilter,
+                                onChange: (v) => {
+                                    setTimeFilter(v);
+                                    setPage(1);
+                                },
+                            }}
+                            sortBy={{
+                                value: sortBy,
+                                onChange: setSortBy,
+                                options: [
+                                    {
+                                        value: 'createdAt',
+                                        label: 'Sort by Date',
+                                    },
+                                    {
+                                        value: 'name',
+                                        label: 'Sort by Name',
+                                    },
+                                ],
+                            }}
+                            sortOrder={{
+                                value: sortOrder,
+                                onToggle: () =>
                                     setSortOrder(
                                         sortOrder === 'asc' ? 'desc' : 'asc',
-                                    )
-                                }
-                                className='p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
-                                title={
-                                    sortOrder === 'asc'
-                                        ? 'Ascending'
-                                        : 'Descending'
-                                }
-                            >
-                                {sortOrder === 'asc' ? (
-                                    <SortAsc className='w-4 h-4' />
-                                ) : (
-                                    <SortDesc className='w-4 h-4' />
-                                )}
-                            </button>
-
-                            {/* Clear Filters (shows when search or course filter active) */}
-                            {(search.trim().length > 0 || filterCourse) && (
-                                <button
-                                    onClick={() => {
-                                        setSearch('');
-                                        setFilterCourse('');
-                                        setPage(1);
-                                    }}
-                                    className='inline-flex items-center gap-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                    title='Clear filters'
-                                >
-                                    <X className='w-4 h-4' />
-                                    Clear
-                                </button>
-                            )}
-                        </div>
+                                    ),
+                            }}
+                            viewMode={{
+                                value: viewMode,
+                                onChange: setViewMode,
+                            }}
+                            onClear={() => {
+                                setSearch('');
+                                setFilterCourse('');
+                                setTimeFilter('');
+                                setPage(1);
+                            }}
+                            showClear={!!(search || filterCourse || timeFilter)}
+                        />
                     </div>
 
                     {error && (
