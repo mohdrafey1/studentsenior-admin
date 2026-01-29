@@ -72,11 +72,11 @@ const DeltaBadge = ({ value, lastViewedAt }) => {
                 {isPositive && '+'}
                 {absValue.toLocaleString()}
             </span>
-            {lastViewedAt && (
+            {/* {lastViewedAt && (
                 <span className='opacity-75 ml-1'>
                     ({formatLastViewed(lastViewedAt)})
                 </span>
-            )}
+            )} */}
         </div>
     );
 };
