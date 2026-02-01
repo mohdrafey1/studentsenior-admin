@@ -22,6 +22,8 @@ import {
     BookOpenCheck,
     ShoppingBag,
     BookMarked,
+    Crown,
+    ShoppingCart,
 } from 'lucide-react';
 import { useSidebar } from '../context/SidebarContext';
 import { Link } from 'react-router-dom';
@@ -70,6 +72,20 @@ function Sidebar() {
                     icon: RotateCcw,
                     to: '/reports/redemptions',
                     colors: 'text-purple-600 dark:text-purple-400',
+                },
+                {
+                    id: 'subscriptions',
+                    label: 'Subscriptions',
+                    icon: Crown,
+                    to: '/reports/subscriptions',
+                    colors: 'text-amber-600 dark:text-amber-400',
+                },
+                {
+                    id: 'content-purchases',
+                    label: 'Content Purchases',
+                    icon: ShoppingCart,
+                    to: '/reports/content-purchases',
+                    colors: 'text-pink-600 dark:text-pink-400',
                 },
                 {
                     id: 'contacts',
