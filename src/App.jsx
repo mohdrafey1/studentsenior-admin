@@ -29,6 +29,7 @@ const PaymentDetail = lazy(() => import('./pages/Financial/PaymentDetail'));
 const Order = lazy(() => import('./pages/Financial/Order'));
 const Redemptions = lazy(() => import('./pages/Financial/Redemptions'));
 const Transactions = lazy(() => import('./pages/Financial/Transactions'));
+const Subscriptions = lazy(() => import('./pages/Financial/Subscriptions'));
 
 // Users
 const Contacts = lazy(() => import('./pages/Users/Contacts'));
@@ -235,6 +236,14 @@ function App() {
                                     element={
                                         <ProtectedRoute>
                                             <Transactions />
+                                        </ProtectedRoute>
+                                    }
+                                />
+                                <Route
+                                    path='/reports/subscriptions'
+                                    element={
+                                        <ProtectedRoute>
+                                            <Subscriptions />
                                         </ProtectedRoute>
                                     }
                                 />

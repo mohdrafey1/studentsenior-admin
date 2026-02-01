@@ -18,6 +18,7 @@ import {
     CreditCard,
     PhoneCall,
     AlertCircle,
+    Diamond,
 } from 'lucide-react';
 import Loader from '../components/Common/Loader';
 
@@ -67,14 +68,15 @@ const Reports = () => {
                     href: '/reports/payments',
                     statKey: 'totalPayments',
                 },
+
                 {
                     id: 'orders',
                     title: 'Total Orders',
                     value: data?.totalOrders || 0,
                     icon: <ShoppingBag className='w-5 h-5' />,
-                    bgColor: 'bg-amber-100 dark:bg-amber-900',
-                    textColor: 'text-amber-600 dark:text-amber-400',
-                    iconColor: 'text-amber-500 dark:text-amber-300',
+                    bgColor: 'bg-orange-100 dark:bg-orange-900',
+                    textColor: 'text-orange-600 dark:text-orange-400',
+                    iconColor: 'text-orange-500 dark:text-orange-300',
                     href: '/reports/orders',
                     statKey: 'totalOrders',
                 },
@@ -137,6 +139,17 @@ const Reports = () => {
                     iconColor: 'text-pink-500 dark:text-pink-300',
                     href: '/reports/contacts',
                     statKey: 'totalContactUs',
+                },
+                {
+                    id: 'subscriptions',
+                    title: 'Subscriptions',
+                    value: data?.totalSubscriptions || 0,
+                    icon: <Diamond className='w-5 h-5' />,
+                    bgColor: 'bg-amber-100 dark:bg-amber-900',
+                    textColor: 'text-amber-600 dark:text-amber-400',
+                    iconColor: 'text-amber-500 dark:text-amber-300',
+                    href: '/reports/subscriptions',
+                    statKey: 'totalSubscriptions',
                 },
             ],
         },
