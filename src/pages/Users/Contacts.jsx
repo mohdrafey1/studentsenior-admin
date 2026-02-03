@@ -5,7 +5,14 @@ import Sidebar from '../../components/Sidebar';
 import { useSidebarLayout } from '../../hooks/useSidebarLayout';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import { PhoneCall, Clock, CheckCircle, AlertCircle, Eye } from 'lucide-react';
+import {
+    PhoneCall,
+    Clock,
+    CheckCircle,
+    AlertCircle,
+    Eye,
+    Mail,
+} from 'lucide-react';
 import FilterBar from '../../components/Common/FilterBar';
 import {
     filterByTime,
