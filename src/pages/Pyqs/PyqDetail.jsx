@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../../components/Header';
+import Sidebar from '../../components/Sidebar';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import {
@@ -9,12 +10,8 @@ import {
     Loader,
     Edit2,
     Trash2,
-    Calendar,
-    GraduationCap,
     BookOpen,
-    Building,
     User,
-    Tag,
     DollarSign,
     CheckCircle,
     XCircle,
@@ -25,6 +22,7 @@ import {
 } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
 import PyqEditModal from '../../components/PyqEditModal';
+import ApprovalActions from '../../components/ApprovalActions';
 
 const PyqDetail = () => {
     const [pyq, setPyq] = useState(null);
@@ -165,6 +163,7 @@ const PyqDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
+                <Sidebar />
                 <div className='flex items-center justify-center min-h-[60vh]'>
                     <Loader className='h-8 w-8 animate-spin text-blue-600' />
                 </div>
@@ -176,6 +175,7 @@ const PyqDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
+                <Sidebar />
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
                     <button
                         onClick={() => navigate(`/${collegeslug}/pyqs`)}
@@ -204,6 +204,7 @@ const PyqDetail = () => {
     return (
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans'>
             <Header />
+            <Sidebar />
             <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
                 {/* Top Navigation & Actions */}
                 <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8'>
@@ -250,6 +251,14 @@ const PyqDetail = () => {
                         </button>
                     </div>
                 </div>
+
+                <ApprovalActions
+                    resourceId={pyq._id}
+                    resourceType='PYQ'
+                    currentStatus={pyq.submissionStatus}
+                    apiEndpoint={`/pyq/edit/${pyq._id}`}
+                    onStatusChange={fetchPyq}
+                />
 
                 <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
                     {/* Left Column: Preview & Subject Info */}

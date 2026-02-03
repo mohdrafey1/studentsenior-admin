@@ -413,7 +413,10 @@ const ProductList = () => {
                                             {current.map((product) => (
                                                 <tr
                                                     key={product._id}
-                                                    className='hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
+                                                    onClick={() =>
+                                                        handleView(product)
+                                                    }
+                                                    className='hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer'
                                                 >
                                                     <td className='px-6 py-4 whitespace-nowrap'>
                                                         <div className='flex items-center'>
@@ -504,20 +507,6 @@ const ProductList = () => {
                                                                     e,
                                                                 ) => {
                                                                     e.stopPropagation();
-                                                                    handleView(
-                                                                        product,
-                                                                    );
-                                                                }}
-                                                                className='text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors p-1 rounded'
-                                                                title='View Details'
-                                                            >
-                                                                <Eye className='h-4 w-4' />
-                                                            </button>
-                                                            <button
-                                                                onClick={(
-                                                                    e,
-                                                                ) => {
-                                                                    e.stopPropagation();
                                                                     handleEdit(
                                                                         product,
                                                                     );
@@ -576,7 +565,8 @@ const ProductList = () => {
                                 {current.map((product) => (
                                     <div
                                         key={product._id}
-                                        className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow'
+                                        onClick={() => handleView(product)}
+                                        className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow cursor-pointer'
                                     >
                                         {/* Product Image */}
                                         <div className='relative h-48 bg-gray-100 dark:bg-gray-700'>
@@ -647,32 +637,26 @@ const ProductList = () => {
                                             </div>
 
                                             {/* Actions */}
-                                            <div className='flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700'>
-                                                <button
-                                                    onClick={() =>
-                                                        handleView(product)
-                                                    }
-                                                    className='flex items-center text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors text-sm'
-                                                >
-                                                    <Eye className='h-4 w-4 mr-1' />
-                                                    View
-                                                </button>
+                                            {/* Actions */}
+                                            <div className='flex items-center justify-end pt-3 border-t border-gray-200 dark:border-gray-700'>
                                                 <div className='flex items-center space-x-2'>
                                                     <button
-                                                        onClick={() =>
-                                                            handleEdit(product)
-                                                        }
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleEdit(product);
+                                                        }}
                                                         className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
                                                         title='Edit Product'
                                                     >
                                                         <Edit2 className='h-4 w-4' />
                                                     </button>
                                                     <button
-                                                        onClick={() =>
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
                                                             handleDelete(
                                                                 product,
-                                                            )
-                                                        }
+                                                            );
+                                                        }}
                                                         className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
                                                         title='Delete Product'
                                                     >

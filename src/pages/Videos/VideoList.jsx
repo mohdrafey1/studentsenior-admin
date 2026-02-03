@@ -496,12 +496,12 @@ const VideoList = () => {
                                                                     )}
                                                                 </div>
                                                                 <div className='ml-4'>
-                                                                    <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
+                                                                    <div className='text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-40'>
                                                                         {
                                                                             video.title
                                                                         }
                                                                     </div>
-                                                                    <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs'>
+                                                                    <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-40'>
                                                                         {video.description ||
                                                                             'No description'}
                                                                     </div>

@@ -385,7 +385,10 @@ const SeniorList = () => {
                                             {current.map((senior) => (
                                                 <tr
                                                     key={senior._id}
-                                                    className='hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
+                                                    onClick={() =>
+                                                        handleView(senior)
+                                                    }
+                                                    className='hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer'
                                                 >
                                                     <td className='px-6 py-4 whitespace-nowrap'>
                                                         <div className='flex items-center'>
@@ -481,20 +484,6 @@ const SeniorList = () => {
                                                                     e,
                                                                 ) => {
                                                                     e.stopPropagation();
-                                                                    handleView(
-                                                                        senior,
-                                                                    );
-                                                                }}
-                                                                className='text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300 transition-colors p-1 rounded'
-                                                                title='View Details'
-                                                            >
-                                                                <Eye className='h-4 w-4' />
-                                                            </button>
-                                                            <button
-                                                                onClick={(
-                                                                    e,
-                                                                ) => {
-                                                                    e.stopPropagation();
                                                                     handleEdit(
                                                                         senior,
                                                                     );
@@ -553,7 +542,8 @@ const SeniorList = () => {
                                 {current.map((senior) => (
                                     <div
                                         key={senior._id}
-                                        className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow'
+                                        onClick={() => handleView(senior)}
+                                        className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow cursor-pointer'
                                     >
                                         {/* Senior Header */}
                                         <div className='relative h-32 bg-gradient-to-r from-purple-500 to-pink-500 p-4'>
@@ -631,30 +621,26 @@ const SeniorList = () => {
                                             </div>
 
                                             {/* Actions */}
-                                            <div className='flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700'>
-                                                <button
-                                                    onClick={() =>
-                                                        handleView(senior)
-                                                    }
-                                                    className='flex items-center text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300 transition-colors text-sm'
-                                                >
-                                                    <Eye className='h-4 w-4 mr-1' />
-                                                    View
-                                                </button>
+                                            {/* Actions */}
+                                            <div className='flex items-center justify-end pt-3 border-t border-gray-200 dark:border-gray-700'>
                                                 <div className='flex items-center space-x-2'>
                                                     <button
-                                                        onClick={() =>
-                                                            handleEdit(senior)
-                                                        }
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleEdit(senior);
+                                                        }}
                                                         className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
                                                         title='Edit Senior'
                                                     >
                                                         <Edit2 className='h-4 w-4' />
                                                     </button>
                                                     <button
-                                                        onClick={() =>
-                                                            handleDelete(senior)
-                                                        }
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDelete(
+                                                                senior,
+                                                            );
+                                                        }}
                                                         className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
                                                         title='Delete Senior'
                                                     >

@@ -388,7 +388,10 @@ const GroupList = () => {
                                             {current.map((group) => (
                                                 <tr
                                                     key={group._id}
-                                                    className='hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
+                                                    onClick={() =>
+                                                        handleView(group)
+                                                    }
+                                                    className='hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer'
                                                 >
                                                     <td className='px-6 py-4 whitespace-nowrap'>
                                                         <div className='flex items-center'>
@@ -463,20 +466,6 @@ const GroupList = () => {
                                                                     e,
                                                                 ) => {
                                                                     e.stopPropagation();
-                                                                    handleView(
-                                                                        group,
-                                                                    );
-                                                                }}
-                                                                className='text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors p-1 rounded'
-                                                                title='View Details'
-                                                            >
-                                                                <Eye className='h-4 w-4' />
-                                                            </button>
-                                                            <button
-                                                                onClick={(
-                                                                    e,
-                                                                ) => {
-                                                                    e.stopPropagation();
                                                                     handleEdit(
                                                                         group,
                                                                     );
@@ -535,7 +524,8 @@ const GroupList = () => {
                                 {current.map((group) => (
                                     <div
                                         key={group._id}
-                                        className='bg-white mt-5 dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow'
+                                        onClick={() => handleView(group)}
+                                        className='bg-white mt-5 dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow cursor-pointer'
                                     >
                                         {/* Group Details */}
                                         <div className='p-4'>
@@ -580,42 +570,36 @@ const GroupList = () => {
                                                 <div className='flex items-center space-x-2'>
                                                     {group.link && (
                                                         <button
-                                                            onClick={() =>
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
                                                                 window.open(
                                                                     group.link,
                                                                     '_blank',
-                                                                )
-                                                            }
+                                                                );
+                                                            }}
                                                             className='text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors p-1 rounded'
                                                             title='Open WhatsApp'
                                                         >
                                                             <ExternalLink className='h-4 w-4' />
                                                         </button>
                                                     )}
-                                                    <button
-                                                        onClick={() =>
-                                                            handleView(group)
-                                                        }
-                                                        className='flex items-center text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors text-sm'
-                                                    >
-                                                        <Eye className='h-4 w-4 mr-1' />
-                                                        View
-                                                    </button>
                                                 </div>
                                                 <div className='flex items-center space-x-2'>
                                                     <button
-                                                        onClick={() =>
-                                                            handleEdit(group)
-                                                        }
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleEdit(group);
+                                                        }}
                                                         className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
                                                         title='Edit Group'
                                                     >
                                                         <Edit2 className='h-4 w-4' />
                                                     </button>
                                                     <button
-                                                        onClick={() =>
-                                                            handleDelete(group)
-                                                        }
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDelete(group);
+                                                        }}
                                                         className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
                                                         title='Delete Group'
                                                     >

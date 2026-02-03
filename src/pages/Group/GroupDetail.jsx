@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
+import Sidebar from '../../components/Sidebar';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import {
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
 import GroupEditModal from '../../components/GroupEditModal';
+import ApprovalActions from '../../components/ApprovalActions';
 
 const GroupDetail = () => {
     const [group, setGroup] = useState(null);
@@ -148,6 +150,7 @@ const GroupDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
+                <Sidebar />
                 <div className='flex items-center justify-center min-h-[60vh]'>
                     <Loader className='h-8 w-8 animate-spin text-blue-600' />
                 </div>
@@ -159,6 +162,7 @@ const GroupDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
+                <Sidebar />
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
                     <button
                         onClick={() => navigate(-1)}
@@ -186,6 +190,7 @@ const GroupDetail = () => {
     return (
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans'>
             <Header />
+            <Sidebar />
             <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
                 {/* Top Navigation & Actions */}
                 <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8'>
@@ -225,6 +230,14 @@ const GroupDetail = () => {
                         </button>
                     </div>
                 </div>
+
+                <ApprovalActions
+                    resourceId={group._id}
+                    resourceType='Group'
+                    currentStatus={group.submissionStatus}
+                    apiEndpoint={`/group/edit/${group._id}`}
+                    onStatusChange={fetchGroup}
+                />
 
                 <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
                     {/* Left Column: Group Info */}
