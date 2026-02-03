@@ -246,7 +246,7 @@ const NotesList = () => {
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
             <Header />
             <Sidebar />
-            <main className='pt-6 pb-12'>
+            <main className='pt-6 pb-12 mx-auto max-w-[90%]'>
                 <div
                     className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
                 >
@@ -404,7 +404,7 @@ const NotesList = () => {
                                                                 {note.title ||
                                                                     'N/A'}
                                                             </div>
-                                                            <div className='text-sm text-gray-500 dark:text-gray-400'>
+                                                            <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs'>
                                                                 {note.description ||
                                                                     'No description'}
                                                             </div>

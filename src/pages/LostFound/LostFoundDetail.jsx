@@ -16,13 +16,13 @@ import {
     Clock,
     Package,
     Phone,
-    Image,
-    Tag,
     User,
     Search,
 } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
 import LostFoundEditModal from '../../components/LostFoundEditModal';
+import ApprovalActions from '../../components/ApprovalActions';
+import Sidebar from '../../components/Sidebar';
 
 const LostFoundDetail = () => {
     const { collegeslug, itemid } = useParams();
@@ -137,6 +137,7 @@ const LostFoundDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
+                <Sidebar />
                 <div className='flex items-center justify-center min-h-[60vh]'>
                     <Loader className='h-8 w-8 animate-spin text-blue-600' />
                 </div>
@@ -148,6 +149,7 @@ const LostFoundDetail = () => {
         return (
             <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
                 <Header />
+                <Sidebar />
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
                     <button
                         onClick={() => navigate(-1)}
@@ -175,6 +177,7 @@ const LostFoundDetail = () => {
     return (
         <div className='min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans'>
             <Header />
+            <Sidebar />
             <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
                 {/* Top Navigation & Actions */}
                 <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8'>
@@ -221,6 +224,14 @@ const LostFoundDetail = () => {
                         </button>
                     </div>
                 </div>
+
+                <ApprovalActions
+                    resourceId={item._id}
+                    resourceType='Lost & Found Item'
+                    currentStatus={item.submissionStatus}
+                    apiEndpoint={`/lostandfound/edit/${item._id}`}
+                    onStatusChange={fetchItemDetails}
+                />
 
                 <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
                     {/* Left Column: Image & Description */}
