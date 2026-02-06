@@ -5,7 +5,7 @@ import Sidebar from '../../components/Sidebar';
 import { useSidebarLayout } from '../../hooks/useSidebarLayout';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import { BookOpen, Calendar, X, BookMarked } from 'lucide-react';
+import { BookOpen, Calendar, X, BookMarked, Sparkles } from 'lucide-react';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import SyllabusModal from '../../components/SyllabusModal';
@@ -661,6 +661,22 @@ const Subjects = () => {
                                                         Syllabus
                                                     </button>
                                                 )}
+                                                {subject.syllabi &&
+                                                    subject.syllabi.length >
+                                                        0 && (
+                                                        <button
+                                                            onClick={() =>
+                                                                navigate(
+                                                                    `/reports/subjects/${subject._id}/quick-notes`,
+                                                                )
+                                                            }
+                                                            className='inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-purple-600 text-white hover:bg-purple-700'
+                                                            title='Quick Notes'
+                                                        >
+                                                            <Sparkles className='w-3 h-3' />
+                                                            Q Notes
+                                                        </button>
+                                                    )}
                                                 <button
                                                     onClick={() =>
                                                         handleEdit(subject)
@@ -777,6 +793,25 @@ const Subjects = () => {
                                                                         Syllabus
                                                                     </button>
                                                                 )}
+                                                                {subject.syllabi &&
+                                                                    subject
+                                                                        .syllabi
+                                                                        .length >
+                                                                        0 && (
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                navigate(
+                                                                                    `/reports/subjects/${subject._id}/quick-notes`,
+                                                                                )
+                                                                            }
+                                                                            className='px-3 py-1.5 rounded-md text-xs font-medium bg-purple-600 text-white hover:bg-purple-700 inline-flex items-center gap-1'
+                                                                            title='Quick Notes'
+                                                                        >
+                                                                            <Sparkles className='w-3 h-3' />
+                                                                            Q
+                                                                            Notes
+                                                                        </button>
+                                                                    )}
                                                                 <button
                                                                     onClick={() =>
                                                                         handleEdit(

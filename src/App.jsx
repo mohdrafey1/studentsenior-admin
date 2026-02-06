@@ -46,6 +46,7 @@ const CollegeDetail = lazy(() => import('./pages/CollegeDetail'));
 const Courses = lazy(() => import('./pages/Resources/Courses'));
 const Branches = lazy(() => import('./pages/Resources/Branches'));
 const Subjects = lazy(() => import('./pages/Resources/Subjects'));
+const QuickNotes = lazy(() => import('./pages/Resources/QuickNotes'));
 
 // PYQs
 const PyqList = lazy(() => import('./pages/Pyqs/PyqList'));
@@ -295,6 +296,14 @@ function App() {
                                     element={
                                         <ProtectedRoute>
                                             <Subjects />
+                                        </ProtectedRoute>
+                                    }
+                                />
+                                <Route
+                                    path='/reports/subjects/:subjectId/quick-notes'
+                                    element={
+                                        <ProtectedRoute>
+                                            <QuickNotes />
                                         </ProtectedRoute>
                                     }
                                 />
