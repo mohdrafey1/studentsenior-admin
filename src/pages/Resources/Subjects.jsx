@@ -5,7 +5,14 @@ import Sidebar from '../../components/Sidebar';
 import { useSidebarLayout } from '../../hooks/useSidebarLayout';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import { BookOpen, Calendar, X, BookMarked, Sparkles } from 'lucide-react';
+import {
+    BookOpen,
+    Calendar,
+    X,
+    BookMarked,
+    Sparkles,
+    Plus,
+} from 'lucide-react';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import SyllabusModal from '../../components/SyllabusModal';
@@ -304,6 +311,11 @@ const Subjects = () => {
         setSyllabusFormData({ ...syllabusFormData, [field]: value });
     };
 
+    // Handler for batch updating multiple form fields at once (used by AI auto-fill)
+    const handleSyllabusBatchUpdate = (updates) => {
+        setSyllabusFormData((prev) => ({ ...prev, ...updates }));
+    };
+
     const handleUnitChange = (index, field, value) => {
         const newUnits = [...syllabusFormData.units];
         newUnits[index][field] = value;
@@ -453,7 +465,17 @@ const Subjects = () => {
             >
                 <div className='max-w-7xl mx-auto px-4 sm:px-6'>
                     {/* Header */}
-                    <BackButton title='Subjects' TitleIcon={BookOpen} />
+                    <div className='flex items-center justify-between'>
+                        <BackButton title='Subjects' TitleIcon={BookOpen} />
+
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className='inline-flex mb-3 items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+                        >
+                            <Plus className='w-4 h-4 mr-2' />
+                            Add Subject
+                        </button>
+                    </div>
 
                     {/* Compact Filters */}
                     <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
@@ -955,16 +977,6 @@ const Subjects = () => {
                                                 className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
                                                 required
                                             >
-                                                <option value=''>
-                                                    Select a college
-                                                </option>
-                                                <option value='dr-apj-abdul-kalam-technical-university-aktu'>
-                                                    Dr. APJ Abdul Kalam
-                                                    Technical University
-                                                </option>
-                                                <option value='integral-university'>
-                                                    Integral University
-                                                </option>
                                                 {colleges.map((college) => (
                                                     <option
                                                         key={college._id}
@@ -1105,6 +1117,7 @@ const Subjects = () => {
                 onClose={handleCloseSyllabusModal}
                 onSubmit={handleSubmitSyllabus}
                 onFormChange={handleSyllabusFormChange}
+                onBatchUpdate={handleSyllabusBatchUpdate}
                 onUnitChange={handleUnitChange}
                 onAddArrayItem={addArrayItem}
                 onRemoveArrayItem={removeArrayItem}
