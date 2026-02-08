@@ -1,4 +1,7 @@
-import { X } from 'lucide-react';
+import { useState } from 'react';
+import { X, Sparkles, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import api from '../utils/api';
+import toast from 'react-hot-toast';
 
 const SyllabusModal = ({
     showModal,
@@ -8,8 +11,66 @@ const SyllabusModal = ({
     onClose,
     onSubmit,
     onFormChange,
+    onBatchUpdate,
 }) => {
+    const [rawSyllabusText, setRawSyllabusText] = useState('');
+    const [showAiSection, setShowAiSection] = useState(true);
+    const [parsing, setParsing] = useState(false);
+
     if (!showModal) return null;
+
+    const handleAutoFillWithAI = async () => {
+        if (!rawSyllabusText.trim()) {
+            toast.error('Please paste syllabus data first');
+            return;
+        }
+
+        if (rawSyllabusText.trim().length < 50) {
+            toast.error('Syllabus text is too short');
+            return;
+        }
+
+        setParsing(true);
+        try {
+            const response = await api.post('/syllabus/parse-with-ai', {
+                rawText: rawSyllabusText,
+            });
+
+            if (response.data.success) {
+                const { description, units, referenceBooks } =
+                    response.data.data;
+
+                // Batch update all form fields at once to avoid stale closure issues
+                const updates = {};
+                if (description) {
+                    updates.description = description;
+                }
+                if (units && Array.isArray(units)) {
+                    updates.units = JSON.stringify(units, null, 2);
+                }
+                if (referenceBooks) {
+                    updates.referenceBooks = referenceBooks;
+                }
+
+                onBatchUpdate(updates);
+
+                toast.success('Form auto-filled successfully!');
+                setShowAiSection(false); // Collapse AI section after success
+            } else {
+                toast.error(
+                    response.data.message || 'Failed to parse syllabus',
+                );
+            }
+        } catch (error) {
+            console.error('AI Parse Error:', error);
+            toast.error(
+                error.response?.data?.message ||
+                    'Failed to parse syllabus with AI',
+            );
+        } finally {
+            setParsing(false);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -79,6 +140,78 @@ const SyllabusModal = ({
                                 </button>
                             </div>
                             <div className='space-y-4 max-h-[70vh] overflow-y-auto'>
+                                {/* AI Auto-Fill Section */}
+                                <div className='border border-purple-200 dark:border-purple-800 rounded-lg overflow-hidden'>
+                                    <button
+                                        type='button'
+                                        onClick={() =>
+                                            setShowAiSection(!showAiSection)
+                                        }
+                                        className='w-full flex items-center justify-between px-4 py-3 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors'
+                                    >
+                                        <div className='flex items-center gap-2'>
+                                            <Sparkles className='w-5 h-5 text-purple-600 dark:text-purple-400' />
+                                            <span className='font-medium text-purple-700 dark:text-purple-300'>
+                                                Auto Fill with AI
+                                            </span>
+                                        </div>
+                                        {showAiSection ? (
+                                            <ChevronUp className='w-5 h-5 text-purple-600 dark:text-purple-400' />
+                                        ) : (
+                                            <ChevronDown className='w-5 h-5 text-purple-600 dark:text-purple-400' />
+                                        )}
+                                    </button>
+                                    {showAiSection && (
+                                        <div className='p-4 bg-purple-50/50 dark:bg-purple-900/20'>
+                                            <p className='text-sm text-gray-600 dark:text-gray-400 mb-3'>
+                                                Paste your raw syllabus data
+                                                below and let AI extract the
+                                                information automatically.
+                                            </p>
+                                            <textarea
+                                                value={rawSyllabusText}
+                                                onChange={(e) =>
+                                                    setRawSyllabusText(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white text-sm'
+                                                placeholder='Paste your syllabus data here...
+
+Example:
+Course Code: PY101
+Title: Physics
+Unit 1: Wave Optics
+Topics: Interference, Diffraction...
+Reference Books:
+1. Fundamentals of Optics by Jenkins'
+                                                rows='6'
+                                            />
+                                            <button
+                                                type='button'
+                                                onClick={handleAutoFillWithAI}
+                                                disabled={
+                                                    parsing ||
+                                                    !rawSyllabusText.trim()
+                                                }
+                                                className='mt-3 inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
+                                            >
+                                                {parsing ? (
+                                                    <>
+                                                        <Loader2 className='w-4 h-4 animate-spin' />
+                                                        Parsing...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Sparkles className='w-4 h-4' />
+                                                        Auto Fill with AI
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Subject Code (Auto-filled, Read-only) */}
                                 <div>
                                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
@@ -91,8 +224,6 @@ const SyllabusModal = ({
                                         className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 dark:text-white'
                                     />
                                 </div>
-
-                                {/* College is now taken from the subject; selection removed */}
 
                                 {/* Description */}
                                 <div>
