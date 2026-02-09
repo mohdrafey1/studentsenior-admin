@@ -22,6 +22,7 @@ import {
     Users,
     Lightbulb,
     Search,
+    Diamond,
 } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
 import Loader from '../../components/Common/Loader';
@@ -35,6 +36,9 @@ const UserDetail = () => {
     const [showBonusModal, setShowBonusModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [showRawData, setShowRawData] = useState(false);
+    const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+    const [subscriptionDays, setSubscriptionDays] = useState('30');
+    const [subscriptionReason, setSubscriptionReason] = useState('');
     const [userContent, setUserContent] = useState({
         notes: [],
         pyqs: [],
@@ -202,6 +206,48 @@ const UserDetail = () => {
             } catch (error) {
                 console.error('Error giving bonus:', error);
                 toast.error('Failed to give bonus');
+            } finally {
+                setSubmitting(false);
+            }
+        }
+    };
+
+    const handleGrantSubscription = async () => {
+        const days = parseInt(subscriptionDays);
+        if (!days || days <= 0) {
+            toast.error('Please select a valid duration');
+            return;
+        }
+
+        const confirmed = await showConfirm({
+            title: 'Grant Free Subscription',
+            message: `Grant ${days} days of premium subscription to "${user.username}"? This will activate their premium status immediately.`,
+            variant: 'info',
+        });
+
+        if (confirmed) {
+            try {
+                setSubmitting(true);
+                const response = await api.post(
+                    `/user/users/${user._id}/grant-subscription`,
+                    {
+                        durationDays: days,
+                        reason:
+                            subscriptionReason ||
+                            `Admin granted ${days} days free subscription`,
+                    },
+                );
+                setUser(response.data.data.user);
+                toast.success(`Premium subscription granted for ${days} days!`);
+                setSubscriptionDays('30');
+                setSubscriptionReason('');
+                setShowSubscriptionModal(false);
+            } catch (error) {
+                console.error('Error granting subscription:', error);
+                toast.error(
+                    error.response?.data?.message ||
+                        'Failed to grant subscription',
+                );
             } finally {
                 setSubmitting(false);
             }
@@ -397,6 +443,14 @@ const UserDetail = () => {
                     >
                         <Gift className='w-5 h-5 mr-2' />
                         Give Bonus Points
+                    </button>
+
+                    <button
+                        onClick={() => setShowSubscriptionModal(true)}
+                        className='flex items-center px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg font-semibold hover:from-amber-600 hover:to-amber-700 transition-all shadow-sm'
+                    >
+                        <Diamond className='w-5 h-5 mr-2' />
+                        Grant Subscription
                     </button>
 
                     {user.blocked ? (
@@ -703,6 +757,92 @@ const UserDetail = () => {
                                         <Loader className='w-4 h-4 animate-spin' />
                                     ) : (
                                         'Give Bonus'
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {/* Subscription Modal */}
+                {showSubscriptionModal && (
+                    <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50'>
+                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6'>
+                            <div className='flex items-center mb-4'>
+                                <div className='bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 p-3 rounded-lg mr-3'>
+                                    <Diamond className='w-6 h-6' />
+                                </div>
+                                <div>
+                                    <h3 className='text-xl font-semibold text-gray-900 dark:text-white'>
+                                        Grant Free Subscription
+                                    </h3>
+                                    {user.isPremium && (
+                                        <p className='text-xs text-amber-600 dark:text-amber-400'>
+                                            Currently premium until{' '}
+                                            {new Date(
+                                                user.premiumExpiryDate,
+                                            ).toLocaleDateString()}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className='mb-4'>
+                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+                                    Duration
+                                </label>
+                                <select
+                                    value={subscriptionDays}
+                                    onChange={(e) =>
+                                        setSubscriptionDays(e.target.value)
+                                    }
+                                    className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 dark:bg-gray-700 dark:text-white'
+                                >
+                                    <option value='7'>7 Days</option>
+                                    <option value='30'>30 Days</option>
+                                    <option value='90'>90 Days</option>
+                                    <option value='180'>180 Days</option>
+                                    <option value='365'>
+                                        365 Days (1 Year)
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div className='mb-6'>
+                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+                                    Reason (Optional)
+                                </label>
+                                <textarea
+                                    value={subscriptionReason}
+                                    onChange={(e) =>
+                                        setSubscriptionReason(e.target.value)
+                                    }
+                                    placeholder='Reason for granting subscription...'
+                                    rows='3'
+                                    className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 dark:bg-gray-700 dark:text-white'
+                                />
+                            </div>
+
+                            <div className='flex gap-3'>
+                                <button
+                                    onClick={() => {
+                                        setShowSubscriptionModal(false);
+                                        setSubscriptionDays('30');
+                                        setSubscriptionReason('');
+                                    }}
+                                    disabled={submitting}
+                                    className='flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleGrantSubscription}
+                                    disabled={submitting}
+                                    className='flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center'
+                                >
+                                    {submitting ? (
+                                        <Loader className='w-4 h-4 animate-spin' />
+                                    ) : (
+                                        'Grant Subscription'
                                     )}
                                 </button>
                             </div>

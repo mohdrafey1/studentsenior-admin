@@ -45,6 +45,7 @@ const Tasks = lazy(() => import('./pages/Tasks/Tasks'));
 const CollegeDetail = lazy(() => import('./pages/CollegeDetail'));
 const Courses = lazy(() => import('./pages/Resources/Courses'));
 const Branches = lazy(() => import('./pages/Resources/Branches'));
+const BranchSubjects = lazy(() => import('./pages/Resources/BranchSubjects'));
 const Subjects = lazy(() => import('./pages/Resources/Subjects'));
 const QuickNotes = lazy(() => import('./pages/Resources/QuickNotes'));
 
@@ -288,6 +289,14 @@ function App() {
                                     element={
                                         <ProtectedRoute>
                                             <Branches />
+                                        </ProtectedRoute>
+                                    }
+                                />
+                                <Route
+                                    path='/reports/branches/:branchId/subjects'
+                                    element={
+                                        <ProtectedRoute>
+                                            <BranchSubjects />
                                         </ProtectedRoute>
                                     }
                                 />
