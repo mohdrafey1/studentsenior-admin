@@ -5,14 +5,7 @@ import Sidebar from '../../components/Sidebar';
 import { useSidebarLayout } from '../../hooks/useSidebarLayout';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import {
-    BookOpen,
-    Calendar,
-    X,
-    BookMarked,
-    Sparkles,
-    Plus,
-} from 'lucide-react';
+import { BookOpen, Calendar, BookMarked, Sparkles, Plus } from 'lucide-react';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import SyllabusModal from '../../components/SyllabusModal';
@@ -20,6 +13,7 @@ import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
 import FilterBar from '../../components/Common/FilterBar';
 import { filterByTime } from '../../components/Common/timeFilterUtils';
+import AddSubjectModal from '../../components/AddSubjectModal';
 
 const Subjects = () => {
     const [subjects, setSubjects] = useState([]);
@@ -61,15 +55,6 @@ const Subjects = () => {
         description: '',
     });
     const [submittingSyllabus, setSubmittingSyllabus] = useState(false);
-    const [formData, setFormData] = useState({
-        subjectName: '',
-        subjectCode: '',
-        course: '',
-        branch: '',
-        semester: '',
-        college: '',
-    });
-    const [submitting, setSubmitting] = useState(false);
     const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
     const location = useLocation();
@@ -198,57 +183,8 @@ const Subjects = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Filter branches based on selected course
-    const filteredBranches = branches.filter(
-        (branch) => !formData.course || branch.course?._id === formData.course,
-    );
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (
-            !formData.subjectName.trim() ||
-            !formData.subjectCode.trim() ||
-            !formData.course ||
-            !formData.branch ||
-            !formData.semester
-        ) {
-            toast.error('Please fill in all fields');
-            return;
-        }
-
-        setSubmitting(true);
-        try {
-            if (editingSubject) {
-                await api.put(
-                    `/resource/subjects/${editingSubject._id}`,
-                    formData,
-                );
-                toast.success('Subject updated successfully');
-                fetchData(); // Refresh to get updated data
-            } else {
-                await api.post('/resource/subjects', formData);
-                toast.success('Subject created successfully');
-                fetchData(); // Refresh to get updated data
-            }
-            handleCloseModal();
-        } catch (e) {
-            console.error(e);
-            toast.error(e.response?.data?.message || 'Operation failed');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
     const handleEdit = (subject) => {
         setEditingSubject(subject);
-        setFormData({
-            subjectName: subject.subjectName,
-            subjectCode: subject.subjectCode,
-            course: subject.course?._id || '',
-            branch: subject.branch?._id || '',
-            semester: subject.semester || '',
-            college: subject.college?._id || '',
-        });
         setShowModal(true);
     };
 
@@ -273,18 +209,6 @@ const Subjects = () => {
     const handleCloseModal = () => {
         setShowModal(false);
         setEditingSubject(null);
-        setFormData({
-            subjectName: '',
-            subjectCode: '',
-            course: '',
-            branch: '',
-            semester: '',
-            college: '',
-        });
-    };
-
-    const handleCourseChange = (courseId) => {
-        setFormData({ ...formData, course: courseId, branch: '' }); // Reset branch when course changes
     };
 
     // Syllabus handlers
@@ -893,220 +817,15 @@ const Subjects = () => {
             </main>
 
             {/* Subject Modal */}
-            {showModal && (
-                <div className='fixed inset-0 z-50 overflow-y-auto'>
-                    <div className='flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0'>
-                        <div
-                            className='fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75'
-                            onClick={handleCloseModal}
-                        ></div>
-                        <span
-                            className='hidden sm:inline-block sm:align-middle sm:h-screen'
-                            aria-hidden='true'
-                        >
-                            &#8203;
-                        </span>
-                        <div className='inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10'>
-                            <form onSubmit={handleSubmit}>
-                                <div className='bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4'>
-                                    <div className='flex items-center justify-between mb-4'>
-                                        <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
-                                            {editingSubject
-                                                ? 'Edit Subject'
-                                                : 'Add New Subject'}
-                                        </h3>
-                                        <button
-                                            type='button'
-                                            onClick={handleCloseModal}
-                                            className='text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                                        >
-                                            <X className='w-5 h-5' />
-                                        </button>
-                                    </div>
-                                    <div className='space-y-4'>
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                                Subject Name
-                                            </label>
-                                            <input
-                                                type='text'
-                                                value={formData.subjectName}
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        subjectName:
-                                                            e.target.value,
-                                                    })
-                                                }
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                                placeholder='Enter subject name'
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                                Subject Code
-                                            </label>
-                                            <input
-                                                type='text'
-                                                value={formData.subjectCode}
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        subjectCode:
-                                                            e.target.value,
-                                                    })
-                                                }
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                                placeholder='Enter subject code'
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                                College
-                                            </label>
-                                            <select
-                                                value={formData.college}
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        college: e.target.value,
-                                                    })
-                                                }
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                                required
-                                            >
-                                                {colleges.map((college) => (
-                                                    <option
-                                                        key={college._id}
-                                                        value={college._id}
-                                                    >
-                                                        {college.name} (
-                                                        {college.slug})
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                                Course
-                                            </label>
-                                            <select
-                                                value={formData.course}
-                                                onChange={(e) =>
-                                                    handleCourseChange(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                                required
-                                            >
-                                                <option value=''>
-                                                    Select a course
-                                                </option>
-                                                {courses.map((course) => (
-                                                    <option
-                                                        key={course._id}
-                                                        value={course._id}
-                                                    >
-                                                        {course.courseName} (
-                                                        {course.courseCode})
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                                Branch
-                                            </label>
-                                            <select
-                                                value={formData.branch}
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        branch: e.target.value,
-                                                    })
-                                                }
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                                required
-                                                disabled={!formData.course}
-                                            >
-                                                <option value=''>
-                                                    Select a branch
-                                                </option>
-                                                {filteredBranches.map(
-                                                    (branch) => (
-                                                        <option
-                                                            key={branch._id}
-                                                            value={branch._id}
-                                                        >
-                                                            {branch.branchName}{' '}
-                                                            ({branch.branchCode}
-                                                            )
-                                                        </option>
-                                                    ),
-                                                )}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                                Semester
-                                            </label>
-                                            <select
-                                                value={formData.semester}
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        semester:
-                                                            e.target.value,
-                                                    })
-                                                }
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                                required
-                                            >
-                                                <option value=''>
-                                                    Select semester
-                                                </option>
-                                                {[1, 2, 3, 4, 5, 6, 7, 8].map(
-                                                    (sem) => (
-                                                        <option
-                                                            key={sem}
-                                                            value={sem}
-                                                        >
-                                                            Semester {sem}
-                                                        </option>
-                                                    ),
-                                                )}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className='bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse'>
-                                    <button
-                                        type='submit'
-                                        disabled={submitting}
-                                        className='w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50'
-                                    >
-                                        {submitting
-                                            ? 'Saving...'
-                                            : editingSubject
-                                              ? 'Update'
-                                              : 'Create'}
-                                    </button>
-                                    <button
-                                        type='button'
-                                        onClick={handleCloseModal}
-                                        className='mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm'
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <AddSubjectModal
+                showModal={showModal}
+                editingSubject={editingSubject}
+                colleges={colleges}
+                courses={courses}
+                branches={branches}
+                onClose={handleCloseModal}
+                onSuccess={fetchData}
+            />
 
             {/* Syllabus Modal */}
             <SyllabusModal

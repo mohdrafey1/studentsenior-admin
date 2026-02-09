@@ -5,7 +5,7 @@ import Sidebar from '../../components/Sidebar';
 import { useSidebarLayout } from '../../hooks/useSidebarLayout';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import { Building, Calendar, X } from 'lucide-react';
+import { Building, Calendar, X, BookOpen } from 'lucide-react';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import { Link } from 'react-router-dom';
@@ -376,6 +376,17 @@ const Branches = () => {
                                             <div className='flex gap-2 justify-end'>
                                                 <button
                                                     onClick={() =>
+                                                        navigate(
+                                                            `/reports/branches/${branch._id}/subjects`,
+                                                        )
+                                                    }
+                                                    className='inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-purple-600 text-white hover:bg-purple-700'
+                                                >
+                                                    <BookOpen className='w-3 h-3 mr-1' />
+                                                    Subjects
+                                                </button>
+                                                <button
+                                                    onClick={() =>
                                                         handleEdit(branch)
                                                     }
                                                     className='inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700'
@@ -466,6 +477,16 @@ const Branches = () => {
 
                                                         <td className='px-3 py-2 whitespace-nowrap text-sm text-right'>
                                                             <div className='inline-flex gap-2'>
+                                                                <button
+                                                                    onClick={() =>
+                                                                        navigate(
+                                                                            `/reports/branches/${branch._id}/subjects`,
+                                                                        )
+                                                                    }
+                                                                    className='px-3 py-1.5 rounded-md text-xs font-medium bg-purple-600 text-white hover:bg-purple-700'
+                                                                >
+                                                                    Subjects
+                                                                </button>
                                                                 <button
                                                                     onClick={() =>
                                                                         handleEdit(
