@@ -40,6 +40,7 @@ const Users = lazy(() => import('./pages/Users/Users'));
 const UserDetail = lazy(() => import('./pages/Users/UserDetail'));
 const DashboardUsers = lazy(() => import('./pages/Users/DashboardUsers'));
 const Tasks = lazy(() => import('./pages/Tasks/Tasks'));
+const AffiliateProducts = lazy(() => import('./pages/AffiliateProducts'));
 
 // College & Resources
 const CollegeDetail = lazy(() => import('./pages/CollegeDetail'));
@@ -163,6 +164,15 @@ function App() {
                                     element={
                                         <ProtectedRoute>
                                             <Notifications />
+                                        </ProtectedRoute>
+                                    }
+                                />
+
+                                <Route
+                                    path='/affiliate-products'
+                                    element={
+                                        <ProtectedRoute>
+                                            <AffiliateProducts />
                                         </ProtectedRoute>
                                     }
                                 />

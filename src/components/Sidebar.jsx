@@ -24,6 +24,7 @@ import {
     BookMarked,
     Crown,
     ShoppingCart,
+    Tag,
 } from 'lucide-react';
 import { useSidebar } from '../context/SidebarContext';
 import { Link } from 'react-router-dom';
@@ -128,6 +129,13 @@ function Sidebar() {
                     icon: BookOpenCheck,
                     to: '/reports/subjects',
                     colors: 'text-red-600 dark:text-red-400',
+                },
+                {
+                    id: 'affiliate-products',
+                    label: 'Affiliate Products',
+                    icon: Tag,
+                    to: '/affiliate-products',
+                    colors: 'text-pink-600 dark:text-pink-400',
                 },
             ];
         }
