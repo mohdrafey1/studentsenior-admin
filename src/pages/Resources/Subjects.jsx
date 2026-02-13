@@ -414,14 +414,6 @@ const Subjects = () => {
                                     onChange: setFilterCollege,
                                     options: [
                                         { value: '', label: 'All Colleges' },
-                                        {
-                                            value: 'dr-apj-abdul-kalam-technical-university-aktu',
-                                            label: 'AKTU',
-                                        },
-                                        {
-                                            value: 'integral-university',
-                                            label: 'Integral University',
-                                        },
                                         ...colleges.map((c) => ({
                                             value: c._id,
                                             label: c.slug,
