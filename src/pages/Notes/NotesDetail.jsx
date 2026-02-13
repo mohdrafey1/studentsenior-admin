@@ -120,7 +120,7 @@ const NotesDetail = () => {
 
         if (confirmed) {
             try {
-                await api.delete(`/dashboard/notes/delete/${note._id}`);
+                await api.delete(`/notes/delete/${note._id}`);
                 toast.success('Note deleted successfully');
                 navigate(`/${collegeslug}/notes`);
             } catch (err) {
