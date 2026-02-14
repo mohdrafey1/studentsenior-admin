@@ -58,6 +58,8 @@ const PyqSolutionPage = () => {
         fetchData();
     }, [pyqid]);
 
+    const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash-lite');
+
     const handleGenerate = async () => {
         if (!pyqDetails?.fileUrl) {
             toast.error('No PDF available for this PYQ');
@@ -68,6 +70,7 @@ const PyqSolutionPage = () => {
             setAiLoading(true);
             const res = await api.post('/pyq-solution/generate', {
                 pyqId: pyqid,
+                model: selectedModel,
             });
 
             if (res.data.success) {
@@ -193,20 +196,36 @@ const PyqSolutionPage = () => {
                             </span>
                         </div>
                     ) : (
-                        <button
-                            onClick={handleGenerate}
-                            disabled={aiLoading}
-                            className='flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50'
-                        >
-                            {aiLoading ? (
-                                <Loader className='animate-spin h-5 w-5' />
-                            ) : (
-                                <Zap className='h-5 w-5' />
-                            )}
-                            {aiLoading
-                                ? 'Generating...'
-                                : 'Generate AI Solutions'}
-                        </button>
+                        <div className='flex items-center gap-3'>
+                            <select
+                                value={selectedModel}
+                                onChange={(e) =>
+                                    setSelectedModel(e.target.value)
+                                }
+                                className='px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none'
+                            >
+                                <option value='gemini-2.5-flash-lite'>
+                                    Gemini 2.5 Flash Lite
+                                </option>
+                                <option value='gemini-2.5-pro'>
+                                    Gemini 2.5 Pro
+                                </option>
+                            </select>
+                            <button
+                                onClick={handleGenerate}
+                                disabled={aiLoading}
+                                className='flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50'
+                            >
+                                {aiLoading ? (
+                                    <Loader className='animate-spin h-5 w-5' />
+                                ) : (
+                                    <Zap className='h-5 w-5' />
+                                )}
+                                {aiLoading
+                                    ? 'Generating...'
+                                    : 'Generate AI Solutions'}
+                            </button>
+                        </div>
                     )}
                 </div>
 
