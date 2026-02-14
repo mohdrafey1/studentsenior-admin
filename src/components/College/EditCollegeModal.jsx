@@ -25,6 +25,7 @@ const ALL_SECTIONS_ENABLED = {
     groups: true,
     opportunities: true,
     lostFound: true,
+    quickNotes: true,
 };
 
 const EditCollegeModal = ({
@@ -348,6 +349,10 @@ const EditCollegeModal = ({
                                         { key: 'notes', label: 'Notes' },
                                         { key: 'videos', label: 'Videos' },
                                         { key: 'syllabus', label: 'Syllabus' },
+                                        {
+                                            key: 'quickNotes',
+                                            label: 'Quick Notes',
+                                        },
                                         { key: 'store', label: 'Store' },
                                         { key: 'seniors', label: 'Seniors' },
                                         {

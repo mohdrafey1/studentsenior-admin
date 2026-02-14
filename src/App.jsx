@@ -53,6 +53,7 @@ const QuickNotes = lazy(() => import('./pages/Resources/QuickNotes'));
 // PYQs
 const PyqList = lazy(() => import('./pages/Pyqs/PyqList'));
 const PyqDetail = lazy(() => import('./pages/Pyqs/PyqDetail'));
+const PyqSolutionPage = lazy(() => import('./pages/Pyqs/PyqSolutionPage'));
 
 // Notes
 const NotesList = lazy(() => import('./pages/Notes/NotesList'));
@@ -345,6 +346,14 @@ function App() {
                                     }
                                 />
 
+                                <Route
+                                    path='/:collegeslug/pyqs/:pyqid/aisolution'
+                                    element={
+                                        <ProtectedRoute>
+                                            <PyqSolutionPage />
+                                        </ProtectedRoute>
+                                    }
+                                />
                                 {/* Notes routes */}
                                 <Route
                                     path='/:collegeslug/notes'
