@@ -19,6 +19,8 @@ import {
     Eye,
     ExternalLink,
     Clock,
+    Sparkles,
+    Bot,
 } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
 import PyqEditModal from '../../components/PyqEditModal';
@@ -219,6 +221,12 @@ const PyqDetail = () => {
                             <h1 className='text-2xl font-bold flex items-center gap-3'>
                                 {pyq.subject?.subjectName || 'PYQ Details'}
                                 {getStatusBadge(pyq.submissionStatus)}
+                                {pyq.mdSolution && (
+                                    <span className='inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'>
+                                        <Bot size={12} />
+                                        AI Solved
+                                    </span>
+                                )}
                             </h1>
                             <p className='text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2'>
                                 <span className='font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded'>
@@ -325,6 +333,31 @@ const PyqDetail = () => {
                                     </div>
                                 )}
                             </div>
+                        </div>
+
+                        {/* AI Solution Management */}
+                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between'>
+                            <div>
+                                <h3 className='font-semibold flex items-center gap-2 mb-1'>
+                                    <Bot className='h-5 w-5 text-indigo-500' />
+                                    AI Solutions
+                                </h3>
+                                <p className='text-sm text-gray-500 max-w-md'>
+                                    Generate and manage Concise and Expert
+                                    solutions for this PYQ.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() =>
+                                    navigate(
+                                        `/${collegeslug}/pyqs/${pyqid}/aisolution`,
+                                    )
+                                }
+                                className='flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors font-medium border border-indigo-200 dark:border-indigo-800'
+                            >
+                                <Sparkles className='h-4 w-4' />
+                                Manage Solutions
+                            </button>
                         </div>
 
                         {/* Subject Details */}
