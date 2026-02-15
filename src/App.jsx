@@ -49,11 +49,13 @@ const Branches = lazy(() => import('./pages/Resources/Branches'));
 const BranchSubjects = lazy(() => import('./pages/Resources/BranchSubjects'));
 const Subjects = lazy(() => import('./pages/Resources/Subjects'));
 const QuickNotes = lazy(() => import('./pages/Resources/QuickNotes'));
+const QuickNotesList = lazy(() => import('./pages/Resources/QuickNotesList'));
 
 // PYQs
 const PyqList = lazy(() => import('./pages/Pyqs/PyqList'));
 const PyqDetail = lazy(() => import('./pages/Pyqs/PyqDetail'));
 const PyqSolutionPage = lazy(() => import('./pages/Pyqs/PyqSolutionPage'));
+const PyqSolutionList = lazy(() => import('./pages/Pyqs/PyqSolutionList'));
 
 // Notes
 const NotesList = lazy(() => import('./pages/Notes/NotesList'));
@@ -503,6 +505,25 @@ function App() {
                                     element={
                                         <ProtectedRoute>
                                             <CollegeDetail />
+                                        </ProtectedRoute>
+                                    }
+                                />
+
+                                {/* Pyqs routes */}
+                                <Route
+                                    path='/:collegeslug/pyqs-solutions'
+                                    element={
+                                        <ProtectedRoute>
+                                            <PyqSolutionList />
+                                        </ProtectedRoute>
+                                    }
+                                />
+
+                                <Route
+                                    path='/:collegeslug/quick-notes'
+                                    element={
+                                        <ProtectedRoute>
+                                            <QuickNotesList />
                                         </ProtectedRoute>
                                     }
                                 />

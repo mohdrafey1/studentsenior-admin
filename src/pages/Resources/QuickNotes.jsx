@@ -110,9 +110,23 @@ Do not remove important syllabus content.`,
             setSyllabus(syllabusData);
             setNotes(notesRes.data.data || []);
 
-            // Select first unit by default if exists
-            if (syllabusData?.units?.length > 0 && !selectedUnit) {
-                setSelectedUnit(syllabusData.units[0]);
+            // Select unit based on query param or default to first
+            const params = new URLSearchParams(window.location.search);
+            const unitParam = params.get('unit');
+
+            if (syllabusData?.units?.length > 0) {
+                if (unitParam) {
+                    const unitFromParam = syllabusData.units.find(
+                        (u) => u.unitNumber === parseInt(unitParam),
+                    );
+                    if (unitFromParam) {
+                        setSelectedUnit(unitFromParam);
+                    } else if (!selectedUnit) {
+                        setSelectedUnit(syllabusData.units[0]);
+                    }
+                } else if (!selectedUnit) {
+                    setSelectedUnit(syllabusData.units[0]);
+                }
             }
         } catch (error) {
             console.error('Fetch error:', error);
