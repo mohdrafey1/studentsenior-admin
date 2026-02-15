@@ -207,6 +207,20 @@ function Sidebar() {
                 to: `${base}/syllabus`,
                 colors: 'text-orange-600 dark:text-orange-400',
             },
+            {
+                id: 'pyqs-solutions',
+                label: 'PYQs Solutions',
+                icon: Star,
+                to: `${base}/pyqs-solutions`,
+                colors: 'text-yellow-600 dark:text-yellow-400',
+            },
+            {
+                id: 'quick-notes',
+                label: 'Quick Notes',
+                icon: FileText,
+                to: `${base}/quick-notes`,
+                colors: 'text-yellow-600 dark:text-yellow-400',
+            },
         ];
     }, [collegeslug, isReportsSection]);
 

@@ -17,6 +17,8 @@ import {
     CheckCircle,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { SOLUTION_PROMPTS } from '../../constants/prompts';
+import ManualPyqSolutionModal from '../../components/ManualPyqSolutionModal';
 
 const PyqSolutionPage = () => {
     const { collegeslug, pyqid } = useParams();
@@ -31,6 +33,7 @@ const PyqSolutionPage = () => {
     const [chatInput, setChatInput] = useState('');
     const [solutionUpdating, setSolutionUpdating] = useState(false);
     const [pyqDetails, setPyqDetails] = useState(null);
+    const [isManualModalOpen, setIsManualModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -111,14 +114,19 @@ const PyqSolutionPage = () => {
     };
 
     const handleSave = async () => {
-        if (!solution) return;
-
         try {
-            const res = await api.put('/pyq-solution/save', {
-                solutionId: solution._id,
+            const payload = {
                 type: activeTab,
                 content: editContent,
-            });
+            };
+
+            if (solution) {
+                payload.solutionId = solution._id;
+            } else {
+                payload.pyqId = pyqid;
+            }
+
+            const res = await api.put('/pyq-solution/save', payload);
 
             if (res.data.success) {
                 toast.success('Saved successfully');
@@ -128,6 +136,36 @@ const PyqSolutionPage = () => {
         } catch (error) {
             console.error(error);
             toast.error('Failed to save');
+        }
+    };
+
+    const handleManualImport = async (parsedJson) => {
+        try {
+            setAiLoading(true); // Re-using aiLoading for modal loading state
+
+            const payload = {
+                pyqId: pyqid,
+                type: 'both',
+                conciseContent: parsedJson.concise,
+                expertContent: parsedJson.expert,
+            };
+
+            if (solution) {
+                payload.solutionId = solution._id;
+            }
+
+            const res = await api.put('/pyq-solution/save', payload);
+
+            if (res.data.success) {
+                toast.success('Solutions imported and saved successfully!');
+                setSolution(res.data.data);
+                setIsManualModalOpen(false);
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to save imported solution');
+        } finally {
+            setAiLoading(false);
         }
     };
 
@@ -197,6 +235,12 @@ const PyqSolutionPage = () => {
                         </div>
                     ) : (
                         <div className='flex items-center gap-3'>
+                            <button
+                                onClick={() => setIsManualModalOpen(true)}
+                                className='px-4 py-2.5 text-indigo-600 bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg font-medium transition-all shadow-sm'
+                            >
+                                Manual Import
+                            </button>
                             <select
                                 value={selectedModel}
                                 onChange={(e) =>
@@ -253,7 +297,7 @@ const PyqSolutionPage = () => {
 
                         {/* Content */}
                         <div className='flex-1 p-6 relative'>
-                            {getCurrentContent() ? (
+                            {getCurrentContent() || isEditing ? (
                                 isEditing ? (
                                     <textarea
                                         value={editContent}
@@ -261,6 +305,7 @@ const PyqSolutionPage = () => {
                                             setEditContent(e.target.value)
                                         }
                                         className='w-full h-full p-4 font-mono text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none'
+                                        placeholder={`Type your ${activeTab} solution here in Markdown format...`}
                                     />
                                 ) : (
                                     <div className='prose dark:prose-invert max-w-none'>
@@ -277,18 +322,24 @@ const PyqSolutionPage = () => {
                                     <h3 className='text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2'>
                                         No {activeTab} solution yet
                                     </h3>
-                                    <p className='text-gray-500 max-w-sm'>
+                                    <p className='text-gray-500 max-w-sm mb-6'>
                                         Click the "Generate AI Solutions" button
                                         above to create both concise and expert
-                                        versions.
+                                        versions, or write one manually.
                                     </p>
+                                    <button
+                                        onClick={() => setIsEditing(true)}
+                                        className='px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
+                                    >
+                                        Write Manually
+                                    </button>
                                 </div>
                             )}
                         </div>
                     </div>
 
                     {/* Sidebar / Tools */}
-                    {getCurrentContent() && (
+                    {(getCurrentContent() || isEditing) && (
                         <div className='w-full lg:w-96 bg-gray-50 dark:bg-gray-900/30 flex flex-col'>
                             <div className='p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800'>
                                 <span className='font-semibold text-sm uppercase tracking-wide text-gray-500'>
@@ -334,19 +385,15 @@ const PyqSolutionPage = () => {
                                 </div>
 
                                 <div className='flex-1 overflow-y-auto space-y-2 mb-4'>
-                                    {[
-                                        'Fix grammar',
-                                        'Simplify language',
-                                        'Add examples',
-                                        'Make it bulleted',
-                                        'Expand explanation',
-                                    ].map((prompt) => (
+                                    {SOLUTION_PROMPTS.map((item) => (
                                         <button
-                                            key={prompt}
-                                            onClick={() => setChatInput(prompt)}
+                                            key={item.label}
+                                            onClick={() =>
+                                                setChatInput(item.prompt)
+                                            }
                                             className='w-full text-left px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:border-indigo-400 hover:shadow-sm transition-all'
                                         >
-                                            {prompt}
+                                            {item.label}
                                         </button>
                                     ))}
                                 </div>
@@ -384,6 +431,13 @@ const PyqSolutionPage = () => {
                     )}
                 </div>
             </div>
+
+            <ManualPyqSolutionModal
+                isOpen={isManualModalOpen}
+                onClose={() => setIsManualModalOpen(false)}
+                onImport={handleManualImport}
+                loading={aiLoading}
+            />
         </div>
     );
 };
