@@ -23,6 +23,7 @@ const PyqSolutionList = () => {
     const [pageSize, setPageSize] = useState(10);
     const [totalPages, setTotalPages] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
+    const [activeTab, setActiveTab] = useState('all');
 
     const [confirmModal, setConfirmModal] = useState({
         isOpen: false,
@@ -35,7 +36,12 @@ const PyqSolutionList = () => {
     const fetchSolutions = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await api.get(`/pyq-solution/all/${collegeslug}`, {
+            const endpoint =
+                activeTab === 'all'
+                    ? `/pyq-solution/all/${collegeslug}`
+                    : `/pyq-solution/requested/${collegeslug}`;
+
+            const response = await api.get(endpoint, {
                 params: {
                     page,
                     limit: pageSize,
@@ -56,7 +62,7 @@ const PyqSolutionList = () => {
         } finally {
             setLoading(false);
         }
-    }, [collegeslug, page, pageSize, search]);
+    }, [collegeslug, page, pageSize, search, activeTab]);
 
     useEffect(() => {
         fetchSolutions();
@@ -120,6 +126,36 @@ const PyqSolutionList = () => {
                         TitleIcon={FileText}
                     />
 
+                    {/* Tabs */}
+                    <div className='flex space-x-1 bg-white dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 w-fit'>
+                        <button
+                            onClick={() => {
+                                setActiveTab('all');
+                                setPage(1);
+                            }}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                activeTab === 'all'
+                                    ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
+                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            All Solutions
+                        </button>
+                        <button
+                            onClick={() => {
+                                setActiveTab('requested');
+                                setPage(1);
+                            }}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                activeTab === 'requested'
+                                    ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
+                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            Requested
+                        </button>
+                    </div>
+
                     {/* Filters & Actions */}
                     <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-4 mb-4'>
                         <form
@@ -171,6 +207,11 @@ const PyqSolutionList = () => {
                                             <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                                                 Info
                                             </th>
+                                            {activeTab === 'requested' && (
+                                                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                                                    Requests
+                                                </th>
+                                            )}
                                             <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                                                 Last Updated
                                             </th>
@@ -180,69 +221,124 @@ const PyqSolutionList = () => {
                                         </tr>
                                     </thead>
                                     <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                        {solutions.map((item) => (
-                                            <tr
-                                                key={item._id}
-                                                className='hover:bg-gray-50 dark:hover:bg-gray-700'
-                                            >
-                                                <td className='px-6 py-4'>
-                                                    <div className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                        {item.pyq?.subject
-                                                            ?.subjectName ||
-                                                            'N/A'}
-                                                    </div>
-                                                    <div className='text-xs text-gray-500 dark:text-gray-400'>
-                                                        {item.pyq?.slug ||
-                                                            'No Slug'}
-                                                    </div>
-                                                </td>
-                                                <td className='px-6 py-4'>
-                                                    <div className='text-sm text-gray-900 dark:text-white'>
-                                                        {item.pyq?.year}
-                                                    </div>
-                                                    <div className='text-xs text-gray-500 dark:text-gray-400'>
-                                                        {item.pyq?.examType}
-                                                    </div>
-                                                </td>
-                                                <td className='px-6 py-4 text-sm text-gray-500 dark:text-gray-400'>
-                                                    {new Date(
-                                                        item.lastUpdated,
-                                                    ).toLocaleDateString()}
-                                                </td>
+                                        {solutions.map((item) => {
+                                            // Handle different structures for PyqSolution (item.pyq is object) vs NewPyq (item IS the pyq)
+                                            const pyq =
+                                                activeTab === 'all'
+                                                    ? item.pyq
+                                                    : item;
+                                            const solutionId =
+                                                activeTab === 'all'
+                                                    ? item._id
+                                                    : null;
+                                            const requests =
+                                                activeTab === 'requested'
+                                                    ? item.solutionRequestCount
+                                                    : 0;
+                                            const updatedDate =
+                                                activeTab === 'all'
+                                                    ? item.lastUpdated
+                                                    : item.updatedAt;
 
-                                                <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
-                                                    <div className='flex items-center justify-end space-x-2'>
-                                                        <button
-                                                            onClick={() =>
-                                                                handleEdit(item)
-                                                            }
-                                                            className='text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 p-1 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded'
-                                                            title='Edit'
-                                                        >
-                                                            <Edit2 className='w-4 h-4' />
-                                                        </button>
-                                                        <button
-                                                            onClick={() =>
-                                                                handleDelete(
-                                                                    item,
-                                                                )
-                                                            }
-                                                            className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded'
-                                                            title='Delete'
-                                                        >
-                                                            <Trash2 className='w-4 h-4' />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                            return (
+                                                <tr
+                                                    key={item._id}
+                                                    className='hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                >
+                                                    <td className='px-6 py-4'>
+                                                        <div className='text-sm font-medium text-gray-900 dark:text-white'>
+                                                            {pyq?.subject
+                                                                ?.subjectName ||
+                                                                'N/A'}
+                                                        </div>
+                                                        <div className='text-xs text-gray-500 dark:text-gray-400'>
+                                                            {pyq?.slug ||
+                                                                'No Slug'}
+                                                        </div>
+                                                    </td>
+                                                    <td className='px-6 py-4'>
+                                                        <div className='text-sm text-gray-900 dark:text-white'>
+                                                            {pyq?.year}
+                                                        </div>
+                                                        <div className='text-xs text-gray-500 dark:text-gray-400'>
+                                                            {pyq?.examType}
+                                                        </div>
+                                                    </td>
+                                                    {activeTab ===
+                                                        'requested' && (
+                                                        <td className='px-6 py-4'>
+                                                            <div className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'>
+                                                                {requests}{' '}
+                                                                Requests
+                                                            </div>
+                                                        </td>
+                                                    )}
+                                                    <td className='px-6 py-4 text-sm text-gray-500 dark:text-gray-400'>
+                                                        {new Date(
+                                                            updatedDate,
+                                                        ).toLocaleDateString()}
+                                                    </td>
+
+                                                    <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
+                                                        <div className='flex items-center justify-end space-x-2'>
+                                                            {activeTab ===
+                                                            'all' ? (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() =>
+                                                                            handleEdit(
+                                                                                item,
+                                                                            )
+                                                                        }
+                                                                        className='text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 p-1 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded'
+                                                                        title='Edit'
+                                                                    >
+                                                                        <Edit2 className='w-4 h-4' />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() =>
+                                                                            handleDelete(
+                                                                                item,
+                                                                            )
+                                                                        }
+                                                                        className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded'
+                                                                        title='Delete'
+                                                                    >
+                                                                        <Trash2 className='w-4 h-4' />
+                                                                    </button>
+                                                                </>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() =>
+                                                                        navigate(
+                                                                            `/${collegeslug}/pyqs/${pyq._id}/aisolution`,
+                                                                        )
+                                                                    }
+                                                                    className='text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded text-xs font-medium'
+                                                                >
+                                                                    Create
+                                                                    Solution
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                         {solutions.length === 0 && (
                                             <tr>
                                                 <td
-                                                    colSpan={5}
+                                                    colSpan={
+                                                        activeTab ===
+                                                        'requested'
+                                                            ? 5
+                                                            : 5
+                                                    }
                                                     className='px-6 py-10 text-center text-gray-500 dark:text-gray-400'
                                                 >
-                                                    No solutions found.
+                                                    {activeTab === 'all'
+                                                        ? 'No solutions found.'
+                                                        : 'No requested solutions request found.'}
                                                 </td>
                                             </tr>
                                         )}
