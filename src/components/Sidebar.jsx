@@ -12,6 +12,7 @@ import {
     ChevronsLeft,
     ChevronsRight,
     X,
+    UploadCloud,
     CreditCard,
     Phone,
     RotateCcw,
@@ -149,6 +150,13 @@ function Sidebar() {
                 icon: Star,
                 to: `${base}/pyqs`,
                 colors: 'text-yellow-600 dark:text-yellow-400',
+            },
+            {
+                id: 'pyqs-bulk-import',
+                label: 'Bulk Import PYQs',
+                icon: UploadCloud,
+                to: `${base}/pyqs-bulk-import`,
+                colors: 'text-blue-600 dark:text-blue-400',
             },
             {
                 id: 'notes',
