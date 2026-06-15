@@ -56,6 +56,7 @@ const PyqList = lazy(() => import('./pages/Pyqs/PyqList'));
 const PyqDetail = lazy(() => import('./pages/Pyqs/PyqDetail'));
 const PyqSolutionPage = lazy(() => import('./pages/Pyqs/PyqSolutionPage'));
 const PyqSolutionList = lazy(() => import('./pages/Pyqs/PyqSolutionList'));
+const PyqBulkImport = lazy(() => import('./pages/Pyqs/BulkImport'));
 
 // Notes
 const NotesList = lazy(() => import('./pages/Notes/NotesList'));
@@ -336,6 +337,14 @@ function App() {
                                     element={
                                         <ProtectedRoute>
                                             <PyqList />
+                                        </ProtectedRoute>
+                                    }
+                                />
+                                <Route
+                                    path='/:collegeslug/pyqs-bulk-import'
+                                    element={
+                                        <ProtectedRoute>
+                                            <PyqBulkImport />
                                         </ProtectedRoute>
                                     }
                                 />
