@@ -14,6 +14,7 @@ import {
     BarChart2,
     Bell,
     CheckSquare,
+    MessagesSquare,
 } from 'lucide-react';
 
 const Header = () => {
@@ -40,6 +41,7 @@ const Header = () => {
         { path: '/reports', label: 'Reports', icon: BarChart2 },
         { path: '/analytics', label: 'Analytics', icon: BarChart3 },
         { path: '/notifications', label: 'Notifications', icon: Bell },
+        { path: '/community', label: 'Community', icon: MessagesSquare },
         { path: '/tasks', label: 'Tasks', icon: CheckSquare },
     ];
 
