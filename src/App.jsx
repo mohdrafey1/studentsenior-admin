@@ -78,6 +78,11 @@ const SeniorDetail = lazy(() => import('./pages/Senior/SeniorDetail'));
 const GroupList = lazy(() => import('./pages/Group/GroupList'));
 const GroupDetail = lazy(() => import('./pages/Group/GroupDetail'));
 
+// Community moderation
+const CommunityModeration = lazy(
+    () => import('./pages/Community/CommunityModeration'),
+);
+
 // Opportunities
 const OpportunityList = lazy(
     () => import('./pages/Opportunity/OpportunityList'),
@@ -187,6 +192,16 @@ function App() {
                                     element={
                                         <ProtectedRoute>
                                             <Reports />
+                                        </ProtectedRoute>
+                                    }
+                                />
+
+                                {/* Community moderation */}
+                                <Route
+                                    path='/community'
+                                    element={
+                                        <ProtectedRoute>
+                                            <CommunityModeration />
                                         </ProtectedRoute>
                                     }
                                 />
