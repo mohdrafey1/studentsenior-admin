@@ -8,7 +8,15 @@ import toast from 'react-hot-toast';
 import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
 import ReactMarkdown from 'react-markdown';
-import { BookOpen, Sparkles, Send, Edit, Save, X } from 'lucide-react';
+import { BookOpen, Sparkles, Send, Edit, Save, X, Key, Cpu, Eye, EyeOff, RefreshCw, Loader2 } from 'lucide-react';
+
+const DEFAULT_MODELS = [
+    { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
+    { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash' },
+    { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
+    { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
+    { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' }
+];
 
 const QuickNotes = () => {
     const { subjectId } = useParams();
@@ -86,6 +94,81 @@ Do not remove important syllabus content.`,
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState('');
 
+    const [modelsList, setModelsList] = useState(DEFAULT_MODELS);
+    const [fetchingModels, setFetchingModels] = useState(false);
+
+    const [selectedModel, setSelectedModel] = useState(() => {
+        const saved = localStorage.getItem('quicknotes_gemini_model');
+        return saved && saved !== 'gemini-3.8-flash' ? saved : 'gemini-3.8-flash';
+    });
+    const [apiKey, setApiKey] = useState(() => {
+        return localStorage.getItem('quicknotes_gemini_api_key') || '';
+    });
+    const [tempKey, setTempKey] = useState(apiKey);
+    const [showKeyModal, setShowKeyModal] = useState(false);
+    const [showApiKeyText, setShowApiKeyText] = useState(false);
+
+    const handleModelChange = (model) => {
+        setSelectedModel(model);
+        localStorage.setItem('quicknotes_gemini_model', model);
+        toast.success(`Model set to ${model}`);
+    };
+
+    const fetchModels = async (keyToUse) => {
+        try {
+            setFetchingModels(true);
+            const trimmedKey = keyToUse?.trim();
+            const config = {};
+            if (trimmedKey) {
+                config.headers = { 'x-gemini-api-key': trimmedKey };
+                config.params = { apiKey: trimmedKey };
+            }
+            const res = await api.get('/quicknotes/models', config);
+            if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+                const fetched = res.data.data;
+                setModelsList(fetched);
+                // If currently stored selectedModel is invalid or gemini-3.8-flash, sync to first valid model
+                const isCurrentValid = fetched.some((m) => m.id === selectedModel);
+                if (!isCurrentValid || selectedModel === 'gemini-3.8-flash') {
+                    const fallbackModel = fetched[0].id;
+                    setSelectedModel(fallbackModel);
+                    localStorage.setItem('quicknotes_gemini_model', fallbackModel);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to fetch Gemini models list:', error);
+        } finally {
+            setFetchingModels(false);
+        }
+    };
+
+    const handleSaveKey = () => {
+        const trimmed = tempKey.trim();
+        setApiKey(trimmed);
+        localStorage.setItem('quicknotes_gemini_api_key', trimmed);
+        setShowKeyModal(false);
+        fetchModels(trimmed);
+        if (trimmed) {
+            toast.success('Custom API Key saved!');
+        } else {
+            toast.success('Using default server API Key');
+        }
+    };
+
+    const handleClearKey = () => {
+        setTempKey('');
+        setApiKey('');
+        localStorage.removeItem('quicknotes_gemini_api_key');
+        setShowKeyModal(false);
+        fetchModels('');
+        toast.success('Custom API Key cleared. Using default server key.');
+    };
+
+    useEffect(() => {
+        fetchModels(apiKey);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [apiKey]);
+
     useEffect(() => {
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,10 +227,20 @@ Do not remove important syllabus content.`,
         if (!selectedUnit) return;
         setGenerating(true);
         try {
-            const res = await api.post('/quicknotes/generate', {
+            const payload = {
                 subjectId,
                 unitNumber: selectedUnit.unitNumber,
+                model: selectedModel,
+            };
+            if (apiKey.trim()) {
+                payload.apiKey = apiKey.trim();
+                payload.customApiKey = apiKey.trim();
+            }
+
+            const res = await api.post('/quicknotes/generate', payload, {
+                headers: apiKey.trim() ? { 'x-gemini-api-key': apiKey.trim() } : {},
             });
+
             if (res.data.success) {
                 toast.success('Note generated successfully!');
                 // Update notes list
@@ -166,7 +259,7 @@ Do not remove important syllabus content.`,
             }
         } catch (error) {
             console.error(error);
-            toast.error('Failed to generate note');
+            toast.error(error.response?.data?.message || 'Failed to generate note');
         } finally {
             setGenerating(false);
         }
@@ -178,10 +271,20 @@ Do not remove important syllabus content.`,
 
         setUpdating(true);
         try {
-            const res = await api.put('/quicknotes/update', {
+            const payload = {
                 noteId: currentNote._id,
                 userPrompt: chatInput,
+                model: selectedModel,
+            };
+            if (apiKey.trim()) {
+                payload.apiKey = apiKey.trim();
+                payload.customApiKey = apiKey.trim();
+            }
+
+            const res = await api.put('/quicknotes/update', payload, {
+                headers: apiKey.trim() ? { 'x-gemini-api-key': apiKey.trim() } : {},
             });
+
             if (res.data.success) {
                 toast.success('Content generated. Please review and save.');
                 setChatInput('');
@@ -193,7 +296,7 @@ Do not remove important syllabus content.`,
             }
         } catch (error) {
             console.error(error);
-            toast.error('Failed to generate update');
+            toast.error(error.response?.data?.message || 'Failed to generate update');
         } finally {
             setUpdating(false);
         }
@@ -269,11 +372,65 @@ Do not remove important syllabus content.`,
                 className={`py-4 ${mainContentMargin} transition-all duration-300`}
             >
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 h-[calc(100vh-100px)] flex flex-col'>
-                    <BackButton
-                        title={`Quick Notes: ${syllabus.slug || 'Subject'}`}
-                        TitleIcon={BookOpen}
-                        className='mb-4'
-                    />
+                    <div className='flex flex-wrap items-center justify-between gap-3 mb-4'>
+                        <BackButton
+                            title={`Quick Notes: ${syllabus.slug || 'Subject'}`}
+                            TitleIcon={BookOpen}
+                            className='mb-0'
+                        />
+
+                        {/* AI Config Bar (Model Selector & Custom API Key Settings) */}
+                        <div className='flex items-center gap-3 bg-white dark:bg-gray-800 p-1.5 px-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm'>
+                            <div className='flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300 font-medium'>
+                                <Cpu size={15} className='text-indigo-500' />
+                                <span className='hidden sm:inline'>Model:</span>
+                                <div className='flex items-center gap-1.5'>
+                                    <select
+                                        value={selectedModel}
+                                        onChange={(e) => handleModelChange(e.target.value)}
+                                        disabled={fetchingModels}
+                                        className='bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-xs rounded-md px-2 py-1 focus:ring-1 focus:ring-indigo-500 outline-none font-sans cursor-pointer disabled:opacity-50'
+                                    >
+                                        {modelsList.map((m) => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        type='button'
+                                        onClick={() => fetchModels(apiKey)}
+                                        disabled={fetchingModels}
+                                        className='p-1 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors disabled:opacity-50'
+                                        title='Fetch latest Gemini models list'
+                                    >
+                                        <RefreshCw
+                                            size={13}
+                                            className={fetchingModels ? 'animate-spin text-indigo-500' : ''}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className='h-4 w-px bg-gray-200 dark:bg-gray-700'></div>
+
+                            <button
+                                onClick={() => {
+                                    setTempKey(apiKey);
+                                    setShowKeyModal(true);
+                                }}
+                                className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md transition-colors ${
+                                    apiKey.trim()
+                                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700 font-medium'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                                }`}
+                                title="Configure Custom Gemini API Key"
+                            >
+                                <Key size={14} className={apiKey.trim() ? 'text-amber-500' : 'text-gray-400'} />
+                                <span>{apiKey.trim() ? 'Custom Key' : 'Default Key'}</span>
+                            </button>
+                        </div>
+                    </div>
 
                     <div className='flex flex-1 gap-4 overflow-hidden'>
                         {/* Unit List Sidebar */}
@@ -336,7 +493,13 @@ Do not remove important syllabus content.`,
                                                     className='inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50'
                                                 >
                                                     {generating ? (
-                                                        'Generating...'
+                                                        <span className='flex items-center gap-2'>
+                                                            <Loader2
+                                                                size={16}
+                                                                className='animate-spin'
+                                                            />{' '}
+                                                            Generating...
+                                                        </span>
                                                     ) : (
                                                         <>
                                                             <Sparkles
@@ -439,8 +602,13 @@ Do not remove important syllabus content.`,
                                         {/* AI Chat / Edit Panel */}
                                         {currentNote && (
                                             <div className='w-full md:w-80 border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-900/30'>
-                                                <div className='p-3 font-semibold text-xs uppercase tracking-wider text-gray-500 border-b border-gray-200 dark:border-gray-700'>
-                                                    Refine Content
+                                                <div className='p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center'>
+                                                    <span className='font-semibold text-xs uppercase tracking-wider text-gray-500'>
+                                                        Refine Content
+                                                    </span>
+                                                    <span className='text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded font-mono truncate max-w-[120px]'>
+                                                        {selectedModel}
+                                                    </span>
                                                 </div>
                                                 <div className='flex-1 p-4 overflow-y-auto'>
                                                     <p className='text-sm text-gray-600 dark:text-gray-400 mb-4'>
@@ -512,6 +680,91 @@ Do not remove important syllabus content.`,
                         </div>
                     </div>
                 </div>
+
+                {/* Custom API Key Modal */}
+                {showKeyModal && (
+                    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4'>
+                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 relative'>
+                            <button
+                                onClick={() => setShowKeyModal(false)}
+                                className='absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
+                            >
+                                <X size={20} />
+                            </button>
+                            <div className='flex items-center gap-3 mb-4'>
+                                <div className='p-2.5 bg-indigo-100 dark:bg-indigo-900/40 rounded-lg text-indigo-600 dark:text-indigo-400'>
+                                    <Key size={22} />
+                                </div>
+                                <div>
+                                    <h3 className='text-lg font-bold text-gray-900 dark:text-white'>
+                                        Custom Gemini API Key
+                                    </h3>
+                                    <p className='text-xs text-gray-500 dark:text-gray-400'>
+                                        Provide your own API Key for AI generation
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className='space-y-4'>
+                                <div>
+                                    <label className='block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1'>
+                                        Gemini API Key
+                                    </label>
+                                    <div className='relative'>
+                                        <input
+                                            type={showApiKeyText ? 'text' : 'password'}
+                                            value={tempKey}
+                                            onChange={(e) => setTempKey(e.target.value)}
+                                            placeholder='AIzaSy...'
+                                            className='w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none'
+                                        />
+                                        <button
+                                            type='button'
+                                            onClick={() => setShowApiKeyText(!showApiKeyText)}
+                                            className='absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
+                                        >
+                                            {showApiKeyText ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+                                    <p className='text-xs text-gray-500 dark:text-gray-400 mt-2 leading-relaxed'>
+                                        Saved securely in your browser's local storage. Leave empty to use default server API key.
+                                    </p>
+                                </div>
+
+                                <div className='flex items-center justify-between gap-3 pt-2 border-t border-gray-100 dark:border-gray-700'>
+                                    {apiKey ? (
+                                        <button
+                                            type='button'
+                                            onClick={handleClearKey}
+                                            className='px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors'
+                                        >
+                                            Clear Custom Key
+                                        </button>
+                                    ) : (
+                                        <div></div>
+                                    )}
+                                    <div className='flex items-center gap-2'>
+                                        <button
+                                            type='button'
+                                            onClick={() => setShowKeyModal(false)}
+                                            className='px-4 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors'
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type='button'
+                                            onClick={handleSaveKey}
+                                            className='px-4 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors flex items-center gap-1.5'
+                                        >
+                                            <Save size={14} />
+                                            Save Key
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </main>
         </div>
     );
