@@ -42,6 +42,12 @@ const DashboardUsers = lazy(() => import('./pages/Users/DashboardUsers'));
 const Tasks = lazy(() => import('./pages/Tasks/Tasks'));
 const AffiliateProducts = lazy(() => import('./pages/AffiliateProducts'));
 
+// Blog (merged in from ss-blog-dashboard)
+const BlogList = lazy(() => import('./pages/Blog/BlogList'));
+const BlogCreate = lazy(() => import('./pages/Blog/BlogCreate'));
+const BlogEdit = lazy(() => import('./pages/Blog/BlogEdit'));
+const BlogAnalytics = lazy(() => import('./pages/Blog/BlogAnalytics'));
+
 // College & Resources
 const CollegeDetail = lazy(() => import('./pages/CollegeDetail'));
 const Courses = lazy(() => import('./pages/Resources/Courses'));
@@ -182,6 +188,41 @@ function App() {
                                     element={
                                         <ProtectedRoute>
                                             <AffiliateProducts />
+                                        </ProtectedRoute>
+                                    }
+                                />
+
+                                {/* Blog — not college-scoped, so these sit
+                                    at the top level rather than under a slug */}
+                                <Route
+                                    path='/blog'
+                                    element={
+                                        <ProtectedRoute>
+                                            <BlogList />
+                                        </ProtectedRoute>
+                                    }
+                                />
+                                <Route
+                                    path='/blog/create'
+                                    element={
+                                        <ProtectedRoute>
+                                            <BlogCreate />
+                                        </ProtectedRoute>
+                                    }
+                                />
+                                <Route
+                                    path='/blog/analytics'
+                                    element={
+                                        <ProtectedRoute>
+                                            <BlogAnalytics />
+                                        </ProtectedRoute>
+                                    }
+                                />
+                                <Route
+                                    path='/blog/edit/:id'
+                                    element={
+                                        <ProtectedRoute>
+                                            <BlogEdit />
                                         </ProtectedRoute>
                                     }
                                 />

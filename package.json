@@ -13,17 +13,23 @@
     },
     "dependencies": {
         "@hookform/resolvers": "^5.2.2",
+        "@mdxeditor/editor": "^4.2.5",
+        "@tailwindcss/typography": "^0.5.20",
         "@tailwindcss/vite": "^4.1.13",
         "@types/react-router-dom": "^5.3.3",
         "axios": "^1.12.2",
         "joi": "^18.0.1",
         "lucide-react": "^0.544.0",
+        "marked": "^18.0.13",
+        "papaparse": "^5.7.0",
         "react": "^19.1.1",
+        "react-datepicker": "^9.1.0",
         "react-dom": "^19.1.1",
         "react-hook-form": "^7.63.0",
         "react-hot-toast": "^2.6.0",
         "react-markdown": "^10.1.0",
         "react-router-dom": "^7.9.1",
+        "recharts": "^3.10.1",
         "tailwindcss": "^4.1.13"
     },
     "devDependencies": {

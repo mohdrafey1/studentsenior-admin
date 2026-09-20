@@ -54,3 +54,7 @@ export const dashboardAPI = {
 };
 
 export default api;
+
+/** The API sends a useful `message` on failure; prefer it over a generic string. */
+export const apiErrorMessage = (error, fallback = 'Something went wrong') =>
+    error?.response?.data?.message || error?.message || fallback;

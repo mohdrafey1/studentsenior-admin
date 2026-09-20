@@ -15,6 +15,7 @@ import {
     Bell,
     CheckSquare,
     MessagesSquare,
+    PenSquare,
 } from 'lucide-react';
 
 const Header = () => {
@@ -43,6 +44,7 @@ const Header = () => {
         { path: '/notifications', label: 'Notifications', icon: Bell },
         { path: '/community', label: 'Community', icon: MessagesSquare },
         { path: '/tasks', label: 'Tasks', icon: CheckSquare },
+        { path: '/blog', label: 'Blog', icon: PenSquare },
     ];
 
     const getRoleColor = (role) => {

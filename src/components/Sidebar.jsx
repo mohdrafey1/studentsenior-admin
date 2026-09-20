@@ -26,6 +26,9 @@ import {
     Crown,
     ShoppingCart,
     Tag,
+    PenSquare,
+    FilePlus2,
+    BarChart3,
 } from 'lucide-react';
 import { useSidebar } from '../context/SidebarContext';
 import { Link } from 'react-router-dom';
@@ -41,9 +44,38 @@ function Sidebar() {
     // Check if sidebar should be shown (not on /dashboard, but show on /reports)
     const shouldShowSidebar = location.pathname !== '/dashboard';
     const isReportsSection = location.pathname.startsWith('/reports');
+    const isBlogSection = location.pathname.startsWith('/blog');
 
     // Items mirror the stats cards
     const items = useMemo(() => {
+        // The blog is not college-scoped, so it gets its own set of links
+        // rather than hanging off a college slug.
+        if (isBlogSection) {
+            return [
+                {
+                    id: 'blog-posts',
+                    label: 'All Posts',
+                    icon: PenSquare,
+                    to: '/blog',
+                    colors: 'text-indigo-600 dark:text-indigo-400',
+                },
+                {
+                    id: 'blog-create',
+                    label: 'New Post',
+                    icon: FilePlus2,
+                    to: '/blog/create',
+                    colors: 'text-green-600 dark:text-green-400',
+                },
+                {
+                    id: 'blog-analytics',
+                    label: 'Blog Analytics',
+                    icon: BarChart3,
+                    to: '/blog/analytics',
+                    colors: 'text-purple-600 dark:text-purple-400',
+                },
+            ];
+        }
+
         // If in reports section, show reports navigation
         if (isReportsSection) {
             return [
@@ -230,7 +262,7 @@ function Sidebar() {
                 colors: 'text-yellow-600 dark:text-yellow-400',
             },
         ];
-    }, [collegeslug, isReportsSection]);
+    }, [collegeslug, isReportsSection, isBlogSection]);
 
     const isRouteActive = (to) =>
         to &&
