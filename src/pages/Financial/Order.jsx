@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
@@ -11,7 +11,6 @@ import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
 import FilterBar from '../../components/Common/FilterBar';
 import {
-    filterByTime,
     getTimeFilterLabel,
 } from '../../components/Common/timeFilterUtils';
 
@@ -34,6 +33,9 @@ const statusClass = (status) => {
 
 export default function OrderPage() {
     const [items, setItems] = useState([]);
+    const [totalItems, setTotalItems] = useState(0);
+    const [totals, setTotals] = useState({ rupees: 0, points: 0 });
+    const [hasLoaded, setHasLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
@@ -52,29 +54,33 @@ export default function OrderPage() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const fetchOrders = async () => {
-        try {
+    useEffect(() => {
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
             setLoading(true);
             setError(null);
-
-            const res = await api.get(`/order`);
-            setItems(res.data?.data);
-        } catch (e) {
-            console.error(e);
-            const msg =
-                e.response?.data?.message ||
-                e.message ||
-                'Failed to load orders';
-            setError(msg);
-            toast.error(msg);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchOrders();
-    }, []);
+            try {
+                const response = await api.get('/order', {
+                    params: { page, pageSize, search, status, orderType, paymentMethod, timeFilter, sortBy, sortOrder, timezoneOffset: new Date().getTimezoneOffset() },
+                    signal: controller.signal,
+                });
+                const result = response.data?.data;
+                if (!Array.isArray(result?.items) || !result.pagination) throw new Error('Invalid list response');
+                setItems(result.items);
+                setTotalItems(result.pagination.total);
+                setTotals(result.totals);
+                if (result.pagination.totalPages > 0 && page > result.pagination.totalPages) setPage(result.pagination.totalPages);
+            } catch (failure) {
+                if (controller.signal.aborted) return;
+                const message = failure.response?.data?.message || 'Could not load records. Please retry.';
+                setError(message);
+                toast.error(message);
+            } finally {
+                if (!controller.signal.aborted) { setLoading(false); setHasLoaded(true); }
+            }
+        }, 250);
+        return () => { clearTimeout(timer); controller.abort(); };
+    }, [page, pageSize, search, status, orderType, paymentMethod, timeFilter, sortBy, sortOrder]);
 
     // Read URL params on mount
     useEffect(() => {
@@ -93,7 +99,7 @@ export default function OrderPage() {
             (window.innerWidth >= 1024 ? 'table' : 'grid');
         setSearch(q);
         setPage(Number.isFinite(p) && p > 0 ? p : 1);
-        setPageSize(Number.isFinite(ps) && ps > 0 ? ps : 12);
+        setPageSize(Number.isFinite(ps) && ps > 0 ? Math.min(ps, 100) : 12);
         setStatus(st);
         setOrderType(ot);
         setPaymentMethod(pm);
@@ -145,89 +151,14 @@ export default function OrderPage() {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const uniqueOrderTypes = useMemo(
-        () =>
-            Array.from(new Set(items.map((o) => o.orderType))).filter(Boolean),
-        [items],
-    );
-    const uniquePaymentMethods = useMemo(
-        () =>
-            Array.from(new Set(items.map((o) => o.paymentMethod))).filter(
-                Boolean,
-            ),
-        [items],
-    );
-    const uniqueStatuses = useMemo(
-        () =>
-            Array.from(
-                new Set(items.map((o) => (o.status || '').toLowerCase())),
-            ).filter(Boolean),
-        [items],
-    );
-
-    const filteredAndSorted = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        let list = items.filter((o) => {
-            const email = (o.user?.email || '').toLowerCase();
-            const name = (o.user?.username || o.user?.name || '').toLowerCase();
-            const id = (o._id || '').toLowerCase();
-            const matchesSearch =
-                !q || email.includes(q) || name.includes(q) || id.includes(q);
-            const matchesStatus =
-                !status || (o.status || '').toLowerCase() === status;
-            const matchesOrderType = !orderType || o.orderType === orderType;
-            const matchesMethod =
-                !paymentMethod || o.paymentMethod === paymentMethod;
-            const matchesTime = filterByTime(o, timeFilter);
-            return (
-                matchesSearch &&
-                matchesStatus &&
-                matchesOrderType &&
-                matchesMethod &&
-                matchesTime
-            );
-        });
-
-        list.sort((a, b) => {
-            let aVal = 0;
-            let bVal = 0;
-            if (sortBy === 'createdAt') {
-                aVal = new Date(a.createdAt || 0).getTime();
-                bVal = new Date(b.createdAt || 0).getTime();
-            } else if (sortBy === 'amount') {
-                aVal = Number(a.amount || 0);
-                bVal = Number(b.amount || 0);
-            }
-            return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-        });
-
-        return list;
-    }, [
-        items,
-        search,
-        status,
-        orderType,
-        paymentMethod,
-        timeFilter,
-        sortBy,
-        sortOrder,
-    ]);
-
-    const totalItems = filteredAndSorted.length;
-    const start = (page - 1) * pageSize;
-    const current = filteredAndSorted.slice(start, start + pageSize);
-
-    // Calculate total amount
-    const totalAmount = useMemo(() => {
-        return filteredAndSorted.reduce(
-            (sum, o) => sum + (Number(o.amount) || 0),
-            0,
-        );
-    }, [filteredAndSorted]);
+    const uniqueOrderTypes = ['pyq_purchase', 'note_purchase', 'add_points'];
+    const uniquePaymentMethods = ['points', 'online', 'iap'];
+    const uniqueStatuses = ['pending', 'processing', 'completed', 'failed', 'cancelled'];
+    const current = items;
 
     // total pages handled inside Pagination component
 
-    if (loading) {
+    if (loading && !hasLoaded) {
         return <Loader />;
     }
 
@@ -251,13 +182,13 @@ export default function OrderPage() {
                                     ):
                                 </span>
                                 <span className='font-semibold text-gray-900 dark:text-white'>
-                                    ₹{totalAmount.toLocaleString()}
+                                    ₹{totals.rupees.toLocaleString()} · {totals.points.toLocaleString()} pts
                                 </span>
                             </div>
                         )}
                         <FilterBar
                             search={search}
-                            onSearch={setSearch}
+                            onSearch={(value) => { setSearch(value); setPage(1); }}
                             filters={[
                                 {
                                     label: 'Order Type',
@@ -348,6 +279,8 @@ export default function OrderPage() {
                         />
                     </div>
 
+                    {loading && <p role='status' className='text-sm text-gray-500 mb-2'>Updating records…</p>}
+
                     {/* Error */}
                     {error && (
                         <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded text-sm mb-3'>
@@ -363,7 +296,7 @@ export default function OrderPage() {
                                 <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mb-3'>
                                     {current.map((o) => {
                                         const amountLabel =
-                                            o.paymentMethod === 'online'
+                                            o.paymentMethod !== 'points'
                                                 ? `₹ ${o.amount}`
                                                 : `${o.amount} pts`;
                                         return (

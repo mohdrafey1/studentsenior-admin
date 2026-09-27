@@ -27,6 +27,7 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 const Payments = lazy(() => import('./pages/Financial/Payments'));
 const PaymentDetail = lazy(() => import('./pages/Financial/PaymentDetail'));
 const Order = lazy(() => import('./pages/Financial/Order'));
+const Refunds = lazy(() => import('./pages/Financial/Refunds'));
 const Redemptions = lazy(() => import('./pages/Financial/Redemptions'));
 const Transactions = lazy(() => import('./pages/Financial/Transactions'));
 const Subscriptions = lazy(() => import('./pages/Financial/Subscriptions'));
@@ -43,6 +44,7 @@ const Tasks = lazy(() => import('./pages/Tasks/Tasks'));
 const AffiliateProducts = lazy(() => import('./pages/AffiliateProducts'));
 
 // Blog (merged in from ss-blog-dashboard)
+const BlogShell = lazy(() => import('./pages/Blog/BlogShell'));
 const BlogList = lazy(() => import('./pages/Blog/BlogList'));
 const BlogCreate = lazy(() => import('./pages/Blog/BlogCreate'));
 const BlogEdit = lazy(() => import('./pages/Blog/BlogEdit'));
@@ -142,6 +144,7 @@ function App() {
                         />
                         <Suspense fallback={<LoadingSpinner />}>
                             <Routes>
+                                <Route path="/reports/refunds" element={<ProtectedRoute><Refunds /></ProtectedRoute>} />
                                 {/* Public routes */}
                                 <Route path='/login' element={<Login />} />
                                 {/* <Route path='/signup' element={<Signup />} /> */}
@@ -198,7 +201,9 @@ function App() {
                                     path='/blog'
                                     element={
                                         <ProtectedRoute>
-                                            <BlogList />
+                                            <BlogShell>
+                                                <BlogList />
+                                            </BlogShell>
                                         </ProtectedRoute>
                                     }
                                 />
@@ -206,7 +211,9 @@ function App() {
                                     path='/blog/create'
                                     element={
                                         <ProtectedRoute>
-                                            <BlogCreate />
+                                            <BlogShell>
+                                                <BlogCreate />
+                                            </BlogShell>
                                         </ProtectedRoute>
                                     }
                                 />
@@ -214,7 +221,9 @@ function App() {
                                     path='/blog/analytics'
                                     element={
                                         <ProtectedRoute>
-                                            <BlogAnalytics />
+                                            <BlogShell>
+                                                <BlogAnalytics />
+                                            </BlogShell>
                                         </ProtectedRoute>
                                     }
                                 />
@@ -222,7 +231,9 @@ function App() {
                                     path='/blog/edit/:id'
                                     element={
                                         <ProtectedRoute>
-                                            <BlogEdit />
+                                            <BlogShell>
+                                                <BlogEdit />
+                                            </BlogShell>
                                         </ProtectedRoute>
                                     }
                                 />

@@ -54,7 +54,7 @@ const ManualPyqSolutionModal = ({ isOpen, onClose, onImport, loading }) => {
             }
 
             onImport(parsed);
-        } catch (err) {
+        } catch {
             setError(
                 'Invalid JSON format. Please ensure you copied only the JSON object.',
             );

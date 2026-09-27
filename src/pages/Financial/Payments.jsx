@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
@@ -11,16 +11,19 @@ import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
 import FilterBar from '../../components/Common/FilterBar';
 import {
-    filterByTime,
     getTimeFilterLabel,
 } from '../../components/Common/timeFilterUtils';
 
 const Payments = () => {
     const [payments, setPayments] = useState([]);
+    const [totalItems, setTotalItems] = useState(0);
+    const [totals, setTotals] = useState({ rupees: 0, points: 0 });
+    const [hasLoaded, setHasLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
+    const [orderType, setOrderType] = useState('');
     const [timeFilter, setTimeFilter] = useState('');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(12);
@@ -34,29 +37,33 @@ const Payments = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const fetchPayments = async () => {
-        try {
-            setError(null);
-            setLoading(true);
-            // Fetch all payments - do client-side filtering and pagination
-            const response = await api.get(`/payment`);
-            setPayments(response?.data?.data || []);
-        } catch (error) {
-            console.error('Error fetching payments:', error);
-            const errorMessage =
-                error.response?.data?.message ||
-                error.message ||
-                'Failed to load payments';
-            setError(errorMessage);
-            toast.error(errorMessage);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
-        fetchPayments();
-    }, []);
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const response = await api.get('/payment', {
+                    params: { page, pageSize, search, status: filterStatus, orderType, timeFilter, sortBy, sortOrder, timezoneOffset: new Date().getTimezoneOffset() },
+                    signal: controller.signal,
+                });
+                const result = response.data?.data;
+                if (!Array.isArray(result?.items) || !result.pagination) throw new Error('Invalid list response');
+                setPayments(result.items);
+                setTotalItems(result.pagination.total);
+                setTotals(result.totals);
+                if (result.pagination.totalPages > 0 && page > result.pagination.totalPages) setPage(result.pagination.totalPages);
+            } catch (failure) {
+                if (controller.signal.aborted) return;
+                const message = failure.response?.data?.message || 'Could not load records. Please retry.';
+                setError(message);
+                toast.error(message);
+            } finally {
+                if (!controller.signal.aborted) { setLoading(false); setHasLoaded(true); }
+            }
+        }, 250);
+        return () => { clearTimeout(timer); controller.abort(); };
+    }, [page, pageSize, search, filterStatus, orderType, timeFilter, sortBy, sortOrder]);
 
     // Read URL params on mount
     useEffect(() => {
@@ -65,6 +72,7 @@ const Payments = () => {
         const p = parseInt(params.get('page') || '1', 10);
         const ps = parseInt(params.get('pageSize') || '12', 10);
         const fs = params.get('filterStatus') || '';
+        setOrderType(params.get('orderType') || '');
         const tf = params.get('timeFilter') || '';
         const sb = params.get('sortBy') || 'createdAt';
         const so = params.get('sortOrder') || 'desc';
@@ -73,7 +81,7 @@ const Payments = () => {
             (window.innerWidth >= 1024 ? 'table' : 'grid');
         setSearch(q);
         setPage(Number.isFinite(p) && p > 0 ? p : 1);
-        setPageSize(Number.isFinite(ps) && ps > 0 ? ps : 12);
+        setPageSize(Number.isFinite(ps) && ps > 0 ? Math.min(ps, 100) : 12);
         setFilterStatus(fs);
         setTimeFilter(tf);
         setSortBy(sb === 'amount' ? 'amount' : 'createdAt');
@@ -89,6 +97,7 @@ const Payments = () => {
         params.set('page', String(page));
         params.set('pageSize', String(pageSize));
         params.set('filterStatus', filterStatus || '');
+        params.set('orderType', orderType || '');
         params.set('timeFilter', timeFilter || '');
         params.set('sortBy', sortBy);
         params.set('sortOrder', sortOrder);
@@ -102,6 +111,7 @@ const Payments = () => {
         page,
         pageSize,
         filterStatus,
+        orderType,
         timeFilter,
         sortBy,
         sortOrder,
@@ -121,60 +131,8 @@ const Payments = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Client-side filtering and sorting
-    const filteredAndSortedPayments = useMemo(() => {
-        let filtered = [...payments];
-
-        // Search filter (email or user name)
-        if (search.trim()) {
-            const searchLower = search.toLowerCase();
-            filtered = filtered.filter(
-                (p) =>
-                    (p.user?.email || '').toLowerCase().includes(searchLower) ||
-                    (p.user?.name || '').toLowerCase().includes(searchLower),
-            );
-        }
-
-        // Status filter
-        if (filterStatus) {
-            filtered = filtered.filter((p) => p.status === filterStatus);
-        }
-
-        // Time filter
-        filtered = filtered.filter((p) => filterByTime(p, timeFilter));
-
-        // Sorting
-        filtered.sort((a, b) => {
-            let aVal, bVal;
-            if (sortBy === 'createdAt') {
-                aVal = new Date(a.createdAt).getTime();
-                bVal = new Date(b.createdAt).getTime();
-            } else if (sortBy === 'amount') {
-                aVal = a.amount || 0;
-                bVal = b.amount || 0;
-            }
-            return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-        });
-
-        return filtered;
-    }, [payments, search, filterStatus, timeFilter, sortBy, sortOrder]);
-
-    // Pagination
-    const totalItems = filteredAndSortedPayments.length;
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const currentPayments = filteredAndSortedPayments.slice(
-        startIndex,
-        endIndex,
-    );
-
-    // Calculate total amount
-    const totalAmount = useMemo(() => {
-        return filteredAndSortedPayments.reduce(
-            (sum, p) => sum + (Number(p.amount) || 0),
-            0,
-        );
-    }, [filteredAndSortedPayments]);
+    const currentPayments = payments;
+    const totalAmount = totals.rupees;
 
     const handlePageChange = (newPage) => {
         setPage(newPage);
@@ -195,7 +153,7 @@ const Payments = () => {
         }
     };
 
-    if (loading) {
+    if (loading && !hasLoaded) {
         return <Loader />;
     }
 
@@ -225,8 +183,16 @@ const Payments = () => {
 
                         <FilterBar
                             search={search}
-                            onSearch={setSearch}
+                            onSearch={(value) => { setSearch(value); setPage(1); }}
                             filters={[
+                                {
+                                    label: 'Order Type', value: orderType,
+                                    onChange: (value) => { setOrderType(value); setPage(1); },
+                                    options: [{ value: '', label: 'All Types' },
+                                        { value: 'pyq_purchase', label: 'PYQ Purchase' },
+                                        { value: 'note_purchase', label: 'Note Purchase' },
+                                        { value: 'add_points', label: 'Wallet Top-up' }],
+                                },
                                 {
                                     label: 'Status',
                                     value: filterStatus,
@@ -238,6 +204,8 @@ const Payments = () => {
                                             label: 'Captured',
                                         },
                                         { value: 'pending', label: 'Pending' },
+                                        { value: 'initiated', label: 'Initiated' },
+                                        { value: 'authorized', label: 'Authorized' },
                                         { value: 'failed', label: 'Failed' },
                                         {
                                             value: 'refunded',
@@ -281,12 +249,15 @@ const Payments = () => {
                             onClear={() => {
                                 setSearch('');
                                 setFilterStatus('');
+                                setOrderType('');
                                 setTimeFilter('');
                                 setPage(1);
                             }}
-                            showClear={!!(search || filterStatus || timeFilter)}
+                            showClear={!!(search || filterStatus || orderType || timeFilter)}
                         />
                     </div>
+
+                    {loading && <p role='status' className='text-sm text-gray-500 mb-2'>Updating records…</p>}
 
                     {/* Error Message */}
                     {error && (

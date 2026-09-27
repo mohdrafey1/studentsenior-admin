@@ -46,7 +46,7 @@ import {
 import "@mdxeditor/editor/style.css";
 import toast from "react-hot-toast";
 import useIsDark from "../../hooks/useIsDark";
-import { marked } from "marked";
+import ReactMarkdown from "react-markdown";
 import LoadingSpinner from "../../components/LoadingSpinner";
 
 const CLOUD_NAME = import.meta.env.VITE_CLAUDINARY_CLOUD;
@@ -110,7 +110,7 @@ const EditPost = () => {
       }
     };
     fetchPost();
-  }, [id]);
+  }, [id, navigate]);
 
   // Validation
   const validateForm = () => {
@@ -224,9 +224,9 @@ const EditPost = () => {
     );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition">
+    <div className="space-y-6">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 flex justify-between items-center px-6 py-3 shadow-sm">
+      <header className="sticky top-16 z-20 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border border-gray-200 dark:border-gray-700 rounded-lg flex justify-between items-center px-6 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(blogRoutes.list)}
@@ -302,11 +302,29 @@ const EditPost = () => {
                   thematicBreakPlugin(),
                   markdownShortcutPlugin(),
                   imagePlugin(),
-                  codeBlockPlugin(),
+                  codeBlockPlugin({ defaultCodeBlockLanguage: "js" }),
+                  codeMirrorPlugin({
+                    // Without registered languages the "Insert code block"
+                    // toolbar button renders disabled, and fenced blocks in
+                    // existing posts have no editor to open in.
+                    codeBlockLanguages: {
+                      js: "JavaScript",
+                      jsx: "JSX",
+                      ts: "TypeScript",
+                      tsx: "TSX",
+                      json: "JSON",
+                      html: "HTML",
+                      css: "CSS",
+                      bash: "Bash",
+                      python: "Python",
+                      sql: "SQL",
+                      yaml: "YAML",
+                      txt: "Plain text",
+                    },
+                  }),
                   directivesPlugin({
                     directiveDescriptors: [AdmonitionDirectiveDescriptor],
                   }),
-                  codeMirrorPlugin(),
                   diffSourcePlugin({ viewMode: "rich-text" }),
                   toolbarPlugin({
                     toolbarContents: () => (
@@ -329,8 +347,9 @@ const EditPost = () => {
             {activeTab === "preview" && (
               <div
                 className="prose dark:prose-invert p-4 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:text-white"
-                dangerouslySetInnerHTML={{ __html: marked(formData.content) }}
-              />
+                >
+                <ReactMarkdown skipHtml>{formData.content}</ReactMarkdown>
+              </div>
             )}
 
             {activeTab === "raw" && (

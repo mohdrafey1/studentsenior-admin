@@ -8,6 +8,7 @@
  */
 export const blogEndpoints = {
     list: '/blogs',
+    analytics: '/blogs/analytics',
     bySlug: (slug) => `/blogs/${slug}`,
     create: '/blogs',
     update: (slug) => `/blogs/${slug}`,

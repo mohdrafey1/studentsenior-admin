@@ -26,7 +26,10 @@ const POSTS_PER_PAGE = 6;
 
 const AllPosts = () => {
   const [posts, setPosts] = useState([]);
-  const [allPosts, setAllPosts] = useState([]);
+  const [allTags, setAllTags] = useState([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -35,32 +38,25 @@ const AllPosts = () => {
   const [viewMode, setViewMode] = useState("grid");
 
   useEffect(() => {
-    const fetchPosts = async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      setError('');
       try {
-        setLoading(true);
-        const res = await api.get(blogEndpoints.list);
-        setAllPosts(res.data.data);
-        applyFilter(res.data.data);
+        const res = await api.get(blogEndpoints.list, { signal: controller.signal, params: {
+          page: currentPage, limit: POSTS_PER_PAGE, status: filter, search: searchTerm, tag: selectedTag,
+        } });
+        setPosts(res.data.data.blogs);
+        setAllTags(res.data.data.tags);
+        setTotalItems(res.data.data.pagination.totalItems);
       } catch (err) {
-        toast.error(apiErrorMessage(err, "Failed to fetch posts"));
+        if (!controller.signal.aborted) setError(apiErrorMessage(err, 'Failed to fetch posts'));
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
-    };
-    fetchPosts();
-  }, []);
-
-  const applyFilter = (data) => {
-    let filtered = data;
-    if (filter === "published") filtered = data.filter((p) => !p.isDraft);
-    else if (filter === "draft") filtered = data.filter((p) => p.isDraft);
-    setPosts(filtered);
-    setCurrentPage(1);
-  };
-
-  useEffect(() => {
-    applyFilter(allPosts);
-  }, [filter]);
+    }, 250);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [currentPage, filter, searchTerm, selectedTag, revision]);
 
   const deletePost = async (id) => {
     try {
@@ -76,33 +72,20 @@ const AllPosts = () => {
       const result = await deletePost(id);
       if (result.success) {
         toast.success("Post deleted successfully");
-        const updated = allPosts.filter((p) => p.slug !== id);
-        setAllPosts(updated);
-        applyFilter(updated);
+        setCurrentPage(1);
+        setRevision(value => value + 1);
       } else {
         toast.error(result.error);
       }
     }
   };
 
-  const filteredPosts = posts.filter((post) => {
-    const matchesSearch =
-      post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      post.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTag = !selectedTag || post.tags.includes(selectedTag);
-    return matchesSearch && matchesTag;
-  });
-
-  const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
-  const indexOfLastPost = currentPage * POSTS_PER_PAGE;
-  const indexOfFirstPost = indexOfLastPost - POSTS_PER_PAGE;
-  const currentPosts = filteredPosts.slice(indexOfFirstPost, indexOfLastPost);
-
+  const totalPages = Math.ceil(totalItems / POSTS_PER_PAGE);
+  const currentPosts = posts;
   const handlePageChange = (page) => setCurrentPage(page);
-  const allTags = [...new Set(allPosts.flatMap((post) => post.tags))];
 
   return (
-    <div className="space-y-8 p-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -136,7 +119,7 @@ const AllPosts = () => {
               type="text"
               placeholder=" Search posts..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); } }
               className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 
               bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 
               focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -147,7 +130,7 @@ const AllPosts = () => {
           <div className="flex flex-wrap md:flex-nowrap items-center gap-3">
             <select
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
+              onChange={(e) => { setFilter(e.target.value); setCurrentPage(1); } }
               className="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 
               bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 
               focus:ring-2 focus:ring-indigo-500 text-sm"
@@ -159,7 +142,7 @@ const AllPosts = () => {
 
             <select
               value={selectedTag}
-              onChange={(e) => setSelectedTag(e.target.value)}
+              onChange={(e) => { setSelectedTag(e.target.value); setCurrentPage(1); } }
               className="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 
               bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 
               focus:ring-2 focus:ring-indigo-500 text-sm"
@@ -211,7 +194,9 @@ const AllPosts = () => {
       </div>
 
       {/* Posts Section */}
-      {loading ? (
+      {error ? (
+        <div role="alert" className="p-6 text-center"><p>{error}</p><button onClick={() => setRevision(value => value + 1)}>Retry</button></div>
+      ) : loading ? (
         <div className="p-10 flex justify-center">
           <LoadingSpinner size="lg" />
         </div>
@@ -389,7 +374,7 @@ const AllPosts = () => {
       )}
 
       {/* Pagination */}
-      {filteredPosts.length > POSTS_PER_PAGE && (
+      {totalItems > POSTS_PER_PAGE && (
         <div className="flex justify-center items-center mt-8 space-x-2">
           {[...Array(totalPages)].map((_, i) => (
             <button

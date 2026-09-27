@@ -5,7 +5,6 @@ import toast from 'react-hot-toast';
 import ConfirmModal from './ConfirmModal';
 
 const ApprovalActions = ({
-    resourceId,
     resourceType,
     currentStatus,
     apiEndpoint,

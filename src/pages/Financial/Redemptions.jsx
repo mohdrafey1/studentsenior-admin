@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
@@ -8,7 +8,6 @@ import toast from 'react-hot-toast';
 import { Gift } from 'lucide-react';
 import FilterBar from '../../components/Common/FilterBar';
 import {
-    filterByTime,
     getTimeFilterLabel,
 } from '../../components/Common/timeFilterUtils';
 import Pagination from '../../components/Pagination';
@@ -23,8 +22,15 @@ const statusColors = {
     rejected: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
 };
 
+const redemptionAmount = (row) => row.requestedPoints > 0
+    ? `${row.requestedPoints} pts (₹${row.rewardBalance})` : `Legacy amount: ${row.rewardBalance} — needs reconciliation`;
+
 const Redemptions = () => {
     const [items, setItems] = useState([]);
+    const [totalItems, setTotalItems] = useState(0);
+    const [totals, setTotals] = useState({ rupees: 0, points: 0, legacyCount: 0 });
+    const [hasLoaded, setHasLoaded] = useState(false);
+    const [refresh, setRefresh] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
@@ -44,28 +50,26 @@ const Redemptions = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const fetchData = async () => {
-        try {
-            setError(null);
-            const res = await api.get('/transactions/redemption-requests');
-            setItems(res.data.data || []);
-        } catch (e) {
-            console.error(e);
-            setError(
-                e.response?.data?.message ||
-                    'Failed to load redemption requests',
-            );
-            toast.error(
-                e.response.data.message || 'Failed to load redemption requests',
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
-        fetchData();
-    }, []);
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            setLoading(true); setError(null);
+            try {
+                const response = await api.get('/transactions/redemption-requests', { params: { page, pageSize, search, status, timeFilter, sortBy, sortOrder, timezoneOffset: new Date().getTimezoneOffset() }, signal: controller.signal });
+                const result = response.data?.data;
+                if (!Array.isArray(result?.items) || !result.pagination) throw new Error('Invalid list response');
+                setItems(result.items); setTotalItems(result.pagination.total); setTotals(result.totals);
+                if (result.pagination.totalPages > 0 && page > result.pagination.totalPages) setPage(result.pagination.totalPages);
+            } catch (failure) {
+                if (controller.signal.aborted) return;
+                const message = failure.response?.data?.message || 'Could not load records. Please retry.';
+                setError(message); toast.error(message);
+            } finally {
+                if (!controller.signal.aborted) { setLoading(false); setHasLoaded(true); }
+            }
+        }, 250);
+        return () => { clearTimeout(timer); controller.abort(); };
+    }, [page, pageSize, search, status, timeFilter, sortBy, sortOrder, refresh]);
 
     // Read URL params on mount
     useEffect(() => {
@@ -82,7 +86,7 @@ const Redemptions = () => {
             (window.innerWidth >= 1024 ? 'table' : 'grid');
         setSearch(q);
         setPage(Number.isFinite(p) && p > 0 ? p : 1);
-        setPageSize(Number.isFinite(ps) && ps > 0 ? ps : 12);
+        setPageSize(Number.isFinite(ps) && ps > 0 ? Math.min(ps, 100) : 12);
         setStatus(st);
         setTimeFilter(tf);
         setSortBy(sb === 'points' ? 'points' : 'createdAt');
@@ -128,47 +132,8 @@ const Redemptions = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const filteredAndSorted = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        const list = items
-            .filter((it) => {
-                const user = it.owner || it.user; // backend populates 'owner'
-                const email = (user?.email || '').toLowerCase();
-                const name = (user?.username || user?.name || '').toLowerCase();
-                const matchesSearch =
-                    !q || email.includes(q) || name.includes(q);
-                const matchesStatus =
-                    !status ||
-                    (it.status || '').toLowerCase() === status.toLowerCase();
-                const matchesTime = filterByTime(it, timeFilter);
-                return matchesSearch && matchesStatus && matchesTime;
-            })
-            .sort((a, b) => {
-                let aVal = 0;
-                let bVal = 0;
-                if (sortBy === 'createdAt') {
-                    aVal = new Date(a.createdAt || 0).getTime();
-                    bVal = new Date(b.createdAt || 0).getTime();
-                } else if (sortBy === 'points') {
-                    aVal = Number(a.rewardBalance || 0);
-                    bVal = Number(b.rewardBalance || 0);
-                }
-                return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-            });
-        return list;
-    }, [items, search, status, timeFilter, sortBy, sortOrder]);
-
-    const totalItems = filteredAndSorted.length;
-    const start = (page - 1) * pageSize;
-    const current = filteredAndSorted.slice(start, start + pageSize);
-
-    // Calculate total points
-    const totalPoints = useMemo(() => {
-        return filteredAndSorted.reduce(
-            (sum, it) => sum + (Number(it.rewardBalance) || 0),
-            0,
-        );
-    }, [filteredAndSorted]);
+    const current = items;
+    const totalPoints = totals.points;
 
     const updateStatus = async (id, newStatus, reason = '') => {
         try {
@@ -182,20 +147,7 @@ const Redemptions = () => {
             }
             await api.put(`/transactions/redemption-requests/${id}`, payload);
             toast.success('Status updated');
-            setItems((prev) =>
-                prev.map((x) =>
-                    x._id === id
-                        ? {
-                              ...x,
-                              status: newStatus,
-                              rejectionReason:
-                                  newStatus.toLowerCase() === 'rejected'
-                                      ? reason.trim()
-                                      : '',
-                          }
-                        : x,
-                ),
-            );
+            setRefresh((value) => value + 1);
             if (showRejectModal) {
                 setShowRejectModal(false);
                 setSelectedId(null);
@@ -203,11 +155,11 @@ const Redemptions = () => {
             }
         } catch (e) {
             console.error(e);
-            toast.error('Failed to update status');
+            toast.error(e.response?.data?.message || 'Failed to update status');
         }
     };
 
-    if (loading) {
+    if (loading && !hasLoaded) {
         return <Loader />;
     }
 
@@ -230,13 +182,13 @@ const Redemptions = () => {
                                     Total ({getTimeFilterLabel(timeFilter)}):
                                 </span>
                                 <span className='font-semibold text-gray-900 dark:text-white'>
-                                    {totalPoints} pts
+                                    {totalPoints} pts · ₹{totals.rupees}
                                 </span>
                             </div>
                         )}
                         <FilterBar
                             search={search}
-                            onSearch={setSearch}
+                            onSearch={(value) => { setSearch(value); setPage(1); }}
                             filters={[
                                 {
                                     label: 'Status',
@@ -303,6 +255,9 @@ const Redemptions = () => {
                             }
                         />
                     </div>
+                    <p className='text-sm text-gray-600 mb-2'>Mark a withdrawal paid only after confirming the UPI transfer. Rejecting a pending request returns its reserved points.</p>
+                    {totals.legacyCount > 0 && <p className='text-sm text-amber-700 mb-2'>{totals.legacyCount} older requests need reconciliation and are excluded from totals.</p>}
+                    {loading && <p role='status' className='text-sm text-gray-500 mb-2'>Updating records…</p>}
                     {/* Error */}
                     {error && (
                         <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded text-sm mb-3'>
@@ -339,12 +294,7 @@ const Redemptions = () => {
                                             </div>
                                             <div className='mb-1'>
                                                 <div className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                                    {row.rewardBalance} pts (₹
-                                                    {Math.round(
-                                                        (row.rewardBalance ||
-                                                            0) / 5,
-                                                    )}
-                                                    )
+                                                    {redemptionAmount(row)}
                                                 </div>
                                                 <div className='text-xs text-gray-500 dark:text-gray-400'>
                                                     UPI:{' '}
@@ -373,7 +323,7 @@ const Redemptions = () => {
                                                         }
                                                         className='flex-1 px-2 py-1.5 rounded bg-green-600 text-white hover:bg-green-700 text-xs'
                                                     >
-                                                        Approve
+                                                        Mark paid
                                                     </button>
                                                     <button
                                                         onClick={() => {
@@ -451,11 +401,7 @@ const Redemptions = () => {
                                                             </div>
                                                         </td>
                                                         <td className='px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white'>
-                                                            {
-                                                                row.requestedPoints
-                                                            }
-                                                            p (₹
-                                                            {row.rewardBalance})
+                                                            {redemptionAmount(row)}
                                                         </td>
                                                         <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400'>
                                                             {row.amount ??
@@ -498,7 +444,7 @@ const Redemptions = () => {
                                                                         }
                                                                         className='px-2 py-1 rounded bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 hover:opacity-90'
                                                                     >
-                                                                        Approve
+                                                                        Mark paid
                                                                     </button>
                                                                     <button
                                                                         onClick={() => {

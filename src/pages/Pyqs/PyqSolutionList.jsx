@@ -227,7 +227,7 @@ const PyqSolutionList = () => {
                                                 activeTab === 'all'
                                                     ? item.pyq
                                                     : item;
-                                            const solutionId =
+                                            const _solutionId =
                                                 activeTab === 'all'
                                                     ? item._id
                                                     : null;

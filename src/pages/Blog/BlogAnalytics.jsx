@@ -29,68 +29,41 @@ import {
 
 
 function AnalyticsOverview() {
-    const [blogs, setBlogs] = useState([]);
+    const [report, setReport] = useState(null);
+    const [error, setError] = useState('');
+    const [revision, setRevision] = useState(0);
     const [loading, setLoading] = useState(true);
     const [startDate, setStartDate] = useState(new Date("2024-01-01"));
     const [endDate, setEndDate] = useState(new Date());
-    const [growthRate, setGrowthRate] = useState(0);
+
 
     useEffect(() => {
-        const fetchBlogs = async () => {
+        const controller = new AbortController();
+        const fetchReport = async () => {
+            setLoading(true);
+            setError('');
             try {
-                // Analytics covers drafts too, so this reads the admin list.
-                const res = await api.get(blogEndpoints.list);
-                if (res.data.success) {
-                    setBlogs(res.data.data);
-                }
+                const end = new Date(endDate); end.setHours(23, 59, 59, 999);
+                const response = await api.get(blogEndpoints.analytics, { signal: controller.signal,
+                    params: { start: startDate.toISOString(), end: end.toISOString() } });
+                setReport(response.data.data);
             } catch (err) {
-                console.error("Error fetching blogs:", err);
-            } finally {
-                setLoading(false);
-            }
+                if (!controller.signal.aborted) setError(err.response?.data?.message || 'Unable to load analytics.');
+            } finally { if (!controller.signal.aborted) setLoading(false); }
         };
-        fetchBlogs();
-    }, []);
+        void fetchReport();
+        return () => controller.abort();
+    }, [startDate, endDate, revision]);
 
-    const filteredBlogs = blogs.filter((b) => {
-        const created = new Date(b.createdAt);
-        return created >= startDate && created <= endDate;
-    });
-
-    // --- Analytics Computations ---
-    const totalReads = filteredBlogs.reduce((a, b) => a + (b.total_reads || 0), 0);
-    const avgReads = filteredBlogs.length
-        ? (totalReads / filteredBlogs.length).toFixed(2)
-        : 0;
-
-    const monthlyUploads = {};
-    const authorStats = {};
-    const dayFrequency = {};
-    const dailyActivity = {};
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-    filteredBlogs.forEach((blog) => {
-        const d = new Date(blog.createdAt);
-        const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        const fullDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const day = days[d.getDay()];
-
-        monthlyUploads[month] = (monthlyUploads[month] || 0) + 1;
-        dailyActivity[fullDate] = (dailyActivity[fullDate] || 0) + 1;
-        dayFrequency[day] = (dayFrequency[day] || 0) + 1;
-
-        authorStats[blog.author] = authorStats[blog.author] || { blogs: 0, reads: 0 };
-        authorStats[blog.author].blogs++;
-        authorStats[blog.author].reads += blog.total_reads || 0;
-    });
-
-    const sortedAuthors = Object.entries(authorStats)
-        .sort((a, b) => b[1].reads - a[1].reads)
-        .slice(0, 5);
-
-    const topBlogs = filteredBlogs
-        .sort((a, b) => (b.total_reads || 0) - (a.total_reads || 0))
-        .slice(0, 5);
+    const totalBlogs = report?.totals?.[0]?.count || 0;
+    const totalReads = report?.totals?.[0]?.reads || 0;
+    const avgReads = totalBlogs ? (totalReads / totalBlogs).toFixed(2) : 0;
+    const monthlyUploads = Object.fromEntries((report?.months || []).map(row => [row._id, row.count]));
+    const dailyActivity = Object.fromEntries((report?.days || []).map(row => [row._id, row.count]));
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayFrequency = Object.fromEntries((report?.weekdays || []).map(row => [days[row._id - 1], row.count]));
+    const sortedAuthors = (report?.authors || []).map(row => [row._id || 'Unknown', { blogs: row.blogs, reads: row.reads }]);
+    const topBlogs = report?.topBlogs || [];
 
     const months = Object.keys(monthlyUploads).sort();
     const lastMonth = months.at(-1);
@@ -104,25 +77,28 @@ function AnalyticsOverview() {
             ).toFixed(2)
             : 0;
 
-    useEffect(() => setGrowthRate(calcGrowth), [calcGrowth]);
+    const growthRate = calcGrowth;
 
     const bestDay =
         Object.entries(dayFrequency).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A";
 
     // Export CSV
     const exportCSV = () => {
-        const csv = Papa.unparse(filteredBlogs);
+        const csv = Papa.unparse([{ totalBlogs, totalReads, averageReads: avgReads, start: startDate.toISOString(), end: endDate.toISOString() }]);
         const blob = new Blob([csv], { type: "text/csv" });
         const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
+        link.href = url;
         link.download = "blog-analytics.csv";
         link.download = "blog-analytics.csv";
         link.click();
+        URL.revokeObjectURL(url);
     };
 
     const formatData = (obj) =>
         Object.entries(obj).map(([label, value]) => ({ label, value }));
 
+    if (error) return <div role="alert" className="p-8"><p>{error}</p><button onClick={() => setRevision(value => value + 1)}>Retry</button></div>;
     if (loading)
         return (
             <div className="flex justify-center items-center h-64 text-gray-600 dark:text-gray-300">
@@ -131,7 +107,7 @@ function AnalyticsOverview() {
         );
 
     return (
-        <div className="min-h-screen p-6 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 space-y-8">
+        <div className="space-y-8">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
@@ -181,7 +157,7 @@ function AnalyticsOverview() {
 
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <KPI label="Total Blogs" value={filteredBlogs.length} icon={<FileBarChart />} color="indigo" />
+                <KPI label="Total Blogs" value={totalBlogs} icon={<FileBarChart />} color="indigo" />
                 <KPI label="Total Reads" value={totalReads} icon={<TrendingUp />} color="emerald" />
                 <KPI label="Average Reads" value={avgReads} icon={<Users />} color="violet" />
                 <KPI label="Best Day" value={bestDay} icon={<Award />} color="rose" />

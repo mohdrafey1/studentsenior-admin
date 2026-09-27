@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
     UploadCloud,
@@ -37,7 +37,6 @@ const StatusBadge = ({ status }) => (
 
 const BulkImport = () => {
     const { collegeslug } = useParams();
-    const navigate = useNavigate();
     const { mainContentMargin } = useSidebarLayout();
 
     const [driveFolderUrl, setDriveFolderUrl] = useState('');
@@ -161,7 +160,7 @@ const BulkImport = () => {
             setCurrentJob(res.data?.data);
             setShowFailures(false);
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        } catch (e) {
+        } catch {
             toast.error('Failed to open job');
         }
     };

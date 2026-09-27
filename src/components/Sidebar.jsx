@@ -101,6 +101,13 @@ function Sidebar() {
                     colors: 'text-yellow-600 dark:text-yellow-400',
                 },
                 {
+                    id: 'refunds',
+                    label: 'Refund requests',
+                    icon: RotateCcw,
+                    to: '/reports/refunds',
+                    colors: 'text-purple-600 dark:text-purple-400',
+                },
+                {
                     id: 'redemptions',
                     label: 'Redemptions',
                     icon: RotateCcw,
@@ -326,7 +333,9 @@ function Sidebar() {
                             {items.map((item) => {
                                 const Icon = item.icon;
                                 const disabled =
-                                    !isReportsSection && !collegeslug;
+                                    !isBlogSection &&
+                                    !isReportsSection &&
+                                    !collegeslug;
                                 const active =
                                     !disabled && isRouteActive(item.to);
                                 return (
@@ -395,7 +404,9 @@ function Sidebar() {
                             {items.map((item) => {
                                 const Icon = item.icon;
                                 const disabled =
-                                    !isReportsSection && !collegeslug;
+                                    !isBlogSection &&
+                                    !isReportsSection &&
+                                    !collegeslug;
                                 const active =
                                     !disabled && isRouteActive(item.to);
                                 return (
