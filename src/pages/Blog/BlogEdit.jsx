@@ -134,11 +134,14 @@ const EditPost = () => {
     if (!validateForm()) return;
     setIsLoading(true);
     try {
+      // See BlogCreate: aiSummary is form state, and the update schema
+      // rejects unknown keys, so sending it 400d the request.
+      const { aiSummary, ...post } = formData;
       await api.put(blogEndpoints.update(id), {
-        ...formData,
+        ...post,
         isDraft,
-        tags: (formData.tags || []).map((t) => t.trim().toLowerCase()),
-        summary: formData.aiSummary,
+        tags: (post.tags || []).map((t) => t.trim().toLowerCase()),
+        summary: aiSummary,
       });
       toast.success(isDraft ? "Draft updated!" : "Post updated successfully!");
       navigate(blogRoutes.list);

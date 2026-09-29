@@ -192,11 +192,15 @@ const CreatePost = () => {
     setIsLoading(true);
 
     try {
+      // aiSummary is client-side form state, not an API field. The create
+      // schema rejects unknown keys, so sending it 400d the whole request --
+      // which is why both Publish and Draft silently failed.
+      const { aiSummary, ...post } = formData;
       await api.post(blogEndpoints.create, {
-        ...formData,
+        ...post,
         isDraft,
-        tags: (formData.tags || []).map((t) => t.trim().toLowerCase()),
-        summary: formData.aiSummary, // ✅ Save array-of-arrays
+        tags: (post.tags || []).map((t) => t.trim().toLowerCase()),
+        summary: aiSummary, // stored as array-of-arrays
       });
       localStorage.removeItem("draft_post");
       toast.success(isDraft ? "Draft saved!" : "Post published!");
