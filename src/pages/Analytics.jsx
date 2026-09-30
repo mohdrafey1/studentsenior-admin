@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import Header from '../components/Header';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import {
@@ -202,8 +201,7 @@ function Analytics() {
 
     if (loading) {
         return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
+            <div className='min-h-full'>
                 <div className='flex items-center justify-center py-20'>
                     <div className='flex items-center space-x-2'>
                         <RefreshCw className='w-6 h-6 animate-spin text-blue-600' />
@@ -217,8 +215,7 @@ function Analytics() {
     }
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
+        <div className='min-h-full'>
 
             <main className='pt-4 md:pt-6 pb-8 md:pb-12'>
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>

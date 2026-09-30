@@ -1,402 +1,440 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import api from '../../utils/api';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
-    User,
-    ArrowLeft,
-    Loader,
-    Edit2,
-    Trash2,
-    Mail,
-    Linkedin,
-    Github,
-    Instagram,
-    MapPin,
-    Calendar,
-    Briefcase,
-    GraduationCap,
     AlertTriangle,
+    Briefcase,
+    Check,
+    ExternalLink,
+    Eye,
+    Pencil,
+    Trash2,
+    UserX,
 } from 'lucide-react';
+import api from '../../utils/api';
+import { useColleges } from '../../context/CollegeContext';
+import { formatDateTime, formatNumber } from '../../utils/format';
+import { personInitials } from '../../utils/initials';
+import { relativeTime } from '../../utils/relativeTime';
+import ApprovalActions from '../../components/ApprovalActions';
 import ConfirmModal from '../../components/ConfirmModal';
 import SeniorEditModal from '../../components/SeniorEditModal';
-import ApprovalActions from '../../components/ApprovalActions';
+import Loader from '../../components/Common/Loader';
+import {
+    hasOwnPhoto,
+    linkHref,
+    platformOf,
+    seniorLinks,
+    viewsOf,
+} from './seniorLinks';
+import {
+    Button,
+    EmptyState,
+    MetaList,
+    Panel,
+    StatusBadge,
+} from '../../components/ui';
+
+// Large round photo for the profile preview, with initials when the photo
+// is missing or doesn't load.
+const ProfilePhoto = ({ name, src }) => {
+    const [failedSrc, setFailedSrc] = useState(null);
+    const classes =
+        'w-24 h-24 sm:w-28 sm:h-28 rounded-full shrink-0 bg-brand-soft';
+    if (src && failedSrc !== src) {
+        return (
+            <img
+                src={src}
+                alt=''
+                onError={() => setFailedSrc(src)}
+                className={`${classes} object-cover`}
+            />
+        );
+    }
+    return (
+        <span
+            aria-hidden='true'
+            className={`${classes} flex items-center justify-center font-serif font-bold text-[34px] sm:text-[38px] text-brand-ink`}
+        >
+            {personInitials(name || '?')}
+        </span>
+    );
+};
+
+const CheckItem = ({ ok, children }) => (
+    <li className='flex items-center gap-2.5 text-[13.5px] text-ink'>
+        <span
+            className={`w-5 h-5 rounded-full shrink-0 flex items-center justify-center ${
+                ok ? 'bg-ok-soft text-ok-ink' : 'bg-warn-soft text-warn-ink'
+            }`}
+        >
+            {ok ? (
+                <Check className='w-3 h-3' aria-hidden='true' />
+            ) : (
+                <AlertTriangle className='w-3 h-3' aria-hidden='true' />
+            )}
+        </span>
+        <span className='sr-only'>{ok ? 'Done:' : 'Check:'}</span>
+        {children}
+    </li>
+);
 
 const SeniorDetail = () => {
+    const { collegeslug, seniorid } = useParams();
+    const navigate = useNavigate();
+    const { currentCollege } = useColleges();
     const [senior, setSenior] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [showModal, setShowModal] = useState(false);
-    const [showRawData, setShowRawData] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [showRaw, setShowRaw] = useState(false);
 
-    const { collegeslug, seniorid } = useParams();
-    const navigate = useNavigate();
-
-    const [confirmModal, setConfirmModal] = useState({
-        isOpen: false,
-        title: '',
-        message: '',
-        onConfirm: null,
-        variant: 'danger',
-    });
-
-    const showConfirm = (config) => {
-        return new Promise((resolve) => {
-            setConfirmModal({
-                isOpen: true,
-                title: config.title || 'Confirm Action',
-                message: config.message,
-                variant: config.variant || 'danger',
-                onConfirm: () => {
-                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-                    resolve(true);
-                },
-            });
-        });
-    };
-
-    const handleCloseConfirm = () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+    const fetchSenior = async () => {
+        try {
+            setError(null);
+            const response = await api.get(`/senior/${seniorid}`);
+            setSenior(response.data.data);
+        } catch (e) {
+            setError(
+                e.response?.status === 404
+                    ? 'This senior profile doesn’t exist or was deleted.'
+                    : 'Couldn’t load this senior profile. Check your connection and try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
         fetchSenior();
     }, [seniorid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const fetchSenior = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get(`/senior/${seniorid}`);
-            setSenior(response.data.data);
-            setError(null);
-        } catch (error) {
-            console.error('Error fetching senior:', error);
-            setError('Failed to fetch senior details');
-            toast.error('Failed to fetch senior details');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleEdit = () => {
-        setShowModal(true);
-    };
-
     const handleDelete = async () => {
-        const confirmed = await showConfirm({
-            title: 'Delete Senior',
-            message: `Are you sure you want to delete "${senior.name}"? This action cannot be undone.`,
-            variant: 'danger',
-        });
-
-        if (confirmed) {
-            try {
-                await api.delete(`/senior/delete/${senior._id}`);
-                toast.success('Senior deleted successfully');
-                navigate(`/${collegeslug}/seniors`);
-            } catch (error) {
-                console.error('Error deleting senior:', error);
-                toast.error('Failed to delete senior');
-            }
+        try {
+            await api.delete(`/senior/delete/${senior._id}`);
+            toast.success('Senior deleted');
+            navigate(`/${collegeslug}/seniors`);
+        } catch (e) {
+            toast.error(
+                e.response?.data?.message || 'Couldn’t delete the senior',
+            );
         }
     };
 
-    const handleModalClose = () => {
-        setShowModal(false);
-    };
-
-    const handleModalSuccess = () => {
-        fetchSenior();
-        handleModalClose();
-    };
-
-    if (loading) {
-        return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div className='flex items-center justify-center min-h-[60vh]'>
-                    <Loader className='h-8 w-8 animate-spin text-blue-600' />
-                </div>
-            </div>
-        );
-    }
+    if (loading) return <Loader />;
 
     if (error || !senior) {
         return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-                    <button
-                        onClick={() => navigate(-1)}
-                        className='flex items-center text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 mb-8 transition-colors'
-                    >
-                        <ArrowLeft className='h-4 w-4 mr-2' />
-                        Back to Seniors
-                    </button>
-                    <div className='text-center py-12'>
-                        <div className='w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4'>
-                            <AlertTriangle className='h-8 w-8 text-red-600 dark:text-red-400' />
-                        </div>
-                        <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2'>
-                            Senior Not Found
-                        </h3>
-                        <p className='text-gray-500 dark:text-gray-400'>
-                            {error ||
-                                'The requested senior could not be found.'}
-                        </p>
-                    </div>
+            <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+                <div className='bg-sheet border border-line rounded-xl'>
+                    <EmptyState
+                        icon={UserX}
+                        tone='error'
+                        title='Senior not found'
+                        description={error}
+                        action={
+                            <Button to={`/${collegeslug}/seniors`}>
+                                Back to seniors
+                            </Button>
+                        }
+                    />
                 </div>
             </div>
         );
     }
 
+    const owner = senior.owner || {};
+    const branch = senior.branch || {};
+    const course = branch.course?.courseName;
+    const links = seniorLinks(senior);
+    const firstName = (senior.name || '').trim().split(/\s+/)[0] || 'them';
+    const detailsFilled = Boolean(
+        senior.name?.trim() && branch.branchName && senior.year,
+    );
+
+    const ownerLink = owner._id ? (
+        <Link
+            to={`/users/${owner._id}`}
+            className='font-medium text-link hover:underline'
+        >
+            @{owner.username || 'student'}
+        </Link>
+    ) : (
+        <span className='font-medium'>@{owner.username || 'unknown'}</span>
+    );
+
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans'>
-            <Header />
-            <Sidebar />
-            <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-                {/* Top Navigation & Actions */}
-                <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8'>
-                    <div className='flex items-center gap-4'>
-                        <button
-                            onClick={() => navigate(-1)}
-                            className='p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors'
-                        >
-                            <ArrowLeft className='h-5 w-5' />
-                        </button>
-                        <div>
-                            <h1 className='text-2xl font-bold flex items-center gap-3'>
-                                {senior.name}
-                            </h1>
-                            <p className='text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2'>
-                                <span className='font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded'>
-                                    ID: {senior._id}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
-                    <div className='flex items-center gap-2'>
-                        <button
-                            onClick={handleEdit}
-                            className='flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium'
-                        >
-                            <Edit2 className='h-4 w-4' />
-                            Edit
-                        </button>
-                        <button
-                            onClick={handleDelete}
-                            className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium'
-                        >
-                            <Trash2 className='h-4 w-4' />
-                            Delete
-                        </button>
-                    </div>
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <div className='flex flex-wrap items-center gap-3 mb-6'>
+                <div className='flex-1 min-w-[240px] flex flex-wrap items-center gap-x-2.5 gap-y-1.5'>
+                    <span className='eyebrow'>Senior profile</span>
+                    <StatusBadge status={senior.submissionStatus} />
+                    {senior.deleted && (
+                        <StatusBadge tone='outline'>Deleted</StatusBadge>
+                    )}
+                    <span className='text-[13px] text-muted'>
+                        Submitted by {ownerLink}{' '}
+                        {relativeTime(senior.createdAt)}
+                    </span>
                 </div>
+                <div className='flex items-center gap-2'>
+                    <Button icon={Pencil} onClick={() => setEditing(true)}>
+                        Edit profile
+                    </Button>
+                    <Button
+                        variant='danger'
+                        iconOnly
+                        icon={Trash2}
+                        aria-label='Delete profile'
+                        onClick={() => setConfirmDelete(true)}
+                    />
+                </div>
+            </div>
 
-                <ApprovalActions
-                    resourceId={senior._id}
-                    resourceType='Senior'
-                    currentStatus={senior.submissionStatus}
-                    apiEndpoint={`/senior/edit/${senior._id}`}
-                    onStatusChange={fetchSenior}
-                />
-
-                <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
-                    {/* Left Column: Profile & About */}
-                    <div className='lg:col-span-2 space-y-8'>
-                        {/* Profile Header Card */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 flex flex-col md:flex-row items-center md:items-start gap-8'>
-                            <div className='flex-shrink-0'>
-                                {senior.profilePicture ? (
-                                    <img
-                                        src={senior.profilePicture}
-                                        alt={senior.name}
-                                        className='h-32 w-32 rounded-full object-cover ring-4 ring-gray-50 dark:ring-gray-700'
-                                    />
+            <div className='grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start'>
+                <div className='flex flex-col gap-5 min-w-0'>
+                    <section
+                        aria-label='Profile as students will see it'
+                        className='bg-sheet border border-line rounded-[14px] overflow-hidden'
+                    >
+                        <div className='eyebrow flex items-center gap-2 h-9 px-4 bg-sunken border-b border-line-soft'>
+                            <Eye className='w-3.5 h-3.5' aria-hidden='true' />
+                            As students will see it
+                        </div>
+                        <div className='flex flex-col sm:flex-row items-start gap-5 sm:gap-7 p-5 sm:px-9 sm:py-8'>
+                            <ProfilePhoto
+                                name={senior.name}
+                                src={senior.profilePicture}
+                            />
+                            <div className='flex-1 min-w-0 flex flex-col gap-2.5'>
+                                <h1 className='font-serif font-bold text-[26px] sm:text-[30px] leading-[1.15] tracking-[-0.3px] text-ink break-words'>
+                                    {senior.name || 'Unnamed senior'}
+                                </h1>
+                                <div className='flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-x-2 gap-y-1 text-[13.5px] text-ink-2'>
+                                    {senior.domain && (
+                                        <span className='inline-flex items-center gap-1.5'>
+                                            <Briefcase
+                                                className='w-3.5 h-3.5 text-muted'
+                                                aria-hidden='true'
+                                            />
+                                            {senior.domain}
+                                        </span>
+                                    )}
+                                    {[
+                                        [course, branch.branchName]
+                                            .filter(Boolean)
+                                            .join(' '),
+                                        senior.year,
+                                    ]
+                                        .filter(Boolean)
+                                        .map((part, i) => (
+                                            <React.Fragment key={part}>
+                                                {(senior.domain || i > 0) && (
+                                                    <span
+                                                        aria-hidden='true'
+                                                        className='hidden sm:inline text-faint'
+                                                    >
+                                                        ·
+                                                    </span>
+                                                )}
+                                                <span>{part}</span>
+                                            </React.Fragment>
+                                        ))}
+                                </div>
+                                {senior.description ? (
+                                    <p className='mt-1.5 text-sm leading-relaxed text-ink-2 whitespace-pre-wrap break-words'>
+                                        {senior.description}
+                                    </p>
                                 ) : (
-                                    <div className='h-32 w-32 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center ring-4 ring-gray-50 dark:ring-gray-700'>
-                                        <User className='h-12 w-12 text-gray-400' />
+                                    <p className='mt-1.5 text-sm text-muted'>
+                                        No about text yet.
+                                    </p>
+                                )}
+                                {links.length > 0 && (
+                                    <div className='flex flex-wrap gap-2 mt-1.5'>
+                                        {links.map((link, i) => {
+                                            const platform = platformOf(
+                                                link.platform,
+                                            );
+                                            return (
+                                                <Button
+                                                    key={`${link.platform}-${i}`}
+                                                    size='sm'
+                                                    icon={platform.icon}
+                                                    href={linkHref(link)}
+                                                    target='_blank'
+                                                    rel='noopener noreferrer'
+                                                >
+                                                    {platform.label}
+                                                </Button>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
-                            <div className='text-center md:text-left flex-1'>
-                                <h2 className='text-2xl font-bold mb-2'>
-                                    {senior.name}
-                                </h2>
-                                <div className='flex flex-wrap items-center justify-center md:justify-start gap-3 mb-4'>
-                                    <span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'>
-                                        <Briefcase className='h-3.5 w-3.5' />
-                                        {senior.domain || 'N/A'}
-                                    </span>
-                                    {senior.year && (
-                                        <span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'>
-                                            <GraduationCap className='h-3.5 w-3.5' />
-                                            {senior.year}
+                        </div>
+                    </section>
+
+                    <Panel title='Links to check' titleId='links-title'>
+                        {links.length === 0 ? (
+                            <p className='px-5 py-4 text-[13.5px] text-muted'>
+                                No social links added. Juniors can only find
+                                this senior through the directory.
+                            </p>
+                        ) : (
+                            <ul>
+                                {links.map((link, i) => (
+                                    <li
+                                        key={`${link.platform}-${i}`}
+                                        className='grid grid-cols-[88px_minmax(0,1fr)_auto] sm:grid-cols-[110px_minmax(0,1fr)_auto] items-center gap-3.5 px-5 py-2.5 border-b border-line-soft last:border-b-0 text-[13.5px]'
+                                    >
+                                        <span>
+                                            {platformOf(link.platform).label}
                                         </span>
-                                    )}
-                                </div>
-                                <div className='flex items-center justify-center md:justify-start gap-4'>
-                                    {senior.linkedin && (
+                                        <code className='font-mono text-[12.5px] text-ink-2 truncate'>
+                                            {link.url.replace(
+                                                /^https?:\/\/(www\.)?/i,
+                                                '',
+                                            )}
+                                        </code>
                                         <a
-                                            href={senior.linkedin}
+                                            href={linkHref(link)}
                                             target='_blank'
                                             rel='noopener noreferrer'
-                                            className='text-gray-400 hover:text-[#0077b5] transition-colors'
+                                            aria-label={`Open ${platformOf(link.platform).label} link`}
+                                            className='inline-flex items-center gap-1.5 text-[13px] font-medium text-link hover:underline'
                                         >
-                                            <Linkedin className='h-6 w-6' />
+                                            Open
+                                            <ExternalLink
+                                                className='w-3.5 h-3.5'
+                                                aria-hidden='true'
+                                            />
                                         </a>
-                                    )}
-                                    {senior.github && (
-                                        <a
-                                            href={senior.github}
-                                            target='_blank'
-                                            rel='noopener noreferrer'
-                                            className='text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors'
-                                        >
-                                            <Github className='h-6 w-6' />
-                                        </a>
-                                    )}
-                                    {senior.instagram && (
-                                        <a
-                                            href={senior.instagram}
-                                            target='_blank'
-                                            rel='noopener noreferrer'
-                                            className='text-gray-400 hover:text-[#E4405F] transition-colors'
-                                        >
-                                            <Instagram className='h-6 w-6' />
-                                        </a>
-                                    )}
-                                    {senior.email && (
-                                        <a
-                                            href={`mailto:${senior.email}`}
-                                            className='text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors'
-                                        >
-                                            <Mail className='h-6 w-6' />
-                                        </a>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Description Card */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
-                            <h2 className='text-lg font-semibold mb-4'>
-                                About
-                            </h2>
-                            <div className='prose prose-sm dark:prose-invert max-w-none text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed'>
-                                {senior.description ||
-                                    'No description provided.'}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Column: Metadata & Details */}
-                    <div className='space-y-8'>
-                        {/* Info Card */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
-                            <h2 className='text-lg font-semibold mb-6 flex items-center gap-2'>
-                                <User className='h-5 w-5 text-gray-400' />
-                                Senior Details
-                            </h2>
-                            <dl className='space-y-4'>
-                                <div>
-                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
-                                        Branch
-                                    </dt>
-                                    <dd className='font-medium'>
-                                        {senior.branch?.branchName ||
-                                            senior.branch ||
-                                            'N/A'}
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
-                                        Created By
-                                    </dt>
-                                    <dd className='flex items-center gap-2 text-sm'>
-                                        <div className='h-6 w-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400'>
-                                            <User className='h-3.5 w-3.5' />
-                                        </div>
-                                        {senior.owner?.username || 'Unknown'}
-                                    </dd>
-                                </div>
-
-                                <div className='pt-4 border-t border-gray-100 dark:border-gray-700'>
-                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
-                                        Timestamps
-                                    </dt>
-                                    <dd className='space-y-2 text-sm'>
-                                        <div className='flex justify-between'>
-                                            <span className='text-gray-500'>
-                                                Created
-                                            </span>
-                                            <span className='font-mono'>
-                                                {new Date(
-                                                    senior.createdAt,
-                                                ).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                        <div className='flex justify-between'>
-                                            <span className='text-gray-500'>
-                                                Updated
-                                            </span>
-                                            <span className='font-mono'>
-                                                {new Date(
-                                                    senior.updatedAt ||
-                                                        senior.createdAt,
-                                                ).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                    </dd>
-                                </div>
-                            </dl>
-                        </div>
-
-                        {/* Raw Data Toggle */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                            <button
-                                onClick={() => setShowRawData(!showRawData)}
-                                className='w-full flex items-center justify-between px-6 py-4 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors'
-                            >
-                                <span className='text-gray-900 dark:text-white'>
-                                    Raw Data
-                                </span>
-                                <span className='text-blue-600 dark:text-blue-400'>
-                                    {showRawData ? 'Hide' : 'Show'}
-                                </span>
-                            </button>
-                            {showRawData && (
-                                <div className='border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 overflow-x-auto'>
-                                    <pre className='text-xs font-mono text-gray-600 dark:text-gray-400'>
-                                        {JSON.stringify(senior, null, 2)}
-                                    </pre>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </Panel>
                 </div>
 
-                {/* Modals */}
-                <ConfirmModal
-                    isOpen={confirmModal.isOpen}
-                    onClose={handleCloseConfirm}
-                    onConfirm={confirmModal.onConfirm}
-                    title={confirmModal.title}
-                    message={confirmModal.message}
-                    variant={confirmModal.variant}
-                />
+                <div className='flex flex-col gap-4'>
+                    <ApprovalActions
+                        variant='panel'
+                        resourceType='profile'
+                        currentStatus={senior.submissionStatus}
+                        rejectionReason={senior.rejectionReason}
+                        apiEndpoint={`/senior/edit/${senior._id}`}
+                        onStatusChange={fetchSenior}
+                        approveNote={`Shows ${firstName} in the ${currentCollege?.name || 'college'} seniors directory.`}
+                    />
 
-                <SeniorEditModal
-                    isOpen={showModal}
-                    onClose={handleModalClose}
-                    senior={senior}
-                    onSuccess={handleModalSuccess}
-                />
+                    <Panel
+                        title='Profile checks'
+                        titleId='checks-title'
+                        bodyClassName='px-5 py-4'
+                    >
+                        <ul className='flex flex-col gap-2.5'>
+                            <CheckItem ok={detailsFilled}>
+                                {detailsFilled
+                                    ? 'Name, branch and year filled'
+                                    : 'Name, branch or year missing'}
+                            </CheckItem>
+                            <CheckItem ok={links.length > 0}>
+                                {links.length > 0
+                                    ? `${formatNumber(links.length)} social link${links.length === 1 ? '' : 's'}`
+                                    : 'No social links'}
+                            </CheckItem>
+                            <CheckItem ok={hasOwnPhoto(senior)}>
+                                {hasOwnPhoto(senior)
+                                    ? 'Has a profile photo'
+                                    : senior.profilePicture
+                                      ? 'Only the default photo'
+                                      : 'No profile photo, so initials are shown'}
+                            </CheckItem>
+                            <CheckItem ok={Boolean(senior.description?.trim())}>
+                                {senior.description?.trim()
+                                    ? 'About text written'
+                                    : 'No about text'}
+                            </CheckItem>
+                        </ul>
+                    </Panel>
+
+                    <Panel
+                        title='Details'
+                        titleId='details-title'
+                        bodyClassName='px-5 py-4 flex flex-col gap-3'
+                    >
+                        <MetaList
+                            items={[
+                                { label: 'Branch', value: branch.branchName },
+                                { label: 'Course', value: course },
+                                { label: 'Year', value: senior.year },
+                                {
+                                    label: 'Account',
+                                    value:
+                                        owner._id || owner.username
+                                            ? ownerLink
+                                            : null,
+                                },
+                                { label: 'Email', value: owner.email },
+                                {
+                                    label: 'Profile views',
+                                    value: formatNumber(viewsOf(senior)),
+                                },
+                                {
+                                    label: 'Slug',
+                                    value: senior.slug,
+                                    mono: true,
+                                },
+                                {
+                                    label: 'Created',
+                                    value: formatDateTime(senior.createdAt),
+                                },
+                                {
+                                    label: 'Updated',
+                                    value: formatDateTime(senior.updatedAt),
+                                },
+                                senior.deletedAt && {
+                                    label: 'Deleted',
+                                    value: formatDateTime(senior.deletedAt),
+                                },
+                                { label: 'ID', value: senior._id, mono: true },
+                            ]}
+                        />
+                        <button
+                            type='button'
+                            aria-expanded={showRaw}
+                            onClick={() => setShowRaw((v) => !v)}
+                            className='self-start text-[13px] font-medium text-link hover:underline cursor-pointer'
+                        >
+                            {showRaw ? 'Hide raw data' : 'Show raw data'}
+                        </button>
+                        {showRaw && (
+                            <pre className='max-h-80 overflow-auto p-3 rounded-lg bg-sunken font-mono text-[11.5px] leading-relaxed text-ink-2'>
+                                {JSON.stringify(senior, null, 2)}
+                            </pre>
+                        )}
+                    </Panel>
+                </div>
             </div>
+
+            <SeniorEditModal
+                isOpen={editing}
+                onClose={() => setEditing(false)}
+                senior={senior}
+                onSuccess={fetchSenior}
+            />
+
+            <ConfirmModal
+                isOpen={confirmDelete}
+                onClose={() => setConfirmDelete(false)}
+                onConfirm={handleDelete}
+                title='Delete this senior?'
+                message='Their profile leaves the seniors directory straight away and juniors can no longer reach them through it. This can’t be undone.'
+                confirmText='Delete'
+                variant='danger'
+            />
         </div>
     );
 };

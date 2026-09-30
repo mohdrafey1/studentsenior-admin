@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, AlertTriangle, Loader } from 'lucide-react';
-import api from '../utils/api';
 import toast from 'react-hot-toast';
+import { Loader2 } from 'lucide-react';
+import api from '../utils/api';
+import { Button, Checkbox, Dialog, Field, Input, Select, Textarea } from './ui';
+import { formatINR, pointsToRupees } from '../utils/format';
 
 const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,7 +29,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                 isPaid: note.isPaid || false,
                 price: note.price || 0,
                 rejectionReason: note.rejectionReason || '',
-                isDownloadable: note.isDownloadable || true,
+                isDownloadable: note.isDownloadable ?? true,
             });
             setErrors({});
         }
@@ -35,46 +37,50 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
 
     const validateForm = () => {
         const newErrors = {};
+        const title = formData.title?.trim() || '';
+        const description = formData.description?.trim() || '';
 
-        if (!formData.title?.trim()) {
-            newErrors.title = 'Title is required';
-        } else if (formData.title.trim().length < 3) {
-            newErrors.title = 'Title must be at least 3 characters long';
-        } else if (formData.title.trim().length > 100) {
-            newErrors.title = 'Title must be less than 100 characters';
+        if (!title) {
+            newErrors.title = 'Enter a title';
+        } else if (title.length < 3) {
+            newErrors.title = 'Use at least 3 characters';
+        } else if (title.length > 100) {
+            newErrors.title = 'Keep it under 100 characters';
         }
 
-        if (!formData.description?.trim()) {
-            newErrors.description = 'Description is required';
-        } else if (formData.description.trim().length < 10) {
-            newErrors.description =
-                'Description must be at least 10 characters long';
-        } else if (formData.description.trim().length > 500) {
-            newErrors.description =
-                'Description must be less than 500 characters';
-        }
-
-        if (formData.slug && formData.slug.trim()) {
-            const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-            if (!slugPattern.test(formData.slug.trim())) {
-                newErrors.slug =
-                    'Slug must contain only lowercase letters, numbers, and hyphens';
-            }
-        }
-
-        if (formData.isPaid) {
-            if (!formData.price || formData.price < 0) {
-                newErrors.price = 'Price must be a positive number';
-            } else if (formData.price > 1000) {
-                newErrors.price = 'Price cannot exceed ₹1000';
-            }
+        if (!description) {
+            newErrors.description = 'Enter a description';
+        } else if (description.length < 10) {
+            newErrors.description = 'Use at least 10 characters';
+        } else if (description.length > 500) {
+            newErrors.description = 'Keep it under 500 characters';
         }
 
         if (
-            formData.submissionStatus === 'rejected' &&
-            !formData.rejectionReason?.trim()
+            formData.slug.trim() &&
+            !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(formData.slug.trim())
         ) {
-            newErrors.rejectionReason = 'Rejection reason is required';
+            newErrors.slug =
+                'Only lowercase letters, numbers and single hyphens';
+        }
+
+        if (formData.isPaid) {
+            const price = Number(formData.price);
+            if (!formData.price || isNaN(price) || price <= 0) {
+                newErrors.price = 'Enter a price of at least 1 point';
+            } else if (price > 1000) {
+                newErrors.price = 'Price can’t be more than 1,000 points';
+            }
+        }
+
+        if (formData.submissionStatus === 'rejected') {
+            const reason = formData.rejectionReason?.trim() || '';
+            if (!reason) {
+                newErrors.rejectionReason =
+                    'Add a reason so the uploader knows what to fix';
+            } else if (reason.length < 10) {
+                newErrors.rejectionReason = 'Use at least 10 characters';
+            }
         }
 
         setErrors(newErrors);
@@ -90,31 +96,21 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
                 [name]: type === 'checkbox' ? checked : value,
             };
 
-            // Automatically manage slug suffix based on submission status
+            // Rejected notes keep a "-rejected" slug so the link is freed up.
             if (name === 'submissionStatus') {
-                const currentSlug = prev.slug || '';
-                const baseSlug = currentSlug.replace(/-rejected$/, ''); // Remove existing -rejected suffix
-
-                if (value === 'rejected') {
-                    // Add -rejected suffix if not already present
-                    newData.slug = baseSlug + '-rejected';
-                } else {
-                    // Remove -rejected suffix for approved/pending
-                    newData.slug = baseSlug;
-                }
+                const baseSlug = (prev.slug || '').replace(/-rejected$/, '');
+                newData.slug =
+                    value === 'rejected' ? `${baseSlug}-rejected` : baseSlug;
             }
+
+            // Free notes have no price.
+            if (name === 'isPaid' && !checked) newData.price = 0;
 
             return newData;
         });
 
-        // Clear error when user starts typing
         if (errors[name]) {
             setErrors((prev) => ({ ...prev, [name]: '' }));
-        }
-
-        // Reset price when switching from paid to free
-        if (name === 'isPaid' && !checked) {
-            setFormData((prev) => ({ ...prev, price: 0 }));
         }
     };
 
@@ -122,7 +118,7 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
         e.preventDefault();
 
         if (!validateForm()) {
-            toast.error('Please fix the validation errors');
+            toast.error('Check the highlighted fields');
             return;
         }
 
@@ -148,276 +144,166 @@ const NotesEditModal = ({ isOpen, onClose, note, onSuccess }) => {
             );
 
             if (response.data.success) {
-                toast.success('Note updated successfully');
+                toast.success('Note saved');
                 onClose();
                 onSuccess?.(response.data.data.updatedNotes);
             }
         } catch (error) {
             console.error('Error updating note:', error);
             toast.error(
-                error.response?.data?.message || 'Failed to update note',
+                error.response?.data?.message ||
+                    'Couldn’t save the note. Try again.',
             );
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    if (!isOpen) return null;
+    const price = Number(formData.price);
 
     return (
-        <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
-            <div className='flex items-center justify-center min-h-screen p-4'>
-                <div className='fixed inset-0' onClick={onClose}></div>
+        <Dialog
+            open={isOpen}
+            onClose={onClose}
+            busy={isSubmitting}
+            title='Edit note'
+            description={note?.subject?.subjectName}
+            footer={
+                <>
+                    <Button onClick={onClose} disabled={isSubmitting}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type='submit'
+                        form='note-edit-form'
+                        variant='primary'
+                        disabled={isSubmitting}
+                        icon={isSubmitting ? Loader2 : undefined}
+                        className={isSubmitting ? '[&>svg]:animate-spin' : ''}
+                    >
+                        {isSubmitting ? 'Saving…' : 'Save changes'}
+                    </Button>
+                </>
+            }
+        >
+            <form
+                id='note-edit-form'
+                onSubmit={handleSubmit}
+                noValidate
+                className='flex flex-col gap-4'
+            >
+                <Field label='Title' required error={errors.title}>
+                    <Input
+                        name='title'
+                        value={formData.title}
+                        onChange={handleInputChange}
+                        placeholder='Operating Systems — Unit 3 notes'
+                        maxLength={100}
+                    />
+                </Field>
 
-                <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
-                    {/* Header */}
-                    <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
-                        <div>
-                            <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                Edit Note
-                            </h2>
-                            <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                {note?.subject?.subjectName}
-                            </p>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className='p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded'
-                            disabled={isSubmitting}
-                        >
-                            <X className='h-5 w-5' />
-                        </button>
-                    </div>
+                <Field
+                    label='Description'
+                    required
+                    error={errors.description}
+                    hint={`${formData.description.trim().length}/500 characters`}
+                >
+                    <Textarea
+                        name='description'
+                        value={formData.description}
+                        onChange={handleInputChange}
+                        rows={3}
+                        placeholder='What the notes cover'
+                    />
+                </Field>
 
-                    <form onSubmit={handleSubmit}>
-                        <div className='p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto'>
-                            {/* Status */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Status{' '}
-                                    <span className='text-red-500'>*</span>
-                                </label>
-                                <select
-                                    name='submissionStatus'
-                                    value={formData.submissionStatus}
-                                    onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                        errors.submissionStatus
-                                            ? 'border-red-300'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                >
-                                    <option value='pending'>Pending</option>
-                                    <option value='approved'>Approved</option>
-                                    <option value='rejected'>Rejected</option>
-                                </select>
-                                {errors.submissionStatus && (
-                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                        <AlertTriangle className='h-3 w-3' />
-                                        {errors.submissionStatus}
-                                    </p>
-                                )}
-                            </div>
+                <Field
+                    label='Slug'
+                    error={errors.slug}
+                    hint='Lowercase letters, numbers and hyphens. Part of the note’s link.'
+                >
+                    <Input
+                        name='slug'
+                        value={formData.slug}
+                        onChange={handleInputChange}
+                        placeholder='operating-systems-unit-3-notes'
+                        className='font-mono text-[13px]'
+                    />
+                </Field>
 
-                            {/* Rejection Reason */}
-                            {formData.submissionStatus === 'rejected' && (
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Rejection Reason{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <textarea
-                                        name='rejectionReason'
-                                        value={formData.rejectionReason}
-                                        onChange={handleInputChange}
-                                        rows={2}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 dark:text-white resize-none ${
-                                            errors.rejectionReason
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                        placeholder='Enter rejection reason...'
-                                    />
-                                    {errors.rejectionReason && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.rejectionReason}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
+                <Field label='Status' required>
+                    <Select
+                        name='submissionStatus'
+                        value={formData.submissionStatus}
+                        onChange={handleInputChange}
+                        options={[
+                            { value: 'pending', label: 'Pending' },
+                            { value: 'approved', label: 'Approved' },
+                            { value: 'rejected', label: 'Rejected' },
+                        ]}
+                    />
+                </Field>
 
-                            {/* Title */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Title{' '}
-                                    <span className='text-red-500'>*</span>
-                                </label>
-                                <input
-                                    type='text'
-                                    name='title'
-                                    value={formData.title}
-                                    onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                        errors.title
-                                            ? 'border-red-300'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    placeholder='Enter note title...'
-                                />
-                                {errors.title && (
-                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                        <AlertTriangle className='h-3 w-3' />
-                                        {errors.title}
-                                    </p>
-                                )}
-                            </div>
+                {formData.submissionStatus === 'rejected' && (
+                    <Field
+                        label='Reason for the uploader'
+                        required
+                        error={errors.rejectionReason}
+                    >
+                        <Textarea
+                            name='rejectionReason'
+                            value={formData.rejectionReason}
+                            onChange={handleInputChange}
+                            rows={3}
+                            placeholder='What should the uploader fix?'
+                        />
+                    </Field>
+                )}
 
-                            {/* Description */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Description{' '}
-                                    <span className='text-red-500'>*</span>
-                                </label>
-                                <textarea
-                                    name='description'
-                                    value={formData.description}
-                                    onChange={handleInputChange}
-                                    rows={3}
-                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none ${
-                                        errors.description
-                                            ? 'border-red-300'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    placeholder='Enter note description...'
-                                />
-                                {errors.description && (
-                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                        <AlertTriangle className='h-3 w-3' />
-                                        {errors.description}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Slug */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    URL Slug
-                                </label>
-                                <input
-                                    type='text'
-                                    name='slug'
-                                    value={formData.slug}
-                                    onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                        errors.slug
-                                            ? 'border-red-300'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    placeholder='e.g., calculus-chapter-1'
-                                />
-                                {errors.slug && (
-                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                        <AlertTriangle className='h-3 w-3' />
-                                        {errors.slug}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className='flex gap-2'>
-                                {/* Paid Resource Checkbox */}
-                                <div className='space-y-2'>
-                                    <label className='flex items-center gap-2'>
-                                        <input
-                                            type='checkbox'
-                                            name='isDownloadable'
-                                            checked={formData.isDownloadable}
-                                            onChange={handleInputChange}
-                                            className='w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
-                                        />
-                                        <span className='text-sm text-gray-700 dark:text-gray-300'>
-                                            Is Downloadable
-                                        </span>
-                                    </label>
-                                </div>
-
-                                {/* Paid Resource Checkbox */}
-                                <div className='space-y-2'>
-                                    <label className='flex items-center gap-2'>
-                                        <input
-                                            type='checkbox'
-                                            name='isPaid'
-                                            checked={formData.isPaid}
-                                            onChange={handleInputChange}
-                                            className='w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
-                                        />
-                                        <span className='text-sm text-gray-700 dark:text-gray-300'>
-                                            Paid Resource
-                                        </span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* Price */}
-                            {formData.isPaid && (
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Price (₹){' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <input
-                                        type='number'
-                                        name='price'
-                                        value={formData.price}
-                                        onChange={handleInputChange}
-                                        min='0'
-                                        max='1000'
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                            errors.price
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                        placeholder='0'
-                                    />
-                                    {errors.price && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.price}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer */}
-                        <div className='flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700'>
-                            <button
-                                type='button'
-                                onClick={onClose}
-                                disabled={isSubmitting}
-                                className='px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg disabled:opacity-50'
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type='submit'
-                                disabled={isSubmitting}
-                                className='px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 flex items-center gap-2'
-                            >
-                                {isSubmitting ? (
-                                    <>
-                                        <Loader className='h-4 w-4 animate-spin' />
-                                        Updating...
-                                    </>
-                                ) : (
-                                    'Update Note'
-                                )}
-                            </button>
-                        </div>
-                    </form>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+                    <Checkbox
+                        bordered
+                        name='isPaid'
+                        checked={formData.isPaid}
+                        onChange={handleInputChange}
+                        label='Paid note'
+                        description='Students unlock it with points.'
+                    />
+                    <Checkbox
+                        bordered
+                        name='isDownloadable'
+                        checked={formData.isDownloadable}
+                        onChange={handleInputChange}
+                        label='Allow download'
+                        description='Otherwise students can only view it.'
+                    />
                 </div>
-            </div>
-        </div>
+
+                {formData.isPaid && (
+                    <Field
+                        label='Price in points'
+                        required
+                        error={errors.price}
+                        hint={
+                            price > 0
+                                ? `Students pay ${formatINR(pointsToRupees(price))} (5 points = ₹1).`
+                                : '5 points = ₹1.'
+                        }
+                    >
+                        <Input
+                            type='number'
+                            name='price'
+                            min='1'
+                            max='1000'
+                            value={formData.price}
+                            onChange={handleInputChange}
+                            placeholder='50'
+                            className='font-mono'
+                        />
+                    </Field>
+                )}
+            </form>
+        </Dialog>
     );
 };
 

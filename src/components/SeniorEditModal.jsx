@@ -1,9 +1,46 @@
-﻿import React, { useState, useEffect } from 'react';
-import { X, Loader, AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useId } from 'react';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import SearchableSelect from './SearchableSelect';
 import { useResources } from '../hooks/useResources';
+import { Button, Dialog, Field, Input, Select, Textarea } from './ui';
+
+// Every platform the Senior model accepts.
+const PLATFORM_OPTIONS = [
+    { value: 'linkedin', label: 'LinkedIn' },
+    { value: 'github', label: 'GitHub' },
+    { value: 'instagram', label: 'Instagram' },
+    { value: 'twitter', label: 'Twitter' },
+    { value: 'facebook', label: 'Facebook' },
+    { value: 'youtube', label: 'YouTube' },
+    { value: 'telegram', label: 'Telegram' },
+    { value: 'whatsapp', label: 'WhatsApp' },
+    { value: 'other', label: 'Other' },
+];
+
+// Label and error around a SearchableSelect, which renders its own control
+// and can't take the id that Field would give it.
+const PickerField = ({ label, error, children }) => {
+    const labelId = useId();
+    return (
+        <div
+            role='group'
+            aria-labelledby={labelId}
+            className='flex flex-col gap-1.5'
+        >
+            <span id={labelId} className='text-[13px] font-medium text-ink'>
+                {label}
+                <span className='text-bad-ink' aria-hidden='true'>
+                    {' '}
+                    *
+                </span>
+            </span>
+            {children}
+            {error && <p className='text-[12.5px] text-bad-ink'>{error}</p>}
+        </div>
+    );
+};
 
 const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,6 +58,7 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
         slug: '',
     });
     const [errors, setErrors] = useState({});
+    const linksLabelId = useId();
     const {
         courses,
         branches: hookBranches,
@@ -108,27 +146,28 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
         const newErrors = {};
 
         if (!formData.name.trim()) {
-            newErrors.name = 'Name is required';
+            newErrors.name = 'Enter a name';
         }
 
         if (!formData.year.trim()) {
-            newErrors.year = 'Year is required';
+            newErrors.year = 'Enter a year';
         }
 
         if (!formData.course) {
-            newErrors.course = 'Course is required';
+            newErrors.course = 'Choose a course';
         }
 
         if (!formData.branch) {
-            newErrors.branch = 'Branch is required';
+            newErrors.branch = 'Choose a branch';
         }
 
-        if (
-            formData.submissionStatus === 'rejected' &&
-            !formData.rejectionReason.trim()
-        ) {
-            newErrors.rejectionReason =
-                'Rejection reason is required when status is rejected';
+        if (formData.submissionStatus === 'rejected') {
+            if (!formData.rejectionReason.trim()) {
+                newErrors.rejectionReason = 'Add a reason for the senior';
+            } else if (formData.rejectionReason.trim().length < 10) {
+                // The API refuses shorter reasons for seniors.
+                newErrors.rejectionReason = 'Use at least 10 characters';
+            }
         }
 
         setErrors(newErrors);
@@ -200,7 +239,7 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
         e.preventDefault();
 
         if (!validateForm()) {
-            toast.error('Please fix the validation errors');
+            toast.error('Check the highlighted fields');
             return;
         }
 
@@ -229,395 +268,257 @@ const SeniorEditModal = ({ isOpen, onClose, senior, onSuccess }) => {
             );
 
             await api.put(`/senior/edit/${senior._id}`, updatedSenior);
-            toast.success('Senior profile updated successfully!');
+            toast.success('Senior saved');
             onSuccess && onSuccess(updatedSenior);
             onClose();
         } catch (error) {
             console.error(error);
             toast.error(
                 error.response?.data?.message ||
-                    'Failed to update senior profile',
+                    'Couldn’t save the senior. Try again.',
             );
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    if (!isOpen) return null;
-
     return (
-        <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
-            <div className='flex items-center justify-center min-h-screen p-4'>
-                <div className='fixed inset-0' onClick={onClose}></div>
+        <Dialog
+            open={isOpen}
+            onClose={onClose}
+            busy={isSubmitting}
+            size='lg'
+            title='Edit senior'
+            description={
+                senior?.owner?.username
+                    ? `Submitted by @${senior.owner.username}`
+                    : senior?.name
+            }
+            footer={
+                <>
+                    <Button onClick={onClose} disabled={isSubmitting}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type='submit'
+                        form='senior-edit-form'
+                        variant='primary'
+                        disabled={isSubmitting}
+                        icon={isSubmitting ? Loader2 : undefined}
+                        className={isSubmitting ? '[&>svg]:animate-spin' : ''}
+                    >
+                        {isSubmitting ? 'Saving…' : 'Save changes'}
+                    </Button>
+                </>
+            }
+        >
+            <form
+                id='senior-edit-form'
+                onSubmit={handleSubmit}
+                noValidate
+                className='flex flex-col gap-4'
+            >
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                    <Field label='Status' required>
+                        <Select
+                            name='submissionStatus'
+                            value={formData.submissionStatus}
+                            onChange={handleInputChange}
+                            options={[
+                                { value: 'pending', label: 'Pending' },
+                                { value: 'approved', label: 'Approved' },
+                                { value: 'rejected', label: 'Rejected' },
+                            ]}
+                        />
+                    </Field>
+                    <Field label='Slug'>
+                        <Input
+                            name='slug'
+                            value={formData.slug}
+                            onChange={handleInputChange}
+                            placeholder='john-doe-cse-2024'
+                            className='font-mono text-[13px]'
+                        />
+                    </Field>
+                </div>
 
-                <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
-                    {/* Header */}
-                    <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
-                        <div>
-                            <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                Edit Senior Profile
-                            </h2>
-                            <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                {senior?.owner?.username || 'Senior'}
-                            </p>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className='p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded'
-                            disabled={isSubmitting}
+                {formData.submissionStatus === 'rejected' && (
+                    <Field
+                        label='Reason for the senior'
+                        required
+                        error={errors.rejectionReason}
+                    >
+                        <Textarea
+                            name='rejectionReason'
+                            value={formData.rejectionReason}
+                            onChange={handleInputChange}
+                            rows={3}
+                            placeholder='What should the senior fix?'
+                        />
+                    </Field>
+                )}
+
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                    <Field label='Full name' required error={errors.name}>
+                        <Input
+                            name='name'
+                            value={formData.name}
+                            onChange={handleInputChange}
+                            placeholder='Ayesha Khan'
+                        />
+                    </Field>
+                    <Field label='Year' required error={errors.year}>
+                        <Input
+                            name='year'
+                            value={formData.year}
+                            onChange={handleInputChange}
+                            placeholder='4th Year'
+                        />
+                    </Field>
+                </div>
+
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                    <PickerField label='Course' error={errors.course}>
+                        <SearchableSelect
+                            options={courses}
+                            value={formData.course}
+                            onChange={(value) => {
+                                setFormData((prev) => ({
+                                    ...prev,
+                                    course:
+                                        typeof value === 'string' ? value : '',
+                                    branch: '',
+                                }));
+                                if (value) {
+                                    fetchBranches(value);
+                                }
+                            }}
+                            placeholder='Choose a course'
+                            loading={loadingCourses}
+                            errorState={!!errors.course}
+                        />
+                    </PickerField>
+                    <PickerField label='Branch' error={errors.branch}>
+                        <SearchableSelect
+                            options={branches}
+                            value={formData.branch}
+                            onChange={(value) =>
+                                setFormData((prev) => ({
+                                    ...prev,
+                                    branch:
+                                        typeof value === 'string' ? value : '',
+                                }))
+                            }
+                            placeholder='Choose a branch'
+                            loading={loadingBranches}
+                            errorState={!!errors.branch}
+                            disabled={!formData.course}
+                        />
+                    </PickerField>
+                </div>
+
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                    <Field label='Domain'>
+                        <Input
+                            name='domain'
+                            value={formData.domain}
+                            onChange={handleInputChange}
+                            placeholder='Web development'
+                        />
+                    </Field>
+                    <Field label='Photo link'>
+                        <Input
+                            type='url'
+                            name='profilePicture'
+                            value={formData.profilePicture}
+                            onChange={handleInputChange}
+                            placeholder='https://…/photo.jpg'
+                            className='font-mono text-[13px]'
+                        />
+                    </Field>
+                </div>
+
+                <Field label='About'>
+                    <Textarea
+                        name='description'
+                        value={formData.description}
+                        onChange={handleInputChange}
+                        rows={3}
+                        placeholder='What they can help juniors with'
+                    />
+                </Field>
+
+                <div
+                    role='group'
+                    aria-labelledby={linksLabelId}
+                    className='flex flex-col gap-2'
+                >
+                    <div className='flex items-center justify-between gap-3'>
+                        <span
+                            id={linksLabelId}
+                            className='text-[13px] font-medium text-ink'
                         >
-                            <X className='h-5 w-5' />
-                        </button>
+                            Social links
+                        </span>
+                        <Button
+                            size='sm'
+                            variant='ghost'
+                            icon={Plus}
+                            onClick={addSocialMediaLink}
+                        >
+                            Add link
+                        </Button>
                     </div>
-
-                    <form onSubmit={handleSubmit}>
-                        <div className='p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto'>
-                            {/* Status and Slug */}
-                            <div className='grid grid-cols-2 gap-4'>
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Status{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <select
-                                        name='submissionStatus'
-                                        value={formData.submissionStatus}
-                                        onChange={handleInputChange}
-                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                    >
-                                        <option value='pending'>Pending</option>
-                                        <option value='approved'>
-                                            Approved
-                                        </option>
-                                        <option value='rejected'>
-                                            Rejected
-                                        </option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        URL Slug
-                                    </label>
-                                    <input
-                                        type='text'
-                                        name='slug'
-                                        value={formData.slug}
-                                        onChange={handleInputChange}
-                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                        placeholder='john-doe-cse-2024'
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Rejection Reason */}
-                            {formData.submissionStatus === 'rejected' && (
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Rejection Reason{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <textarea
-                                        name='rejectionReason'
-                                        value={formData.rejectionReason}
-                                        onChange={handleInputChange}
-                                        rows={2}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 dark:text-white resize-none ${
-                                            errors.rejectionReason
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                        placeholder='Provide rejection reason...'
-                                    />
-                                    {errors.rejectionReason && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.rejectionReason}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Name and Year */}
-                            <div className='grid grid-cols-2 gap-4'>
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Full Name{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <input
-                                        type='text'
-                                        name='name'
-                                        value={formData.name}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                            errors.name
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                        placeholder='Enter full name...'
-                                    />
-                                    {errors.name && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.name}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Year{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <input
-                                        type='text'
-                                        name='year'
-                                        value={formData.year}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                            errors.year
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                        placeholder='e.g., 2024'
-                                    />
-                                    {errors.year && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.year}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Course and Branch */}
-                            <div className='grid grid-cols-2 gap-4'>
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Course{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <SearchableSelect
-                                        options={courses}
-                                        value={formData.course}
-                                        onChange={(value) => {
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                course:
-                                                    typeof value === 'string'
-                                                        ? value
-                                                        : '',
-                                                branch: '',
-                                            }));
-                                            if (value) {
-                                                fetchBranches(value);
-                                            }
-                                        }}
-                                        placeholder='Select course...'
-                                        loading={loadingCourses}
-                                        errorState={!!errors.course}
-                                    />
-                                    {errors.course && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.course}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Branch{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <SearchableSelect
-                                        options={branches}
-                                        value={formData.branch}
-                                        onChange={(value) =>
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                branch:
-                                                    typeof value === 'string'
-                                                        ? value
-                                                        : '',
-                                            }))
+                    {formData.socialMediaLinks.length === 0 ? (
+                        <p className='text-[12.5px] text-muted'>
+                            No links yet.
+                        </p>
+                    ) : (
+                        formData.socialMediaLinks.map((link, index) => (
+                            <div key={index} className='flex gap-2'>
+                                <div className='w-32 sm:w-36 shrink-0'>
+                                    <Select
+                                        aria-label={`Platform for link ${index + 1}`}
+                                        value={link.platform}
+                                        onChange={(e) =>
+                                            updateSocialMediaLink(
+                                                index,
+                                                'platform',
+                                                e.target.value,
+                                            )
                                         }
-                                        placeholder='Select branch...'
-                                        loading={loadingBranches}
-                                        errorState={!!errors.branch}
-                                        disabled={!formData.course}
-                                    />
-                                    {errors.branch && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.branch}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Domain and Profile Picture */}
-                            <div className='grid grid-cols-2 gap-4'>
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Domain
-                                    </label>
-                                    <input
-                                        type='text'
-                                        name='domain'
-                                        value={formData.domain}
-                                        onChange={handleInputChange}
-                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                        placeholder='e.g., Web Development'
+                                        options={PLATFORM_OPTIONS}
                                     />
                                 </div>
-
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Profile Picture URL
-                                    </label>
-                                    <input
-                                        type='url'
-                                        name='profilePicture'
-                                        value={formData.profilePicture}
-                                        onChange={handleInputChange}
-                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                        placeholder='https://...'
+                                <div className='flex-1 min-w-0'>
+                                    <Input
+                                        aria-label={`Address for link ${index + 1}`}
+                                        value={link.url}
+                                        onChange={(e) =>
+                                            updateSocialMediaLink(
+                                                index,
+                                                'url',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder='https://…'
+                                        className='font-mono text-[13px]'
                                     />
                                 </div>
-                            </div>
-
-                            {/* Description */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Description
-                                </label>
-                                <textarea
-                                    name='description'
-                                    value={formData.description}
-                                    onChange={handleInputChange}
-                                    rows={3}
-                                    className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none border-gray-300 dark:border-gray-600'
-                                    placeholder='Tell us about yourself...'
+                                <Button
+                                    variant='ghost'
+                                    iconOnly
+                                    icon={Trash2}
+                                    aria-label={`Remove link ${index + 1}`}
+                                    className='text-bad-ink hover:text-bad-ink shrink-0'
+                                    onClick={() => removeSocialMediaLink(index)}
                                 />
                             </div>
-
-                            {/* Social Media Links */}
-                            <div>
-                                <div className='flex items-center justify-between mb-2'>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300'>
-                                        Social Media Links
-                                    </label>
-                                    <button
-                                        type='button'
-                                        onClick={addSocialMediaLink}
-                                        className='text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1'
-                                    >
-                                        <Plus className='h-4 w-4' />
-                                        Add Link
-                                    </button>
-                                </div>
-                                <div className='space-y-2'>
-                                    {formData.socialMediaLinks.map(
-                                        (link, index) => (
-                                            <div
-                                                key={index}
-                                                className='flex gap-2'
-                                            >
-                                                <select
-                                                    value={link.platform}
-                                                    onChange={(e) =>
-                                                        updateSocialMediaLink(
-                                                            index,
-                                                            'platform',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    className='px-3 py-2 border rounded-lg dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                                >
-                                                    <option value='whatsapp'>
-                                                        WhatsApp
-                                                    </option>
-                                                    <option value='linkedin'>
-                                                        LinkedIn
-                                                    </option>
-                                                    <option value='github'>
-                                                        GitHub
-                                                    </option>
-                                                    <option value='twitter'>
-                                                        Twitter
-                                                    </option>
-                                                    <option value='instagram'>
-                                                        Instagram
-                                                    </option>
-                                                    <option value='telegram'>
-                                                        Telegram
-                                                    </option>
-                                                    <option value='other'>
-                                                        Other
-                                                    </option>
-                                                </select>
-                                                <input
-                                                    type='text'
-                                                    value={link.url}
-                                                    onChange={(e) =>
-                                                        updateSocialMediaLink(
-                                                            index,
-                                                            'url',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    placeholder='https://...'
-                                                    className='flex-1 px-3 py-2 border rounded-lg dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                                />
-                                                <button
-                                                    type='button'
-                                                    onClick={() =>
-                                                        removeSocialMediaLink(
-                                                            index,
-                                                        )
-                                                    }
-                                                    className='p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg'
-                                                >
-                                                    <Trash2 className='h-4 w-4' />
-                                                </button>
-                                            </div>
-                                        ),
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className='flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700'>
-                            <button
-                                type='button'
-                                onClick={onClose}
-                                disabled={isSubmitting}
-                                className='px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg disabled:opacity-50'
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type='submit'
-                                disabled={isSubmitting}
-                                className='px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 flex items-center gap-2'
-                            >
-                                {isSubmitting ? (
-                                    <>
-                                        <Loader className='h-4 w-4 animate-spin' />
-                                        Updating...
-                                    </>
-                                ) : (
-                                    'Update Profile'
-                                )}
-                            </button>
-                        </div>
-                    </form>
+                        ))
+                    )}
                 </div>
-            </div>
-        </div>
+            </form>
+        </Dialog>
     );
 };
 

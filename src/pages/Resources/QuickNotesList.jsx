@@ -1,24 +1,39 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
+import { Link, useParams } from 'react-router-dom';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import { BookOpen, Edit2, Trash2, Search, RefreshCw } from 'lucide-react';
+import { BookOpen, Sparkles, Trash2 } from 'lucide-react';
+import { useColleges } from '../../context/CollegeContext';
+import { formatNumber, formatShortDate } from '../../utils/format';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
-import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
+import FilterBar from '../../components/Common/FilterBar';
+import {
+    Alert,
+    Button,
+    EmptyState,
+    PageHeader,
+    Table,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+
+const editorPath = (note) =>
+    `/reports/subjects/${note.subject._id}/quick-notes?unit=${note.unitNumber}`;
 
 const QuickNotesList = () => {
     const { collegeslug } = useParams();
-    const navigate = useNavigate();
-    const { mainContentMargin } = useSidebarLayout();
+    const { currentCollege } = useColleges();
 
     const [notes, setNotes] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loaded, setLoaded] = useState(false);
+    const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
+    // What the API is asked for; follows the search box after a short pause.
+    const [query, setQuery] = useState('');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [totalPages, setTotalPages] = useState(1);
@@ -32,14 +47,20 @@ const QuickNotesList = () => {
         variant: 'danger',
     });
 
+    useEffect(() => {
+        const timer = setTimeout(() => setQuery(search), 300);
+        return () => clearTimeout(timer);
+    }, [search]);
+
     const fetchNotes = useCallback(async () => {
         try {
             setLoading(true);
+            setError(null);
             const response = await api.get(`/quicknotes/all/${collegeslug}`, {
                 params: {
                     page,
                     limit: pageSize,
-                    search: search.trim() || undefined,
+                    search: query.trim() || undefined,
                 },
             });
 
@@ -50,32 +71,26 @@ const QuickNotesList = () => {
             }
         } catch (err) {
             console.error(err);
-            toast.error(err.response?.data?.message || 'Failed to fetch notes');
+            setError(
+                err.response?.data?.message ||
+                    'Couldn’t load quick notes. Check your connection and try again.',
+            );
         } finally {
             setLoading(false);
+            setLoaded(true);
         }
-    }, [collegeslug, page, pageSize, search]);
+    }, [collegeslug, page, pageSize, query]);
 
     useEffect(() => {
         fetchNotes();
     }, [fetchNotes]);
 
-    const handleEdit = (note) => {
-        if (note.subject?._id) {
-            navigate(
-                `/reports/subjects/${note.subject._id}/quick-notes?unit=${note.unitNumber}`,
-            );
-        } else {
-            toast.error('Invalid subject reference');
-        }
-    };
-
     const handleDelete = async (note) => {
         const confirmed = await new Promise((resolve) => {
             setConfirmModal({
                 isOpen: true,
-                title: 'Delete Quick Note',
-                message: `Are you sure you want to delete the note for "${note.title}" (Unit ${note.unitNumber})? This action cannot be undone.`,
+                title: `Delete the notes for unit ${note.unitNumber}?`,
+                message: `${note.subject?.subjectName || 'This subject'} loses its summary for “${note.title}”. Students stop seeing it straight away. This can’t be undone.`,
                 variant: 'danger',
                 onConfirm: () => resolve(true),
             });
@@ -85,189 +100,217 @@ const QuickNotesList = () => {
             try {
                 const res = await api.delete(`/quicknotes/delete/${note._id}`);
                 if (res.data.success) {
-                    toast.success('Note deleted successfully');
+                    toast.success('Note deleted');
                     fetchNotes(); // Refresh list
                 }
             } catch (err) {
                 toast.error(
-                    err.response?.data?.message || 'Failed to delete note',
+                    err.response?.data?.message ||
+                        'Couldn’t delete the note. Try again.',
                 );
             }
         }
-        setConfirmModal({ ...confirmModal, isOpen: false });
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
     };
 
-    const handleSearch = (e) => {
-        e.preventDefault();
-        setPage(1); // Reset to page 1 on search
-        fetchNotes();
-    };
+    if (!loaded) return <Loader />;
+
+    const collegeName = currentCollege?.name || collegeslug;
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
-            <main className='pt-6 pb-12'>
-                <div
-                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Quick notes'
+                description={`AI unit summaries for ${collegeName} subjects that have a syllabus.`}
+                meta={
+                    totalItems > 0 && !query ? (
+                        <span className='text-[13px] text-muted'>
+                            {formatNumber(totalItems)} unit note
+                            {totalItems === 1 ? '' : 's'} so far
+                        </span>
+                    ) : undefined
+                }
+                actions={
+                    <Button
+                        icon={BookOpen}
+                        to={`/reports/subjects?syllabus=ready${
+                            currentCollege?._id
+                                ? `&college=${currentCollege._id}`
+                                : ''
+                        }`}
+                    >
+                        Subjects with a syllabus
+                    </Button>
+                }
+            />
+
+            <FilterBar
+                className='mb-4'
+                search={search}
+                onSearch={(value) => {
+                    setSearch(value);
+                    setPage(1);
+                }}
+                searchPlaceholder='Search by subject name or code'
+                onClear={() => {
+                    setSearch('');
+                    setPage(1);
+                }}
+                showClear={Boolean(search)}
+            />
+
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button size='sm' onClick={fetchNotes}>
+                            Try again
+                        </Button>
+                    }
                 >
-                    <BackButton
-                        title={`Quick Notes for ${collegeslug}`}
-                        TitleIcon={BookOpen}
+                    {error}
+                </Alert>
+            )}
+
+            <div
+                className={`bg-sheet border border-line rounded-xl overflow-hidden transition-opacity ${
+                    loading ? 'opacity-60' : ''
+                }`}
+                aria-busy={loading}
+            >
+                {notes.length === 0 ? (
+                    <EmptyState
+                        icon={Sparkles}
+                        title={query ? 'No notes match' : 'No quick notes yet'}
+                        description={
+                            query
+                                ? 'Try another subject name or code.'
+                                : 'Notes you generate for a subject’s syllabus units appear here.'
+                        }
+                        action={
+                            query ? (
+                                <Button
+                                    onClick={() => {
+                                        setSearch('');
+                                        setPage(1);
+                                    }}
+                                >
+                                    Clear search
+                                </Button>
+                            ) : undefined
+                        }
                     />
-
-                    {/* Filters & Actions */}
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-4 mb-4'>
-                        <form
-                            onSubmit={handleSearch}
-                            className='flex gap-2 max-w-md'
-                        >
-                            <div className='relative flex-1'>
-                                <input
-                                    type='text'
-                                    placeholder='Search by subject name or code...'
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className='w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500'
-                                />
-                                <Search className='w-4 h-4 text-gray-400 absolute left-3 top-3' />
-                            </div>
-                            <button
-                                type='submit'
-                                className='px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors'
-                            >
-                                Search
-                            </button>
-                            <button
-                                type='button'
-                                onClick={() => {
-                                    setSearch('');
-                                    setPage(1);
-                                    fetchNotes();
-                                }}
-                                className='p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                                title='Reset'
-                            >
-                                <RefreshCw className='w-5 h-5' />
-                            </button>
-                        </form>
-                    </div>
-
-                    {loading && !notes.length ? (
-                        <Loader />
-                    ) : (
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                            <div className='overflow-x-auto'>
-                                <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                    <thead className='bg-gray-50 dark:bg-gray-900'>
-                                        <tr>
-                                            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                Subject / Code
-                                            </th>
-                                            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                Unit / Title
-                                            </th>
-                                            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                Last Updated
-                                            </th>
-                                            <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                Actions
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                        {notes.map((note) => (
-                                            <tr
-                                                key={note._id}
-                                                className='hover:bg-gray-50 dark:hover:bg-gray-700'
-                                            >
-                                                <td className='px-6 py-4'>
-                                                    <div className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                        {note.subject
-                                                            ?.subjectName ||
-                                                            'N/A'}
-                                                    </div>
-                                                    <div className='text-xs text-gray-500 dark:text-gray-400'>
-                                                        {note.subject
-                                                            ?.subjectCode ||
-                                                            'No Code'}
-                                                    </div>
-                                                </td>
-                                                <td className='px-6 py-4'>
-                                                    <div className='text-sm text-gray-900 dark:text-white'>
-                                                        Unit {note.unitNumber}
-                                                    </div>
-                                                    <div className='text-xs text-gray-500 dark:text-gray-400 truncate max-w-xs'>
-                                                        {note.title}
-                                                    </div>
-                                                </td>
-                                                <td className='px-6 py-4 text-sm text-gray-500 dark:text-gray-400'>
-                                                    {new Date(
-                                                        note.lastUpdated,
-                                                    ).toLocaleDateString()}
-                                                </td>
-                                                <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
-                                                    <div className='flex items-center justify-end space-x-2'>
-                                                        <button
-                                                            onClick={() =>
-                                                                handleEdit(note)
-                                                            }
-                                                            className='text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 p-1 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded'
-                                                            title='Edit'
-                                                        >
-                                                            <Edit2 className='w-4 h-4' />
-                                                        </button>
-                                                        <button
-                                                            onClick={() =>
-                                                                handleDelete(
-                                                                    note,
-                                                                )
-                                                            }
-                                                            className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded'
-                                                            title='Delete'
-                                                        >
-                                                            <Trash2 className='w-4 h-4' />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {notes.length === 0 && (
-                                            <tr>
-                                                <td
-                                                    colSpan={5}
-                                                    className='px-6 py-10 text-center text-gray-500 dark:text-gray-400'
+                ) : (
+                    <Table minWidth={760}>
+                        <thead>
+                            <tr>
+                                <Th>Subject</Th>
+                                <Th>Unit</Th>
+                                <Th align='right'>Views</Th>
+                                <Th>Last updated</Th>
+                                <Th>
+                                    <span className='sr-only'>Actions</span>
+                                </Th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {notes.map((note) => (
+                                <Tr key={note._id}>
+                                    <Td className='max-w-[320px]'>
+                                        <div className='flex items-center gap-3 min-w-0'>
+                                            <code className='w-[68px] shrink-0 font-mono text-[12px] text-ink-2 truncate'>
+                                                {note.subject?.subjectCode ||
+                                                    '—'}
+                                            </code>
+                                            {note.subject?._id ? (
+                                                <Link
+                                                    to={editorPath(note)}
+                                                    className='font-medium text-ink hover:underline truncate'
                                                 >
-                                                    No notes found.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div className='px-4 py-3 border-t border-gray-200 dark:border-gray-700'>
-                                <Pagination
-                                    currentPage={page}
-                                    totalPages={totalPages}
-                                    onPageChange={setPage}
-                                    pageSize={pageSize}
-                                    onPageSizeChange={setPageSize}
-                                    totalItems={totalItems}
-                                />
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </main>
+                                                    {note.subject.subjectName ||
+                                                        'Untitled subject'}
+                                                </Link>
+                                            ) : (
+                                                <span className='text-muted'>
+                                                    Subject deleted
+                                                </span>
+                                            )}
+                                        </div>
+                                    </Td>
+                                    <Td className='max-w-[300px]'>
+                                        <div className='flex flex-col gap-0.5 min-w-0'>
+                                            <span>Unit {note.unitNumber}</span>
+                                            <span className='text-[12.5px] text-muted truncate'>
+                                                {note.title}
+                                            </span>
+                                        </div>
+                                    </Td>
+                                    <Td
+                                        align='right'
+                                        mono
+                                        className='text-ink-2'
+                                    >
+                                        {formatNumber(note.clickCounts)}
+                                    </Td>
+                                    <Td className='text-ink-2 whitespace-nowrap'>
+                                        {formatShortDate(note.lastUpdated)}
+                                    </Td>
+                                    <Td align='right'>
+                                        <div className='flex justify-end items-center gap-1'>
+                                            {note.subject?._id && (
+                                                <Button
+                                                    size='sm'
+                                                    to={editorPath(note)}
+                                                    aria-label={`Open the editor for ${note.subject.subjectName}, unit ${note.unitNumber}`}
+                                                >
+                                                    Open editor
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant='ghost'
+                                                size='sm'
+                                                iconOnly
+                                                icon={Trash2}
+                                                aria-label={`Delete the notes for ${note.subject?.subjectName || 'this subject'}, unit ${note.unitNumber}`}
+                                                className='text-bad-ink hover:text-bad-ink'
+                                                onClick={() =>
+                                                    handleDelete(note)
+                                                }
+                                            />
+                                        </div>
+                                    </Td>
+                                </Tr>
+                            ))}
+                        </tbody>
+                    </Table>
+                )}
+                {totalItems > 0 && (
+                    <div className='px-4 py-3 border-t border-line-soft'>
+                        <Pagination
+                            currentPage={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            pageSize={pageSize}
+                            onPageSizeChange={(size) => {
+                                setPageSize(size);
+                                setPage(1);
+                            }}
+                            totalItems={totalItems}
+                        />
+                    </div>
+                )}
+            </div>
 
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
                 onClose={() =>
-                    setConfirmModal({ ...confirmModal, isOpen: false })
+                    setConfirmModal((prev) => ({ ...prev, isOpen: false }))
                 }
                 onConfirm={confirmModal.onConfirm}
                 title={confirmModal.title}
                 message={confirmModal.message}
+                confirmText='Delete note'
                 variant={confirmModal.variant}
             />
         </div>

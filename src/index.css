@@ -3,6 +3,152 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Paper Ledger design tokens.
+ *
+ * Colours live in CSS variables so the `.dark` class on <html> swaps the whole
+ * palette at once; components use the semantic utilities below (bg-sheet,
+ * text-ink, border-line, bg-warn-soft …) and never need a `dark:` variant.
+ */
+:root {
+    --ss-ground: #f3f1ec;
+    --ss-sheet: #ffffff;
+    --ss-sunken: #f8f7f3;
+    --ss-line: #e7e4dd;
+    --ss-line-strong: #ddd9d0;
+    --ss-line-soft: #f0ede7;
+    --ss-ink: #1c1b18;
+    --ss-ink-2: #45423c;
+    --ss-muted: #6b675f;
+    --ss-faint: #c9c4b9;
+    --ss-inverse: #1c1b18;
+    --ss-on-inverse: #f3f1ec;
+
+    --ss-brand: #1f5fd1;
+    --ss-brand-hover: #194fb0;
+    --ss-brand-soft: #eaf0fc;
+    --ss-brand-ink: #1a4da8;
+    --ss-link: #1f5fd1;
+
+    --ss-warn: #d98a1c;
+    --ss-warn-soft: #fbefd9;
+    --ss-warn-ink: #8a4b08;
+    --ss-ok: #2f9160;
+    --ss-ok-soft: #e3f2e8;
+    --ss-ok-ink: #1b6340;
+    --ss-bad: #d0453a;
+    --ss-bad-soft: #fbe6e3;
+    --ss-bad-ink: #a1261d;
+    --ss-bad-line: #efcfca;
+    --ss-bad-strong: #a1261d;
+    --ss-neutral: #8c877d;
+    --ss-neutral-soft: #efede8;
+    --ss-neutral-ink: #45423c;
+
+    color-scheme: light;
+}
+
+.dark {
+    --ss-ground: #121211;
+    --ss-sheet: #1b1b19;
+    --ss-sunken: #222220;
+    --ss-line: #2e2d2a;
+    --ss-line-strong: #3a3834;
+    --ss-line-soft: #262523;
+    --ss-ink: #edebe6;
+    --ss-ink-2: #c9c5bc;
+    --ss-muted: #8f8a80;
+    --ss-faint: #4a4843;
+    --ss-inverse: #edebe6;
+    --ss-on-inverse: #121211;
+
+    --ss-brand: #2f66d0;
+    --ss-brand-hover: #3b74e0;
+    --ss-brand-soft: #1e2a44;
+    --ss-brand-ink: #a9c3f4;
+    --ss-link: #8fb2f2;
+
+    --ss-warn: #e0a040;
+    --ss-warn-soft: #3a2a12;
+    --ss-warn-ink: #f0b45c;
+    --ss-ok: #3fa36b;
+    --ss-ok-soft: #16301f;
+    --ss-ok-ink: #7fd1a0;
+    --ss-bad: #d95b50;
+    --ss-bad-soft: #3a1a17;
+    --ss-bad-ink: #f09a90;
+    --ss-bad-line: #5a2a25;
+    --ss-bad-strong: #b3372d;
+    --ss-neutral: #8c877d;
+    --ss-neutral-soft: #2a2926;
+    --ss-neutral-ink: #c9c5bc;
+
+    color-scheme: dark;
+}
+
+@theme inline {
+    --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    --font-serif: 'PT Serif', Georgia, serif;
+    --font-mono: 'Geist Mono', ui-monospace, monospace;
+
+    --color-ground: var(--ss-ground);
+    --color-sheet: var(--ss-sheet);
+    --color-sunken: var(--ss-sunken);
+    --color-line: var(--ss-line);
+    --color-line-strong: var(--ss-line-strong);
+    --color-line-soft: var(--ss-line-soft);
+    --color-ink: var(--ss-ink);
+    --color-ink-2: var(--ss-ink-2);
+    --color-muted: var(--ss-muted);
+    --color-faint: var(--ss-faint);
+    --color-inverse: var(--ss-inverse);
+    --color-on-inverse: var(--ss-on-inverse);
+
+    --color-brand: var(--ss-brand);
+    --color-brand-hover: var(--ss-brand-hover);
+    --color-brand-soft: var(--ss-brand-soft);
+    --color-brand-ink: var(--ss-brand-ink);
+    --color-link: var(--ss-link);
+
+    --color-warn: var(--ss-warn);
+    --color-warn-soft: var(--ss-warn-soft);
+    --color-warn-ink: var(--ss-warn-ink);
+    --color-ok: var(--ss-ok);
+    --color-ok-soft: var(--ss-ok-soft);
+    --color-ok-ink: var(--ss-ok-ink);
+    --color-bad: var(--ss-bad);
+    --color-bad-soft: var(--ss-bad-soft);
+    --color-bad-ink: var(--ss-bad-ink);
+    --color-bad-line: var(--ss-bad-line);
+    --color-bad-strong: var(--ss-bad-strong);
+    --color-neutral: var(--ss-neutral);
+    --color-neutral-soft: var(--ss-neutral-soft);
+    --color-neutral-ink: var(--ss-neutral-ink);
+}
+
+@layer base {
+    body {
+        background-color: var(--ss-ground);
+        color: var(--ss-ink);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--ss-brand);
+        outline-offset: 2px;
+    }
+}
+
+/* Small uppercase mono label used for table headers and section eyebrows. */
+@utility eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ss-muted);
+}
+
 /* Custom Animations */
 @keyframes fade-in {
     from {

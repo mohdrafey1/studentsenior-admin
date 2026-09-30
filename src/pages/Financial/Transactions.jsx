@@ -1,26 +1,58 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
-import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import { BarChart3 } from 'lucide-react';
+import { ArrowLeftRight, Download } from 'lucide-react';
+import api from '../../utils/api';
+import { downloadCsv } from '../../utils/csv';
+import { formatDateTime, formatNumber } from '../../utils/format';
 import FilterBar from '../../components/Common/FilterBar';
-import {
-    getTimeFilterLabel,
-} from '../../components/Common/timeFilterUtils';
+import { getTimeFilterLabel } from '../../components/Common/timeFilterUtils';
 import Pagination from '../../components/Pagination';
-import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
+import {
+    Alert,
+    Button,
+    EmptyState,
+    PageHeader,
+    Stat,
+    StatusBadge,
+    Table,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+import {
+    EXPORT_LIMIT,
+    TRANSACTION_TYPE_LABELS,
+    fetchAllPages,
+    formatRupees,
+    formatSignedPts,
+    transactionTypeLabel,
+} from './financeFormat';
+import { DateCell, PointsValue, UserCell } from './financeParts';
+
+const RESOURCE_LABELS = { pyq: 'PYQ', notes: 'Notes' };
+
+const pointsTone = (points) =>
+    Number(points) > 0
+        ? 'text-ok-ink'
+        : Number(points) < 0
+          ? 'text-bad-ink'
+          : '';
 
 const Transactions = () => {
     const [items, setItems] = useState([]);
     const [totalItems, setTotalItems] = useState(0);
-    const [totals, setTotals] = useState({ rupees: 0, points: 0, legacyCount: 0 });
+    const [totals, setTotals] = useState({
+        rupees: 0,
+        points: 0,
+        legacyCount: 0,
+    });
     const [hasLoaded, setHasLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [refresh, setRefresh] = useState(0);
+    const [exporting, setExporting] = useState(false);
     const [search, setSearch] = useState('');
     // Filters
     const [type, setType] = useState(''); // credit | debit
@@ -33,30 +65,69 @@ const Transactions = () => {
     const [viewMode, setViewMode] = useState(() =>
         window.innerWidth >= 1024 ? 'table' : 'grid',
     );
-    const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
     const location = useLocation();
+
+    const listParams = () => ({
+        search,
+        type,
+        resourceType,
+        timeFilter,
+        sortBy,
+        sortOrder,
+        timezoneOffset: new Date().getTimezoneOffset(),
+    });
 
     useEffect(() => {
         const controller = new AbortController();
         const timer = setTimeout(async () => {
-            setLoading(true); setError(null);
+            setLoading(true);
+            setError(null);
             try {
-                const response = await api.get('/transactions/all', { params: { page, pageSize, search, type, resourceType, timeFilter, sortBy, sortOrder, timezoneOffset: new Date().getTimezoneOffset() }, signal: controller.signal });
+                const response = await api.get('/transactions/all', {
+                    params: { page, pageSize, ...listParams() },
+                    signal: controller.signal,
+                });
                 const result = response.data?.data;
-                if (!Array.isArray(result?.items) || !result.pagination) throw new Error('Invalid list response');
-                setItems(result.items); setTotalItems(result.pagination.total); setTotals(result.totals);
-                if (result.pagination.totalPages > 0 && page > result.pagination.totalPages) setPage(result.pagination.totalPages);
+                if (!Array.isArray(result?.items) || !result.pagination)
+                    throw new Error('Invalid list response');
+                setItems(result.items);
+                setTotalItems(result.pagination.total);
+                setTotals(result.totals);
+                if (
+                    result.pagination.totalPages > 0 &&
+                    page > result.pagination.totalPages
+                )
+                    setPage(result.pagination.totalPages);
             } catch (failure) {
                 if (controller.signal.aborted) return;
-                const message = failure.response?.data?.message || 'Could not load records. Please retry.';
-                setError(message); toast.error(message);
+                setError(
+                    failure.response?.data?.message ||
+                        'Couldn’t load transactions. Check your connection and try again.',
+                );
             } finally {
-                if (!controller.signal.aborted) { setLoading(false); setHasLoaded(true); }
+                if (!controller.signal.aborted) {
+                    setLoading(false);
+                    setHasLoaded(true);
+                }
             }
         }, 250);
-        return () => { clearTimeout(timer); controller.abort(); };
-    }, [page, pageSize, search, type, resourceType, timeFilter, sortBy, sortOrder]);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        page,
+        pageSize,
+        search,
+        type,
+        resourceType,
+        timeFilter,
+        sortBy,
+        sortOrder,
+        refresh,
+    ]);
 
     // Read URL params on mount
     useEffect(() => {
@@ -114,293 +185,338 @@ const Transactions = () => {
         navigate,
     ]);
 
-    // Responsive view mode - auto switch on resize
-    useEffect(() => {
-        const handleResize = () => {
-            setViewMode(window.innerWidth >= 1024 ? 'table' : 'grid');
-        };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    const current = items;
-    const totalAmount = totals.points;
-    const uniqueTypes = ['earn', 'spend', 'add', 'redeem', 'refund', 'bonus', 'sale', 'deduct'];
-    const uniqueResourceTypes = ['pyq', 'notes'];
-
-    const typeBadge = (t) => {
-        const v = (t || '').toLowerCase();
-        if (['earn', 'add', 'refund', 'bonus', 'sale'].includes(v))
-            return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-        if (['spend', 'redeem', 'deduct'].includes(v))
-            return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+    const hasFilters = Boolean(
+        search || type || resourceType || (timeFilter && timeFilter !== 'all'),
+    );
+    const clearFilters = () => {
+        setSearch('');
+        setType('');
+        setResourceType('');
+        setTimeFilter('all');
+        setPage(1);
     };
-    const resTypeBadge = () =>
-        'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300';
+
+    const exportCsv = async () => {
+        setExporting(true);
+        try {
+            const { rows, total } = await fetchAllPages(
+                '/transactions/all',
+                listParams(),
+            );
+            downloadCsv(
+                'transactions',
+                [
+                    {
+                        label: 'Date',
+                        value: (t) => formatDateTime(t.createdAt),
+                    },
+                    { label: 'Username', value: (t) => t.user?.username },
+                    { label: 'Email', value: (t) => t.user?.email },
+                    { label: 'Type', value: (t) => t.type },
+                    { label: 'Points', value: (t) => t.points },
+                    { label: 'Balance after', value: (t) => t.balanceAfter },
+                    { label: 'Resource', value: (t) => t.resourceType },
+                    { label: 'Description', value: (t) => t.description },
+                    { label: 'Transaction ID', value: (t) => t._id },
+                ],
+                rows,
+            );
+            toast.success(
+                total > EXPORT_LIMIT
+                    ? `Exported the first ${formatNumber(EXPORT_LIMIT)} of ${formatNumber(total)} transactions`
+                    : `Exported ${formatNumber(rows.length)} transactions`,
+            );
+        } catch (failure) {
+            toast.error(
+                failure.response?.data?.message ||
+                    'Couldn’t export transactions. Try again.',
+            );
+        } finally {
+            setExporting(false);
+        }
+    };
 
     if (loading && !hasLoaded) {
         return <Loader />;
     }
 
+    const netPoints = Number(totals?.points || 0);
+    const timeLabel = getTimeFilterLabel(timeFilter).toLowerCase();
+
+    const pagination = (
+        <Pagination
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+            }}
+        />
+    );
+
+    const empty = (
+        <EmptyState
+            icon={ArrowLeftRight}
+            title={hasFilters ? 'No transactions match' : 'No transactions yet'}
+            description={
+                hasFilters
+                    ? 'Try another search, type or date range.'
+                    : 'Points earned, spent, topped up and redeemed appear here.'
+            }
+            action={
+                hasFilters ? (
+                    <Button onClick={clearFilters}>Clear filters</Button>
+                ) : undefined
+            }
+        />
+    );
+
+    const resourceBadge = (t) =>
+        t.resourceType ? (
+            <StatusBadge tone='outline'>
+                {RESOURCE_LABELS[t.resourceType] || t.resourceType}
+            </StatusBadge>
+        ) : null;
+
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
-            <main
-                className={`py-4 ${mainContentMargin} transition-all duration-300`}
-            >
-                <div className='max-w-7xl mx-auto px-4 sm:px-6'>
-                    {/* Compact Header */}
-                    <BackButton title='Transactions' TitleIcon={BarChart3} />
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Transactions'
+                description='Every points credit and debit across student wallets. 5 pts = ₹1.'
+                actions={
+                    <Button
+                        icon={Download}
+                        onClick={exportCsv}
+                        disabled={!totalItems || exporting}
+                    >
+                        {exporting ? 'Exporting…' : 'Export CSV'}
+                    </Button>
+                }
+            />
 
-                    {/* Compact Filters */}
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
-                        {/* Total Amount - Compact */}
-                        {timeFilter && (
-                            <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
-                                <span className='text-gray-600 dark:text-gray-400'>
-                                    Total ({getTimeFilterLabel(timeFilter)}):
-                                </span>
-                                <span className='font-semibold text-gray-900 dark:text-white'>
-                                    {totalAmount} pts / ₹
-                                    {(totalAmount / 5).toFixed(2)}
-                                </span>
-                            </div>
-                        )}
-                        <FilterBar
-                            search={search}
-                            onSearch={(value) => { setSearch(value); setPage(1); }}
-                            filters={[
-                                {
-                                    label: 'Type',
-                                    value: type,
-                                    onChange: setType,
-                                    options: [
-                                        { value: '', label: 'All Types' },
-                                        ...uniqueTypes.map((t) => ({
-                                            value: t,
-                                            label: t,
-                                        })),
-                                    ],
-                                },
-                                {
-                                    label: 'Resource Type',
-                                    value: resourceType,
-                                    onChange: setResourceType,
-                                    options: [
-                                        { value: '', label: 'All Resources' },
-                                        ...uniqueResourceTypes.map((rt) => ({
-                                            value: rt,
-                                            label: rt || '-',
-                                        })),
-                                    ],
-                                },
-                            ]}
-                            timeFilter={{
-                                value: timeFilter,
-                                onChange: (v) => {
-                                    setTimeFilter(v);
-                                    setPage(1);
-                                },
-                            }}
-                            sortBy={{
-                                value: sortBy,
-                                onChange: setSortBy,
-                                options: [
-                                    {
-                                        value: 'createdAt',
-                                        label: 'Sort by Date',
-                                    },
-                                    {
-                                        value: 'amount',
-                                        label: 'Sort by Amount',
-                                    },
-                                ],
-                            }}
-                            sortOrder={{
-                                value: sortOrder,
-                                onToggle: () =>
-                                    setSortOrder(
-                                        sortOrder === 'asc' ? 'desc' : 'asc',
-                                    ),
-                            }}
-                            viewMode={{
-                                value: viewMode,
-                                onChange: setViewMode,
-                            }}
-                            onClear={() => {
-                                setSearch('');
-                                setType('');
-                                setResourceType('');
-                                setTimeFilter('all');
-                                setPage(1);
-                            }}
-                            showClear={
-                                !!(
-                                    search ||
-                                    type ||
-                                    resourceType ||
-                                    (timeFilter && timeFilter !== 'all')
-                                )
-                            }
-                        />
-                    </div>
+            <div className='grid grid-cols-2 gap-3 sm:gap-4 mb-6'>
+                <Stat
+                    label='Net change'
+                    value={<PointsValue points={netPoints} signed />}
+                    note={`Worth ${formatRupees(netPoints / 5)} · ${timeLabel}`}
+                />
+                <Stat
+                    label='Transactions'
+                    value={formatNumber(totalItems)}
+                    note={
+                        type ? transactionTypeLabel(type) : 'Credits and debits'
+                    }
+                />
+            </div>
 
-                    {loading && <p role='status' className='text-sm text-gray-500 mb-2'>Updating records…</p>}
-                    {/* Error */}
-                    {error && (
-                        <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded text-sm mb-3'>
-                            {error}
-                        </div>
-                    )}
+            <FilterBar
+                className='mb-4'
+                search={search}
+                onSearch={(value) => {
+                    setSearch(value);
+                    setPage(1);
+                }}
+                searchPlaceholder='Search by username, email or transaction ID'
+                filters={[
+                    {
+                        label: 'Type',
+                        value: type,
+                        onChange: (value) => {
+                            setType(value);
+                            setPage(1);
+                        },
+                        options: [
+                            { value: '', label: 'Any type' },
+                            ...Object.entries(TRANSACTION_TYPE_LABELS).map(
+                                ([value, label]) => ({ value, label }),
+                            ),
+                        ],
+                    },
+                    {
+                        label: 'Resource type',
+                        value: resourceType,
+                        onChange: (value) => {
+                            setResourceType(value);
+                            setPage(1);
+                        },
+                        options: [
+                            { value: '', label: 'Any resource' },
+                            { value: 'pyq', label: 'PYQs' },
+                            { value: 'notes', label: 'Notes' },
+                        ],
+                    },
+                ]}
+                timeFilter={{
+                    value: timeFilter,
+                    onChange: (v) => {
+                        setTimeFilter(v);
+                        setPage(1);
+                    },
+                }}
+                sortBy={{
+                    value: sortBy,
+                    onChange: setSortBy,
+                    options: [
+                        { value: 'createdAt', label: 'Sort by date' },
+                        { value: 'amount', label: 'Sort by points' },
+                    ],
+                }}
+                sortOrder={{
+                    value: sortOrder,
+                    onToggle: () =>
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                }}
+                viewMode={{
+                    value: viewMode,
+                    onChange: setViewMode,
+                }}
+                onClear={clearFilters}
+                showClear={hasFilters}
+            />
 
-                    {/* Grid/Table Views */}
-                    {current.length > 0 ? (
-                        <>
-                            {/* Compact Grid View */}
-                            {viewMode === 'grid' && (
-                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mb-3'>
-                                    {current.map((t) => (
-                                        <div
-                                            key={t._id}
-                                            className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 hover:border-gray-300 dark:hover:border-gray-600 transition-colors'
-                                        >
-                                            <div className='flex justify-between items-start gap-1 mb-2'>
-                                                <span
-                                                    className={`px-1.5 py-0.5 text-xs rounded ${typeBadge(t.type)}`}
-                                                >
-                                                    {t.type || 'N/A'}
-                                                </span>
-                                                <span
-                                                    className={`px-1.5 py-0.5 text-xs rounded ${resTypeBadge(t.resourceType)}`}
-                                                >
-                                                    {t.resourceType || '-'}
-                                                </span>
-                                            </div>
-                                            <div className='mb-2'>
-                                                <div className='text-sm font-medium text-gray-900 dark:text-white truncate'>
-                                                    {t.user?.username ||
-                                                        t.user?.name ||
-                                                        'N/A'}
-                                                </div>
-                                                <div className='text-xs text-gray-500 dark:text-gray-400 truncate'>
-                                                    {t.user?.email || 'N/A'}
-                                                </div>
-                                            </div>
-                                            <div className='mb-1'>
-                                                <div className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                                    {t.points || 0} pts
-                                                </div>
-                                            </div>
-                                            <div className='text-xs text-gray-500 dark:text-gray-400'>
-                                                {t.createdAt
-                                                    ? new Date(
-                                                          t.createdAt,
-                                                      ).toLocaleDateString()
-                                                    : 'N/A'}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button
+                            size='sm'
+                            onClick={() => setRefresh((v) => v + 1)}
+                        >
+                            Try again
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
 
-                            {/* Compact Table View */}
-                            {viewMode === 'table' && (
-                                <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden mb-3'>
-                                    <div className='overflow-x-auto'>
-                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                            <thead className='bg-gray-50 dark:bg-gray-900'>
-                                                <tr>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        User
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Type
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Amount
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Resource
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Date
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                                {current.map((t) => (
-                                                    <tr
-                                                        key={t._id}
-                                                        className='hover:bg-gray-50 dark:hover:bg-gray-900'
-                                                    >
-                                                        <td className='px-3 py-2 whitespace-nowrap'>
-                                                            <div className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                                {t.user
-                                                                    ?.username ||
-                                                                    t.user
-                                                                        ?.name ||
-                                                                    'N/A'}
-                                                            </div>
-                                                            <div className='text-xs text-gray-500 dark:text-gray-400'>
-                                                                {t.user
-                                                                    ?.email ||
-                                                                    'N/A'}
-                                                            </div>
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-900 dark:text-white capitalize'>
-                                                            {t.type || 'N/A'}
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white'>
-                                                            {t.points || 0} pts
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400'>
-                                                            {t.resourceType ||
-                                                                '-'}
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400'>
-                                                            {t.createdAt
-                                                                ? new Date(
-                                                                      t.createdAt,
-                                                                  ).toLocaleDateString()
-                                                                : 'N/A'}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
+            <p role='status' className='sr-only'>
+                {loading ? 'Updating transactions…' : ''}
+            </p>
 
-                            {/* Compact Pagination */}
-                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 px-3 py-2'>
-                                <Pagination
-                                    currentPage={page}
-                                    pageSize={pageSize}
-                                    totalItems={totalItems}
-                                    onPageChange={setPage}
-                                    onPageSizeChange={(s) => {
-                                        setPageSize(s);
-                                        setPage(1);
-                                    }}
-                                />
-                            </div>
-                        </>
+            {viewMode === 'table' ? (
+                <div
+                    aria-busy={loading}
+                    className={`bg-sheet border border-line rounded-xl overflow-hidden transition-opacity ${loading ? 'opacity-60' : ''}`}
+                >
+                    {items.length === 0 ? (
+                        empty
                     ) : (
-                        <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-center py-12'>
-                            <BarChart3 className='w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3' />
-                            <h3 className='text-sm font-medium text-gray-900 dark:text-white mb-1'>
-                                No Transactions Found
-                            </h3>
-                            <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                No transactions match your current filters.
-                            </p>
+                        <Table minWidth={900}>
+                            <thead>
+                                <tr>
+                                    <Th>User</Th>
+                                    <Th>Type</Th>
+                                    <Th>What for</Th>
+                                    <Th align='right'>Points</Th>
+                                    <Th align='right'>Balance after</Th>
+                                    <Th>Date</Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {items.map((t) => (
+                                    <Tr key={t._id}>
+                                        <Td className='max-w-[240px]'>
+                                            <UserCell user={t.user} />
+                                        </Td>
+                                        <Td className='whitespace-nowrap'>
+                                            {transactionTypeLabel(t.type)}
+                                        </Td>
+                                        <Td className='max-w-[360px]'>
+                                            <div className='flex flex-col items-start gap-1 min-w-0'>
+                                                <span className='text-ink-2 line-clamp-2'>
+                                                    {t.description || '—'}
+                                                </span>
+                                                {resourceBadge(t)}
+                                            </div>
+                                        </Td>
+                                        <Td
+                                            align='right'
+                                            mono
+                                            className={`font-medium whitespace-nowrap ${pointsTone(t.points)}`}
+                                        >
+                                            {formatSignedPts(t.points)}
+                                        </Td>
+                                        <Td
+                                            align='right'
+                                            mono
+                                            className='whitespace-nowrap text-ink-2'
+                                        >
+                                            {t.balanceAfter !== undefined &&
+                                            t.balanceAfter !== null
+                                                ? formatNumber(t.balanceAfter)
+                                                : '—'}
+                                        </Td>
+                                        <Td>
+                                            <DateCell value={t.createdAt} />
+                                        </Td>
+                                    </Tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                    {totalItems > 0 && (
+                        <div className='px-4 py-3 border-t border-line-soft'>
+                            {pagination}
                         </div>
                     )}
                 </div>
-            </main>
+            ) : items.length === 0 ? (
+                <div className='bg-sheet border border-line rounded-xl'>
+                    {empty}
+                </div>
+            ) : (
+                <div
+                    aria-busy={loading}
+                    className={`flex flex-col gap-4 transition-opacity ${loading ? 'opacity-60' : ''}`}
+                >
+                    <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
+                        {items.map((t) => (
+                            <article
+                                key={t._id}
+                                className='flex flex-col gap-3 p-4 bg-sheet border border-line rounded-xl'
+                            >
+                                <div className='flex items-start gap-2'>
+                                    <div className='flex-1 min-w-0'>
+                                        <UserCell user={t.user} />
+                                    </div>
+                                    <span
+                                        className={`font-mono text-[15px] font-medium whitespace-nowrap ${pointsTone(t.points)}`}
+                                    >
+                                        {formatSignedPts(t.points)}
+                                    </span>
+                                </div>
+                                <div className='flex flex-col items-start gap-1'>
+                                    <span className='text-[13px] font-medium text-ink'>
+                                        {transactionTypeLabel(t.type)}
+                                    </span>
+                                    <span className='text-[13px] text-ink-2 line-clamp-2'>
+                                        {t.description || '—'}
+                                    </span>
+                                    {resourceBadge(t)}
+                                </div>
+                                <div className='flex items-center gap-2 pt-3 border-t border-line-soft text-xs text-muted'>
+                                    <span className='flex-1'>
+                                        {t.balanceAfter !== undefined &&
+                                        t.balanceAfter !== null
+                                            ? `Balance after ${formatNumber(t.balanceAfter)} pts`
+                                            : ''}
+                                    </span>
+                                    <span className='whitespace-nowrap'>
+                                        {formatDateTime(t.createdAt)}
+                                    </span>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                    <div className='bg-sheet border border-line rounded-xl px-4 py-3'>
+                        {pagination}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

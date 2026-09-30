@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { Button, Dialog } from '../ui';
 
 const DEFAULT_SECTIONS = {
     pyqs: true,
@@ -27,6 +28,20 @@ const ALL_SECTIONS_ENABLED = {
     lostFound: true,
     quickNotes: true,
 };
+
+const SECTION_OPTIONS = [
+    { key: 'pyqs', label: 'PYQs' },
+    { key: 'notes', label: 'Notes' },
+    { key: 'videos', label: 'Videos' },
+    { key: 'syllabus', label: 'Syllabus' },
+    { key: 'quickNotes', label: 'Quick notes' },
+    { key: 'store', label: 'Store' },
+    { key: 'seniors', label: 'Seniors' },
+    { key: 'resources', label: 'Resources' },
+    { key: 'groups', label: 'Groups' },
+    { key: 'opportunities', label: 'Opportunities' },
+    { key: 'lostFound', label: 'Lost & found' },
+];
 
 const EditCollegeModal = ({
     isOpen,
@@ -88,7 +103,9 @@ const EditCollegeModal = ({
         setFormData((prev) => ({
             ...prev,
             name,
-            slug: generateSlug(name),
+            // Only a new college gets its slug from the name. Renaming an
+            // existing one must not quietly change its public URL.
+            slug: college ? prev.slug : generateSlug(name),
         }));
 
         if (errors.name) {
@@ -156,273 +173,213 @@ const EditCollegeModal = ({
         }
     };
 
-    if (!isOpen) return null;
+    const disabled = loading || readOnly;
+    const inputClass = (hasError) =>
+        `w-full px-3 py-2 rounded-lg border bg-sheet text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 disabled:bg-sunken disabled:text-ink-2 ${
+            hasError ? 'border-bad' : 'border-line-strong'
+        }`;
+    const fieldError = (key) =>
+        errors[key] && (
+            <p id={`${key}-error`} className='text-[12.5px] text-bad-ink'>
+                {errors[key]}
+            </p>
+        );
 
     return (
-        <div className='fixed inset-0 z-[9999] overflow-y-auto'>
-            <div className='flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0'>
-                {/* Background overlay */}
-                <div
-                    className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
-                    onClick={onClose}
-                ></div>
-
-                {/* Modal centering span */}
-                <span
-                    className='hidden sm:inline-block sm:align-middle sm:h-screen'
-                    aria-hidden='true'
-                >
-                    &#8203;
-                </span>
-
-                {/* Modal */}
-                <div className='relative inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full'>
-                    {/* Header */}
-                    <div className='bg-white dark:bg-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-700'>
-                        <div className='flex items-center justify-between'>
-                            <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
-                                {readOnly ? 'View College' : 'Edit College'}
-                            </h3>
-                            <button
-                                onClick={onClose}
-                                className='text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                                disabled={loading}
-                            >
-                                <X className='h-6 w-6' />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Form */}
-                    <form
-                        onSubmit={handleSubmit}
-                        className='bg-white dark:bg-gray-800 px-6 py-4'
+        <Dialog
+            open={isOpen}
+            onClose={onClose}
+            busy={loading}
+            size='md'
+            title={readOnly ? 'College details' : 'Edit college'}
+            description={
+                readOnly
+                    ? undefined
+                    : 'Changes show on the student site straight away.'
+            }
+            footer={
+                <>
+                    <Button onClick={onClose} disabled={loading}>
+                        {readOnly ? 'Close' : 'Cancel'}
+                    </Button>
+                    {!readOnly && (
+                        <Button
+                            type='submit'
+                            form='edit-college-form'
+                            variant='primary'
+                            disabled={loading}
+                        >
+                            {loading && (
+                                <Loader2
+                                    className='w-4 h-4 animate-spin'
+                                    aria-hidden='true'
+                                />
+                            )}
+                            {loading ? 'Saving…' : 'Save changes'}
+                        </Button>
+                    )}
+                </>
+            }
+        >
+            <form
+                id='edit-college-form'
+                onSubmit={handleSubmit}
+                noValidate
+                className='flex flex-col gap-4'
+            >
+                <div className='flex flex-col gap-1.5'>
+                    <label
+                        htmlFor='college-name'
+                        className='text-[13px] font-medium text-ink'
                     >
-                        <div className='space-y-4'>
-                            {/* College Name */}
-                            <div>
-                                <label
-                                    htmlFor='name'
-                                    className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
-                                >
-                                    College Name *
-                                </label>
-                                <input
-                                    type='text'
-                                    id='name'
-                                    name='name'
-                                    value={formData.name}
-                                    onChange={handleNameChange}
-                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white ${
-                                        errors.name
-                                            ? 'border-red-300 dark:border-red-600'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    placeholder='Enter college name'
-                                    disabled={loading || readOnly}
-                                />
-                                {errors.name && (
-                                    <p className='mt-1 text-sm text-red-600'>
-                                        {errors.name}
-                                    </p>
-                                )}
-                            </div>
+                        Name
+                    </label>
+                    <input
+                        id='college-name'
+                        name='name'
+                        type='text'
+                        value={formData.name}
+                        onChange={handleNameChange}
+                        placeholder='Integral University'
+                        aria-invalid={Boolean(errors.name)}
+                        aria-describedby={
+                            errors.name ? 'name-error' : undefined
+                        }
+                        className={inputClass(errors.name)}
+                        disabled={disabled}
+                    />
+                    {fieldError('name')}
+                </div>
 
-                            {/* Location */}
-                            <div>
-                                <label
-                                    htmlFor='location'
-                                    className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
-                                >
-                                    Location *
-                                </label>
-                                <input
-                                    type='text'
-                                    id='location'
-                                    name='location'
-                                    value={formData.location}
-                                    onChange={handleChange}
-                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white ${
-                                        errors.location
-                                            ? 'border-red-300 dark:border-red-600'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    placeholder='Enter location'
-                                    disabled={loading || readOnly}
-                                />
-                                {errors.location && (
-                                    <p className='mt-1 text-sm text-red-600'>
-                                        {errors.location}
-                                    </p>
-                                )}
-                            </div>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                    <div className='flex flex-col gap-1.5'>
+                        <label
+                            htmlFor='college-location'
+                            className='text-[13px] font-medium text-ink'
+                        >
+                            Location
+                        </label>
+                        <input
+                            id='college-location'
+                            name='location'
+                            type='text'
+                            value={formData.location}
+                            onChange={handleChange}
+                            placeholder='Lucknow, Uttar Pradesh'
+                            aria-invalid={Boolean(errors.location)}
+                            aria-describedby={
+                                errors.location ? 'location-error' : undefined
+                            }
+                            className={inputClass(errors.location)}
+                            disabled={disabled}
+                        />
+                        {fieldError('location')}
+                    </div>
+                    <div className='flex flex-col gap-1.5'>
+                        <label
+                            htmlFor='college-slug'
+                            className='text-[13px] font-medium text-ink'
+                        >
+                            Slug
+                        </label>
+                        <input
+                            id='college-slug'
+                            name='slug'
+                            type='text'
+                            value={formData.slug}
+                            onChange={handleChange}
+                            placeholder='integral-university'
+                            aria-invalid={Boolean(errors.slug)}
+                            aria-describedby={
+                                errors.slug ? 'slug-error' : 'slug-hint'
+                            }
+                            className={`${inputClass(errors.slug)} font-mono text-[13px]`}
+                            disabled={disabled}
+                        />
+                        {fieldError('slug') || (
+                            <p
+                                id='slug-hint'
+                                className='text-[12.5px] text-muted'
+                            >
+                                studentsenior.com/{formData.slug || 'slug'}
+                                {college && ' · changing it breaks old links'}
+                            </p>
+                        )}
+                    </div>
+                </div>
 
-                            {/* Slug */}
-                            <div>
-                                <label
-                                    htmlFor='slug'
-                                    className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
-                                >
-                                    Slug *
-                                </label>
-                                <input
-                                    type='text'
-                                    id='slug'
-                                    name='slug'
-                                    value={formData.slug}
-                                    onChange={handleChange}
-                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white font-mono text-sm ${
-                                        errors.slug
-                                            ? 'border-red-300 dark:border-red-600'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    placeholder='college-slug'
-                                    disabled={loading || readOnly}
-                                />
-                                {errors.slug && (
-                                    <p className='mt-1 text-sm text-red-600'>
-                                        {errors.slug}
-                                    </p>
-                                )}
-                                <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
-                                    URL-friendly version of the college name
-                                    (auto-generated)
-                                </p>
-                            </div>
+                <div className='flex flex-col gap-1.5'>
+                    <label
+                        htmlFor='college-description'
+                        className='text-[13px] font-medium text-ink'
+                    >
+                        Description
+                    </label>
+                    <textarea
+                        id='college-description'
+                        name='description'
+                        rows={3}
+                        value={formData.description}
+                        onChange={handleChange}
+                        placeholder='A line or two students see on the college page'
+                        aria-invalid={Boolean(errors.description)}
+                        aria-describedby={
+                            errors.description ? 'description-error' : undefined
+                        }
+                        className={`${inputClass(errors.description)} resize-none`}
+                        disabled={disabled}
+                    />
+                    {fieldError('description')}
+                </div>
 
-                            {/* Description */}
-                            <div>
-                                <label
-                                    htmlFor='description'
-                                    className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
-                                >
-                                    Description *
-                                </label>
-                                <textarea
-                                    id='description'
-                                    name='description'
-                                    rows={4}
-                                    value={formData.description}
-                                    onChange={handleChange}
-                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white resize-none ${
-                                        errors.description
-                                            ? 'border-red-300 dark:border-red-600'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    placeholder='Enter college description'
-                                    disabled={loading || readOnly}
-                                />
-                                {errors.description && (
-                                    <p className='mt-1 text-sm text-red-600'>
-                                        {errors.description}
-                                    </p>
-                                )}
-                            </div>
+                <label className='flex items-start gap-3 p-3 rounded-lg border border-line'>
+                    <input
+                        type='checkbox'
+                        name='status'
+                        checked={formData.status}
+                        onChange={handleChange}
+                        className='mt-0.5 w-4 h-4 accent-brand'
+                        disabled={disabled}
+                    />
+                    <span className='flex flex-col gap-0.5'>
+                        <span className='text-[13.5px] font-medium text-ink'>
+                            Active
+                        </span>
+                        <span className='text-[12.5px] text-muted'>
+                            Inactive colleges are hidden from students.
+                        </span>
+                    </span>
+                </label>
 
-                            {/* Status */}
-                            <div className='flex items-center'>
+                <fieldset className='flex flex-col gap-2'>
+                    <legend className='text-[13px] font-medium text-ink mb-2'>
+                        Sections students can see
+                    </legend>
+                    <div className='grid grid-cols-2 sm:grid-cols-3 gap-2'>
+                        {SECTION_OPTIONS.map((section) => (
+                            <label
+                                key={section.key}
+                                className='flex items-center gap-2 h-9 px-2.5 rounded-lg border border-line text-[13px] text-ink-2 has-[:checked]:border-brand/40 has-[:checked]:bg-brand-soft has-[:checked]:text-brand-ink'
+                            >
                                 <input
                                     type='checkbox'
-                                    id='status'
-                                    name='status'
-                                    checked={formData.status}
-                                    onChange={handleChange}
-                                    className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
-                                    disabled={loading || readOnly}
+                                    checked={
+                                        formData.sections?.[section.key] ||
+                                        false
+                                    }
+                                    onChange={() =>
+                                        handleSectionToggle(section.key)
+                                    }
+                                    className='w-4 h-4 accent-brand'
+                                    disabled={disabled}
                                 />
-                                <label
-                                    htmlFor='status'
-                                    className='ml-2 block text-sm text-gray-700 dark:text-gray-300'
-                                >
-                                    Active Status
-                                </label>
-                            </div>
-
-                            {/* Sections */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                                    Enabled Sections
-                                </label>
-                                <div className='grid grid-cols-2 gap-3'>
-                                    {[
-                                        { key: 'pyqs', label: 'PYQs' },
-                                        { key: 'notes', label: 'Notes' },
-                                        { key: 'videos', label: 'Videos' },
-                                        { key: 'syllabus', label: 'Syllabus' },
-                                        {
-                                            key: 'quickNotes',
-                                            label: 'Quick Notes',
-                                        },
-                                        { key: 'store', label: 'Store' },
-                                        { key: 'seniors', label: 'Seniors' },
-                                        {
-                                            key: 'resources',
-                                            label: 'Resources',
-                                        },
-                                        { key: 'groups', label: 'Groups' },
-                                        {
-                                            key: 'opportunities',
-                                            label: 'Opportunities',
-                                        },
-                                        {
-                                            key: 'lostFound',
-                                            label: 'Lost & Found',
-                                        },
-                                    ].map((section) => (
-                                        <label
-                                            key={section.key}
-                                            className='flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300'
-                                        >
-                                            <input
-                                                type='checkbox'
-                                                checked={
-                                                    formData.sections?.[
-                                                        section.key
-                                                    ] || false
-                                                }
-                                                onChange={() =>
-                                                    handleSectionToggle(
-                                                        section.key,
-                                                    )
-                                                }
-                                                className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
-                                                disabled={loading || readOnly}
-                                            />
-                                            {section.label}
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Buttons */}
-                        <div className='mt-6 flex justify-end space-x-3'>
-                            <button
-                                type='button'
-                                onClick={onClose}
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors'
-                                disabled={loading}
-                            >
-                                {readOnly ? 'Close' : 'Cancel'}
-                            </button>
-                            {!readOnly && (
-                                <button
-                                    type='submit'
-                                    className='inline-flex items-center px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-                                    disabled={loading}
-                                >
-                                    {loading && (
-                                        <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                                    )}
-                                    <Save className='h-4 w-4 mr-2' />
-                                    Update
-                                </button>
-                            )}
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+                                {section.label}
+                            </label>
+                        ))}
+                    </div>
+                </fieldset>
+            </form>
+        </Dialog>
     );
 };
 

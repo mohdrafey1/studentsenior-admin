@@ -1,9 +1,14 @@
-import { Search, Grid3x3, List, SortAsc, SortDesc, X } from 'lucide-react';
+import { LayoutGrid, List, Search, SortAsc, SortDesc, X } from 'lucide-react';
 import { TIME_FILTER_OPTIONS } from './timeFilterUtils';
+import Segmented from '../ui/Segmented';
+
+const CONTROL =
+    'h-9 rounded-lg border border-line-strong bg-sheet text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/30 cursor-pointer';
 
 const FilterBar = ({
     search = '',
     onSearch,
+    searchPlaceholder = 'Search',
     filters = [],
     timeFilter,
     sortBy,
@@ -13,114 +18,144 @@ const FilterBar = ({
     showClear,
     className = '',
 }) => {
-    return (
-        <div
-            className={`flex flex-wrap gap-2 items-center text-xs ${className}`}
+    const selects = [
+        ...filters.map((filter, idx) => (
+            <select
+                key={filter.label || idx}
+                aria-label={filter.label}
+                value={filter.value}
+                onChange={(e) => filter.onChange(e.target.value)}
+                className={`${CONTROL} px-2.5 ${filter.value ? 'border-brand/50 bg-brand-soft/40' : ''}`}
+                {...filter.props}
+            >
+                {filter.options.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                    </option>
+                ))}
+            </select>
+        )),
+        timeFilter && (
+            <select
+                key='time'
+                aria-label='Date range'
+                value={timeFilter.value}
+                onChange={(e) => timeFilter.onChange(e.target.value)}
+                className={`${CONTROL} px-2.5 ${
+                    timeFilter.value && timeFilter.value !== 'all'
+                        ? 'border-brand/50 bg-brand-soft/40'
+                        : ''
+                }`}
+            >
+                {TIME_FILTER_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                    </option>
+                ))}
+            </select>
+        ),
+    ].filter(Boolean);
+
+    const clearButton = showClear && (
+        <button
+            type='button'
+            onClick={onClear}
+            className='inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[13px] text-ink-2 hover:bg-sunken hover:text-ink cursor-pointer'
         >
-            {/* Search */}
-            <div className='w-full md:max-w-xs'>
-                <input
-                    type='text'
-                    placeholder='Search...'
-                    value={search}
-                    onChange={(e) => onSearch(e.target.value)}
-                    className='w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white'
-                />
+            <X className='w-3.5 h-3.5' aria-hidden='true' />
+            Clear filters
+        </button>
+    );
+
+    // Search, sort and view on the first row; filters (and Clear) below, so
+    // the search box keeps its width however many filters a page has.
+    return (
+        <div className={`flex flex-col gap-2 ${className}`}>
+            <div className='flex flex-wrap gap-2 items-center'>
+                {onSearch && (
+                    <label className='flex items-center gap-2 flex-1 min-w-[220px] h-9 px-3 rounded-lg border border-line-strong bg-sheet text-muted focus-within:ring-2 focus-within:ring-brand/30'>
+                        <Search
+                            className='w-[15px] h-[15px] shrink-0'
+                            aria-hidden='true'
+                        />
+                        <input
+                            type='search'
+                            placeholder={searchPlaceholder}
+                            aria-label={searchPlaceholder}
+                            value={search}
+                            onChange={(e) => onSearch(e.target.value)}
+                            className='flex-1 min-w-0 bg-transparent outline-none text-[13.5px] text-ink placeholder:text-muted'
+                        />
+                    </label>
+                )}
+
+                {sortBy && (
+                    <select
+                        aria-label='Sort by'
+                        value={sortBy.value}
+                        onChange={(e) => sortBy.onChange(e.target.value)}
+                        className={`${CONTROL} px-2.5`}
+                    >
+                        {sortBy.options.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                            </option>
+                        ))}
+                    </select>
+                )}
+
+                {sortOrder && (
+                    <button
+                        type='button'
+                        onClick={sortOrder.onToggle}
+                        aria-label={
+                            sortOrder.value === 'asc'
+                                ? 'Sorted ascending, switch to descending'
+                                : 'Sorted descending, switch to ascending'
+                        }
+                        title={
+                            sortOrder.value === 'asc'
+                                ? 'Ascending'
+                                : 'Descending'
+                        }
+                        className={`${CONTROL} w-9 flex items-center justify-center text-ink-2 hover:bg-sunken`}
+                    >
+                        {sortOrder.value === 'asc' ? (
+                            <SortAsc className='w-4 h-4' aria-hidden='true' />
+                        ) : (
+                            <SortDesc className='w-4 h-4' aria-hidden='true' />
+                        )}
+                    </button>
+                )}
+
+                {viewMode && (
+                    <Segmented
+                        label='View'
+                        value={viewMode.value}
+                        onChange={viewMode.onChange}
+                        options={[
+                            {
+                                value: 'table',
+                                icon: List,
+                                ariaLabel: 'Table view',
+                            },
+                            {
+                                value: 'grid',
+                                icon: LayoutGrid,
+                                ariaLabel: 'Grid view',
+                            },
+                        ]}
+                    />
+                )}
+
+                {selects.length === 0 && clearButton}
             </div>
 
-            {/* View Mode Toggle */}
-            {viewMode && (
-                <div className='flex bg-gray-100 dark:bg-gray-900 rounded p-0.5'>
-                    <button
-                        onClick={() => viewMode.onChange('grid')}
-                        className={`p-1.5 rounded transition-colors ${viewMode.value === 'grid' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
-                        title='Grid view'
-                    >
-                        <Grid3x3 className='w-3.5 h-3.5' />
-                    </button>
-                    <button
-                        onClick={() => viewMode.onChange('table')}
-                        className={`p-1.5 rounded transition-colors ${viewMode.value === 'table' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
-                        title='Table view'
-                    >
-                        <List className='w-3.5 h-3.5' />
-                    </button>
+            {selects.length > 0 && (
+                <div className='flex flex-wrap gap-2 items-center'>
+                    {selects}
+                    {clearButton}
                 </div>
-            )}
-
-            {/* Other select filters */}
-            {filters.map((filter, idx) => (
-                <select
-                    key={filter.label || idx}
-                    value={filter.value}
-                    onChange={(e) => filter.onChange(e.target.value)}
-                    className='px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white'
-                    {...filter.props}
-                >
-                    {filter.options.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                        </option>
-                    ))}
-                </select>
-            ))}
-
-            {/* Time Filter */}
-            {timeFilter && (
-                <select
-                    value={timeFilter.value}
-                    onChange={(e) => timeFilter.onChange(e.target.value)}
-                    className={`px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white ${className}`}
-                >
-                    {TIME_FILTER_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                        </option>
-                    ))}
-                </select>
-            )}
-
-            {/* Sort By */}
-            {sortBy && (
-                <select
-                    value={sortBy.value}
-                    onChange={(e) => sortBy.onChange(e.target.value)}
-                    className='px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 dark:bg-gray-900 dark:text-white'
-                >
-                    {sortBy.options.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                        </option>
-                    ))}
-                </select>
-            )}
-
-            {/* Sort Order */}
-            {sortOrder && (
-                <button
-                    onClick={sortOrder.onToggle}
-                    className='p-1.5 border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors'
-                    title={
-                        sortOrder.value === 'asc' ? 'Ascending' : 'Descending'
-                    }
-                >
-                    {sortOrder.value === 'asc' ? (
-                        <SortAsc className='w-3.5 h-3.5' />
-                    ) : (
-                        <SortDesc className='w-3.5 h-3.5' />
-                    )}
-                </button>
-            )}
-
-            {/* Clear Filters */}
-            {showClear && (
-                <button
-                    onClick={onClear}
-                    className='flex items-center gap-1 px-2 py-1.5 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors'
-                >
-                    <X className='w-3 h-3' />
-                    Clear
-                </button>
             )}
         </div>
     );

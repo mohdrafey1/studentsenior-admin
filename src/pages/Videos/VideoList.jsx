@@ -1,787 +1,836 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
-import api from '../../utils/api';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
-    Play,
-    Edit2,
-    Trash2,
-    Eye,
-    Calendar,
-    User,
-    BookOpen,
-    Clock,
-    CheckCircle,
-    XCircle,
+    Check,
+    Download,
     ExternalLink,
+    Pencil,
+    Play,
+    Trash2,
     Video,
+    X,
 } from 'lucide-react';
-import ConfirmModal from '../../components/ConfirmModal';
-import VideoEditModal from '../../components/VideoEditModal';
-import FilterBar from '../../components/Common/FilterBar';
-import BackButton from '../../components/Common/BackButton';
-import Loader from '../../components/Common/Loader';
+import api from '../../utils/api';
+import { useColleges } from '../../context/CollegeContext';
+import { useSelection } from '../../hooks/useSelection';
+import { downloadCsv } from '../../utils/csv';
 import {
-    filterByTime,
-    getTimeFilterLabel,
-} from '../../components/Common/timeFilterUtils';
+    formatDateTime,
+    formatNumber,
+    formatShortDate,
+    formatShortDateTime,
+} from '../../utils/format';
+import { relativeTime } from '../../utils/relativeTime';
+import FilterBar from '../../components/Common/FilterBar';
+import { filterByTime } from '../../components/Common/timeFilterUtils';
+import Loader from '../../components/Common/Loader';
+import Pagination from '../../components/Pagination';
+import ConfirmModal from '../../components/ConfirmModal';
+import RejectDialog from '../../components/RejectDialog';
+import VideoEditModal from '../../components/VideoEditModal';
+import {
+    Alert,
+    BulkBar,
+    BulkButton,
+    Button,
+    EmptyState,
+    PageHeader,
+    SelectCell,
+    StatusBadge,
+    Table,
+    Tabs,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+import { youtubeThumb } from './videoUtils';
+
+const STATUS_TABS = [
+    ['', 'All'],
+    ['pending', 'Pending'],
+    ['approved', 'Approved'],
+    ['rejected', 'Rejected'],
+];
+
+const EMPTY_FILTERS = { submissionStatus: '', subject: '' };
+
+// The endpoint pages its results (10 by default), so ask for big pages and
+// fetch the rest, letting the filters and counts cover every video.
+const FETCH_LIMIT = 100;
+
+/** YouTube thumbnail, or a dark tile with a play icon for other links. */
+const Thumb = ({ url, className = '' }) => {
+    const [failed, setFailed] = useState(false);
+    const src = youtubeThumb(url);
+    return (
+        <span
+            className={`relative flex items-center justify-center overflow-hidden bg-black text-white ${className}`}
+        >
+            {src && !failed ? (
+                <img
+                    src={src}
+                    alt=''
+                    loading='lazy'
+                    onError={() => setFailed(true)}
+                    className='absolute inset-0 w-full h-full object-cover'
+                />
+            ) : (
+                <Play className='w-5 h-5 opacity-70' aria-hidden='true' />
+            )}
+        </span>
+    );
+};
+
+// "3 h ago" for the last week, then a date.
+const age = (date) =>
+    Date.now() - new Date(date) < 7 * 864e5
+        ? relativeTime(date)
+        : formatShortDate(date);
 
 const VideoList = () => {
     const location = useLocation();
-    const { collegeslug } = useParams();
     const navigate = useNavigate();
+    const { collegeslug } = useParams();
+    const { currentCollege } = useColleges();
 
-    // Read URL params
+    // Filters live in the URL so a filtered list can be shared or reloaded.
     const params = new URLSearchParams(location.search);
-    const initialSearch = params.get('search') || '';
-    const initialTimeFilter = params.get('time') || '';
-    const initialPage = parseInt(params.get('page')) || 1;
-    const initialSubmissionStatus = params.get('submissionStatus') || '';
-    const initialDeleted = params.get('deleted') || '';
-
     const [videos, setVideos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [search, setSearch] = useState(initialSearch);
-    const [page, setPage] = useState(initialPage);
-    const [pageSize, setPageSize] = useState(12);
-    const [timeFilter, setTimeFilter] = useState(initialTimeFilter);
-    const [showModal, setShowModal] = useState(false);
-    const [editingVideo, setEditingVideo] = useState(null);
-    const { mainContentMargin } = useSidebarLayout();
-
-    // View mode - responsive default (small screens = grid, large screens = table)
-    const [viewMode, setViewMode] = useState(() => {
-        return window.innerWidth >= 1024 ? 'table' : 'grid';
-    });
-
-    // Filters state
-    const [filters, setFilters] = useState({
-        submissionStatus: initialSubmissionStatus,
-        deleted: initialDeleted,
-    });
+    const [search, setSearch] = useState(params.get('search') || '');
+    const [page, setPage] = useState(parseInt(params.get('page')) || 1);
+    const [pageSize, setPageSize] = useState(20);
+    const [timeFilter, setTimeFilter] = useState(params.get('time') || 'all');
+    const [filters, setFilters] = useState(() =>
+        Object.fromEntries(
+            Object.keys(EMPTY_FILTERS).map((key) => [
+                key,
+                params.get(key) || '',
+            ]),
+        ),
+    );
     const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState('desc');
+    const [viewMode, setViewMode] = useState('grid');
 
-    // Responsive view mode - always auto-switch based on screen size
-    useEffect(() => {
-        const handleResize = () => {
-            const newMode = window.innerWidth >= 1024 ? 'table' : 'grid';
-            setViewMode(newMode);
-        };
+    const [editingVideo, setEditingVideo] = useState(null);
+    const [confirm, setConfirm] = useState(null);
+    const [rejecting, setRejecting] = useState(null); // array of ids
+    const [bulkBusy, setBulkBusy] = useState(false);
 
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    // Confirmation modal state
-    const [confirmModal, setConfirmModal] = useState({
-        isOpen: false,
-        title: '',
-        message: '',
-        onConfirm: null,
-        variant: 'danger',
-    });
-
-    const showConfirm = (config) => {
-        return new Promise((resolve) => {
-            setConfirmModal({
-                isOpen: true,
-                title: config.title || 'Confirm Action',
-                message: config.message,
-                variant: config.variant || 'danger',
-                onConfirm: () => resolve(true),
+    const fetchVideos = async () => {
+        try {
+            setError(null);
+            const url = `/video/all/${collegeslug}`;
+            const first = await api.get(url, {
+                params: { page: 1, limit: FETCH_LIMIT },
             });
-        });
-    };
-
-    const closeConfirm = () => {
-        setConfirmModal({ ...confirmModal, isOpen: false });
+            const { videos: firstPage = [], pagination } =
+                first.data.data || {};
+            const pages = pagination?.totalPages || 1;
+            const rest =
+                pages > 1
+                    ? await Promise.all(
+                          Array.from({ length: pages - 1 }, (_, i) =>
+                              api.get(url, {
+                                  params: { page: i + 2, limit: FETCH_LIMIT },
+                              }),
+                          ),
+                      )
+                    : [];
+            setVideos([
+                ...firstPage,
+                ...rest.flatMap((r) => r.data.data?.videos || []),
+            ]);
+        } catch (err) {
+            setError(
+                err.response?.data?.message ||
+                    'Couldn’t load videos. Check your connection and try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
         fetchVideos();
     }, [collegeslug]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Persist filters in URL
     useEffect(() => {
-        const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (timeFilter) params.set('time', timeFilter);
-        if (filters.submissionStatus)
-            params.set('submissionStatus', filters.submissionStatus);
-        if (filters.deleted) params.set('deleted', filters.deleted);
-        if (page > 1) params.set('page', page.toString());
-        navigate({ search: params.toString() }, { replace: true });
+        const next = new URLSearchParams();
+        if (search) next.set('search', search);
+        if (timeFilter && timeFilter !== 'all') next.set('time', timeFilter);
+        Object.entries(filters).forEach(
+            ([key, value]) => value && next.set(key, value),
+        );
+        if (page > 1) next.set('page', String(page));
+        navigate({ search: next.toString() }, { replace: true });
     }, [search, timeFilter, filters, page, navigate]);
 
-    const fetchVideos = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get(`/video/all/${collegeslug}`);
-
-            setVideos(response.data.data.videos);
-
-            setError(null);
-        } catch (err) {
-            setError(err.response?.data?.message || 'Failed to fetch videos');
-            toast.error('Failed to fetch videos');
-        } finally {
-            setLoading(false);
-        }
-    };
-    const handleEdit = (video) => {
-        setEditingVideo(video);
-        setShowModal(true);
-    };
-
-    const handleDelete = async (video) => {
-        const confirmed = await showConfirm({
-            title: 'Delete Video',
-            message: `Are you sure you want to delete "${video.title}"? This action cannot be undone.`,
-            variant: 'danger',
-        });
-
-        if (confirmed) {
-            try {
-                await api.delete(`/video/delete/${video._id}`);
-                setVideos(videos.filter((v) => v._id !== video._id));
-                toast.success('Video deleted successfully');
-            } catch (err) {
-                toast.error(
-                    err.response?.data?.message || 'Failed to delete video',
-                );
-            }
-        }
-        closeConfirm();
-    };
-
-    const handleView = (video) => {
-        navigate(`/${collegeslug}/videos/${video._id}`);
-    };
-
-    const handleModalClose = () => {
-        setShowModal(false);
-        setEditingVideo(null);
-    };
-
-    const handleModalSuccess = (updatedVideo) => {
-        if (editingVideo) {
-            // Update existing video
-            setVideos((prev) =>
-                prev.map((v) =>
-                    v._id === updatedVideo._id ? updatedVideo : v,
-                ),
-            );
-        } else {
-            // Add new video
-            setVideos((prev) => [updatedVideo, ...prev]);
-        }
-        handleModalClose();
-    };
-
-    const getStatusColor = (status) => {
-        const colors = {
-            approved:
-                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-            pending:
-                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-            rejected:
-                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-        };
-        return colors[status] || colors.pending;
-    };
-
-    const getStatusIcon = (status) => {
-        const icons = {
-            approved: CheckCircle,
-            pending: Clock,
-            rejected: XCircle,
-        };
-        const Icon = icons[status] || Clock;
-        return <Icon className='h-4 w-4' />;
-    };
-
-    // Filter, sort, and paginate
-    const filtered = videos.filter((video) => {
-        const subjectName = video.subject?.subjectName || video.subject || '';
-        const matchesSearch =
-            video.title?.toLowerCase().includes(search.toLowerCase()) ||
-            video.description?.toLowerCase().includes(search.toLowerCase()) ||
-            subjectName.toLowerCase().includes(search.toLowerCase()) ||
-            video.owner?.username?.toLowerCase().includes(search.toLowerCase());
-
-        const matchesSubmissionStatus =
-            !filters.submissionStatus ||
-            video.submissionStatus === filters.submissionStatus;
-        const matchesDeleted =
-            !filters.deleted || video.deleted?.toString() === filters.deleted;
-
-        // Time filter
-        const matchesTime = filterByTime(video, timeFilter);
-
-        return (
-            matchesSearch &&
-            matchesSubmissionStatus &&
-            matchesDeleted &&
-            matchesTime
-        );
-    });
-
-    const sorted = [...filtered].sort((a, b) => {
-        const aValue = a[sortBy];
-        const bValue = b[sortBy];
-
-        if (sortBy === 'createdAt') {
-            const aDate = new Date(aValue);
-            const bDate = new Date(bValue);
-            return sortOrder === 'asc' ? aDate - bDate : bDate - aDate;
-        }
-
-        if (sortBy === 'clickCounts') {
-            const aCount = Number(aValue) || 0;
-            const bCount = Number(bValue) || 0;
-            return sortOrder === 'asc' ? aCount - bCount : bCount - aCount;
-        }
-
-        return 0;
-    });
-
-    const totalItems = sorted.length;
-    const totalPages = Math.ceil(totalItems / pageSize);
-    const current = sorted.slice((page - 1) * pageSize, page * pageSize);
-
-    const totalVideos = sorted.length;
-
-    const uniqueStatuses = [
-        ...new Set(videos.map((video) => video.submissionStatus)),
-    ].filter(Boolean);
-
-    const clearAllFilters = () => {
-        setSearch('');
-        setTimeFilter('');
-        setFilters({
-            submissionStatus: '',
-            deleted: '',
-        });
+    const setFilter = (key, value) => {
+        setFilters((prev) => ({ ...prev, [key]: value }));
         setPage(1);
     };
 
-    const activeFiltersCount =
-        (filters.submissionStatus ? 1 : 0) + (filters.deleted ? 1 : 0);
+    const subjectNames = useMemo(
+        () =>
+            [
+                ...new Set(
+                    videos.map((v) => v.subject?.subjectName).filter(Boolean),
+                ),
+            ].sort((a, b) => a.localeCompare(b)),
+        [videos],
+    );
 
-    if (loading) {
-        return <Loader />;
-    }
-
-    if (error) {
+    // Everything except the status tab, so tab counts reflect the other filters.
+    const matchesFilters = (video) => {
+        const q = search.trim().toLowerCase();
+        const matchesSearch =
+            !q ||
+            video.title?.toLowerCase().includes(q) ||
+            video.description?.toLowerCase().includes(q) ||
+            video.subject?.subjectName?.toLowerCase().includes(q) ||
+            video.subject?.subjectCode?.toLowerCase().includes(q) ||
+            video.owner?.username?.toLowerCase().includes(q);
         return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div
-                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${mainContentMargin} transition-all duration-300`}
-                >
-                    <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-8 text-center'>
-                        <div className='text-red-600 dark:text-red-400 text-lg font-medium mb-2'>
-                            Error Loading Videos
-                        </div>
-                        <p className='text-red-500 dark:text-red-300 mb-4'>
-                            {error}
-                        </p>
-                        <button
-                            onClick={fetchVideos}
-                            className='bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors'
-                        >
-                            Try Again
-                        </button>
-                    </div>
-                </div>
-            </div>
+            matchesSearch &&
+            (!filters.subject ||
+                video.subject?.subjectName === filters.subject) &&
+            filterByTime(video, timeFilter)
         );
-    }
+    };
+
+    const base = videos.filter(matchesFilters);
+    const counts = base.reduce(
+        (acc, v) => {
+            const status = v.submissionStatus || 'pending';
+            acc[status] = (acc[status] || 0) + 1;
+            return acc;
+        },
+        { '': base.length },
+    );
+    const filtered = base.filter(
+        (v) =>
+            !filters.submissionStatus ||
+            (v.submissionStatus || 'pending') === filters.submissionStatus,
+    );
+    const sorted = [...filtered].sort((a, b) => {
+        const diff =
+            sortBy === 'clickCounts'
+                ? (a.clickCounts || 0) - (b.clickCounts || 0)
+                : new Date(a.createdAt) - new Date(b.createdAt);
+        return sortOrder === 'desc' ? -diff : diff;
+    });
+    const current = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+    const selection = useSelection(
+        useMemo(() => current.map((v) => v._id), [current]),
+    );
+
+    const activeFilters = Object.entries(filters).filter(
+        ([key, value]) => key !== 'submissionStatus' && value,
+    ).length;
+    const clearAll = () => {
+        setSearch('');
+        setTimeFilter('all');
+        setFilters((prev) => ({
+            ...EMPTY_FILTERS,
+            submissionStatus: prev.submissionStatus,
+        }));
+        setSortBy('createdAt');
+        setSortOrder('desc');
+        setPage(1);
+    };
+
+    const updateLocal = (ids, patch) =>
+        setVideos((prev) =>
+            prev.map((v) => (ids.includes(v._id) ? { ...v, ...patch } : v)),
+        );
+
+    // Runs one request per video and reports how many went through.
+    const runBulk = async (ids, request, verb) => {
+        setBulkBusy(true);
+        const results = await Promise.allSettled(ids.map(request));
+        setBulkBusy(false);
+        const done = ids.filter((_, i) => results[i].status === 'fulfilled');
+        const failed = ids.length - done.length;
+        if (done.length)
+            toast.success(
+                `${formatNumber(done.length)} video${done.length === 1 ? '' : 's'} ${verb}`,
+            );
+        if (failed) {
+            const reason = results.find((r) => r.status === 'rejected')?.reason
+                ?.response?.data?.message;
+            toast.error(
+                `${formatNumber(failed)} couldn’t be ${verb}.${reason ? ` ${reason}` : ' Try those again.'}`,
+            );
+        }
+        return done;
+    };
+
+    // The video endpoint only accepts the fields it knows, so approving
+    // sends the status alone.
+    const approve = async (ids) => {
+        const done = await runBulk(
+            ids,
+            (id) =>
+                api.put(`/video/edit/${id}`, { submissionStatus: 'approved' }),
+            'approved',
+        );
+        updateLocal(done, { submissionStatus: 'approved' });
+        selection.clear();
+    };
+
+    const reject = async (ids, reason) => {
+        const done = await runBulk(
+            ids,
+            (id) =>
+                api.put(`/video/edit/${id}`, {
+                    submissionStatus: 'rejected',
+                    rejectionReason: reason,
+                }),
+            'rejected',
+        );
+        updateLocal(done, {
+            submissionStatus: 'rejected',
+            rejectionReason: reason,
+        });
+        selection.clear();
+        setRejecting(null);
+    };
+
+    const remove = (ids) =>
+        setConfirm({
+            title:
+                ids.length === 1
+                    ? 'Delete this video?'
+                    : `Delete ${formatNumber(ids.length)} videos?`,
+            message:
+                'Students stop seeing it on the subject page straight away.',
+            confirmText: 'Delete',
+            onConfirm: async () => {
+                const done = await runBulk(
+                    ids,
+                    (id) => api.delete(`/video/delete/${id}`),
+                    'deleted',
+                );
+                setVideos((prev) => prev.filter((v) => !done.includes(v._id)));
+                selection.clear();
+            },
+        });
+
+    const exportCsv = () =>
+        downloadCsv(
+            `videos-${collegeslug}`,
+            [
+                { label: 'Title', value: (v) => v.title },
+                { label: 'Subject', value: (v) => v.subject?.subjectName },
+                { label: 'Code', value: (v) => v.subject?.subjectCode },
+                { label: 'Semester', value: (v) => v.subject?.semester },
+                {
+                    label: 'Status',
+                    value: (v) => v.submissionStatus || 'pending',
+                },
+                { label: 'Views', value: (v) => v.clickCounts || 0 },
+                { label: 'Link', value: (v) => v.videoUrl },
+                { label: 'Shared by', value: (v) => v.owner?.username },
+                {
+                    label: 'Submitted',
+                    value: (v) => formatDateTime(v.createdAt),
+                },
+            ],
+            sorted,
+        );
+
+    if (loading) return <Loader />;
+
+    const selectedIds = [...selection.selected];
+    const videoUrl = (video) => `/${collegeslug}/videos/${video._id}`;
+    const subjectLine = (video) =>
+        [
+            video.subject?.subjectCode,
+            video.subject?.semester && `Sem ${video.subject.semester}`,
+        ]
+            .filter(Boolean)
+            .join(' · ');
+
+    const rowActions = (video) => {
+        const pending = (video.submissionStatus || 'pending') === 'pending';
+        const name = video.title || 'video';
+        const stop = (fn) => (event) => {
+            event.stopPropagation();
+            fn();
+        };
+        return pending ? (
+            <>
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={X}
+                    aria-label={`Reject ${name}`}
+                    className='text-bad-ink hover:text-bad-ink'
+                    disabled={bulkBusy}
+                    onClick={stop(() => setRejecting([video._id]))}
+                />
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={Check}
+                    aria-label={`Approve ${name}`}
+                    className='text-ok-ink hover:text-ok-ink'
+                    disabled={bulkBusy}
+                    onClick={stop(() => approve([video._id]))}
+                />
+            </>
+        ) : (
+            <>
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={Pencil}
+                    aria-label={`Edit ${name}`}
+                    onClick={stop(() => setEditingVideo(video))}
+                />
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={Trash2}
+                    aria-label={`Delete ${name}`}
+                    className='text-bad-ink hover:text-bad-ink'
+                    onClick={stop(() => remove([video._id]))}
+                />
+            </>
+        );
+    };
+
+    const watchLink = (video, withLabel) =>
+        video.videoUrl && (
+            <Button
+                variant={withLabel ? 'link' : 'ghost'}
+                size='sm'
+                iconOnly={!withLabel}
+                icon={withLabel ? undefined : ExternalLink}
+                href={video.videoUrl}
+                target='_blank'
+                rel='noopener noreferrer'
+                aria-label={
+                    withLabel
+                        ? undefined
+                        : `Watch ${video.title || 'video'} in a new tab`
+                }
+                onClick={(e) => e.stopPropagation()}
+            >
+                {withLabel && (
+                    <>
+                        Watch
+                        <ExternalLink
+                            className='w-3.5 h-3.5'
+                            aria-hidden='true'
+                        />
+                    </>
+                )}
+            </Button>
+        );
+
+    const pagination = (
+        <Pagination
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={sorted.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+            }}
+        />
+    );
+
+    const reviewQueueEmpty =
+        filters.submissionStatus === 'pending' && !activeFilters && !search;
+    const empty = (
+        <EmptyState
+            icon={Video}
+            tone={reviewQueueEmpty && videos.length ? 'done' : 'neutral'}
+            title={
+                videos.length === 0
+                    ? 'No videos yet'
+                    : reviewQueueEmpty
+                      ? 'Nothing waiting for review'
+                      : 'No videos match'
+            }
+            description={
+                videos.length === 0
+                    ? 'Lecture links students share for this college’s subjects appear here.'
+                    : reviewQueueEmpty
+                      ? 'New links appear here until someone approves or rejects them.'
+                      : 'Try another search or clear the filters.'
+            }
+            action={
+                activeFilters || search || timeFilter !== 'all' ? (
+                    <Button onClick={clearAll}>Clear filters</Button>
+                ) : undefined
+            }
+        />
+    );
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
-            <main className='pt-6 pb-12'>
-                <div
-                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Videos'
+                description={`Lecture videos students have shared for ${currentCollege?.name || collegeslug} subjects.`}
+                actions={
+                    <Button
+                        icon={Download}
+                        onClick={exportCsv}
+                        disabled={!sorted.length}
+                    >
+                        Export CSV
+                    </Button>
+                }
+            />
+
+            <Tabs
+                label='Review status'
+                className='mb-4'
+                value={filters.submissionStatus}
+                onChange={(value) => {
+                    setFilter('submissionStatus', value);
+                    selection.clear();
+                }}
+                items={STATUS_TABS.map(([value, label]) => ({
+                    value,
+                    label,
+                    count: counts[value] || 0,
+                    attention: value === 'pending' && counts.pending > 0,
+                }))}
+            />
+
+            <FilterBar
+                className='mb-4'
+                search={search}
+                onSearch={(value) => {
+                    setSearch(value);
+                    setPage(1);
+                }}
+                searchPlaceholder='Search by title, subject or who shared it'
+                filters={[
+                    {
+                        label: 'Subject',
+                        value: filters.subject,
+                        onChange: (v) => setFilter('subject', v),
+                        options: [
+                            { value: '', label: 'Any subject' },
+                            ...subjectNames.map((s) => ({
+                                value: s,
+                                label: s,
+                            })),
+                        ],
+                    },
+                ]}
+                timeFilter={{
+                    value: timeFilter,
+                    onChange: (v) => {
+                        setTimeFilter(v);
+                        setPage(1);
+                    },
+                }}
+                sortBy={{
+                    value: sortBy,
+                    onChange: setSortBy,
+                    options: [
+                        { value: 'createdAt', label: 'Newest first' },
+                        { value: 'clickCounts', label: 'Most viewed' },
+                    ],
+                }}
+                sortOrder={{
+                    value: sortOrder,
+                    onToggle: () =>
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                }}
+                viewMode={{ value: viewMode, onChange: setViewMode }}
+                onClear={clearAll}
+                showClear={Boolean(
+                    search || timeFilter !== 'all' || activeFilters,
+                )}
+            />
+
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button size='sm' onClick={fetchVideos}>
+                            Try again
+                        </Button>
+                    }
                 >
-                    {/* Header */}
-                    <BackButton
-                        title={`Educational Videos for ${collegeslug}`}
-                        TitleIcon={Video}
-                    />
+                    {error}
+                </Alert>
+            )}
 
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
-                        <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
-                            <span className='text-gray-600 dark:text-gray-400'>
-                                Total ({getTimeFilterLabel(timeFilter)}):
-                            </span>
-                            <span className='font-semibold text-gray-900 dark:text-white'>
-                                {totalVideos}
-                            </span>
-                        </div>
-
-                        {/* FilterBar */}
-                        <FilterBar
-                            search={search}
-                            onSearch={(v) => {
-                                setSearch(v);
-                                setPage(1);
-                            }}
-                            searchPlaceholder='Search videos...'
-                            filters={[
-                                {
-                                    label: 'Status',
-                                    value: filters.submissionStatus,
-                                    onChange: (v) =>
-                                        setFilters({
-                                            ...filters,
-                                            submissionStatus: v,
-                                        }),
-                                    options: [
-                                        { value: '', label: 'All Statuses' },
-                                        ...uniqueStatuses.map((s) => ({
-                                            value: s,
-                                            label:
-                                                s.charAt(0).toUpperCase() +
-                                                s.slice(1),
-                                        })),
-                                    ],
-                                },
-                                {
-                                    label: 'Deleted',
-                                    value: filters.deleted,
-                                    onChange: (v) =>
-                                        setFilters({ ...filters, deleted: v }),
-                                    options: [
-                                        { value: '', label: 'All (Deleted)' },
-                                        { value: 'true', label: 'Deleted' },
-                                        {
-                                            value: 'false',
-                                            label: 'Not Deleted',
-                                        },
-                                    ],
-                                },
-                            ]}
-                            timeFilter={{
-                                value: timeFilter,
-                                onChange: (v) => {
-                                    setTimeFilter(v);
-                                    setPage(1);
-                                },
-                            }}
-                            sortBy={{
-                                value: sortBy,
-                                onChange: setSortBy,
-                                options: [
-                                    {
-                                        value: 'createdAt',
-                                        label: 'Sort by Date',
-                                    },
-                                    {
-                                        value: 'clickCounts',
-                                        label: 'Sort by Views',
-                                    },
-                                ],
-                            }}
-                            sortOrder={{
-                                value: sortOrder,
-                                onToggle: () =>
-                                    setSortOrder(
-                                        sortOrder === 'asc' ? 'desc' : 'asc',
-                                    ),
-                            }}
-                            viewMode={{
-                                value: viewMode,
-                                onChange: setViewMode,
-                            }}
-                            onClear={clearAllFilters}
-                            showClear={
-                                !!(
-                                    search ||
-                                    timeFilter ||
-                                    activeFiltersCount > 0
-                                )
-                            }
-                        />
-                    </div>
-
-                    {error && (
-                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8'>
-                            {error}
-                        </div>
-                    )}
-
-                    {/* Empty State */}
+            {viewMode === 'table' ? (
+                <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
+                    <BulkBar count={selection.count} onClear={selection.clear}>
+                        <BulkButton
+                            primary
+                            icon={Check}
+                            disabled={bulkBusy}
+                            onClick={() => approve(selectedIds)}
+                        >
+                            Approve
+                        </BulkButton>
+                        <BulkButton
+                            icon={X}
+                            disabled={bulkBusy}
+                            onClick={() => setRejecting(selectedIds)}
+                        >
+                            Reject…
+                        </BulkButton>
+                        <BulkButton
+                            icon={Trash2}
+                            disabled={bulkBusy}
+                            onClick={() => remove(selectedIds)}
+                        >
+                            Delete
+                        </BulkButton>
+                    </BulkBar>
                     {current.length === 0 ? (
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center'>
-                            <Video className='h-16 w-16 text-gray-400 mx-auto mb-4' />
-                            <h3 className='text-lg font-medium text-gray-900 dark:text-gray-100 mb-2'>
-                                No videos found
-                            </h3>
-                            <p className='text-gray-600 dark:text-gray-400 mb-4'>
-                                {search || activeFiltersCount > 0
-                                    ? 'Try adjusting your search or filters'
-                                    : 'No videos have been uploaded yet'}
-                            </p>
-                            <button
-                                onClick={() => setShowModal(true)}
-                                className='bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-4 py-2 rounded-lg transition-colors'
-                            >
-                                Add First Video
-                            </button>
-                        </div>
+                        empty
                     ) : (
-                        <>
-                            {/* Table View */}
-                            {viewMode === 'table' && (
-                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                    <div className='overflow-x-auto'>
-                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                            <thead className='bg-gray-50 dark:bg-gray-700'>
-                                                <tr>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Video
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Subject
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Status
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Posted By
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Views / Date
-                                                    </th>
-                                                    <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Actions
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                                {current.map((video) => (
-                                                    <tr
-                                                        key={video._id}
-                                                        className='hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors'
-                                                        onClick={() =>
-                                                            handleView(video)
+                        <Table minWidth={1000}>
+                            <thead>
+                                <tr>
+                                    <SelectCell
+                                        header
+                                        label='Select all videos on this page'
+                                        checked={selection.allVisible}
+                                        indeterminate={selection.someVisible}
+                                        onChange={selection.toggleAllVisible}
+                                    />
+                                    <Th>Video</Th>
+                                    <Th>Subject</Th>
+                                    <Th>Status</Th>
+                                    <Th>Shared</Th>
+                                    <Th>
+                                        <span className='sr-only'>Actions</span>
+                                    </Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {current.map((video) => (
+                                    <Tr
+                                        key={video._id}
+                                        selected={selection.isSelected(
+                                            video._id,
+                                        )}
+                                        onClick={() =>
+                                            navigate(videoUrl(video))
+                                        }
+                                    >
+                                        <SelectCell
+                                            label={`Select ${video.title || 'video'}`}
+                                            checked={selection.isSelected(
+                                                video._id,
+                                            )}
+                                            onChange={(on) =>
+                                                selection.toggle(video._id, on)
+                                            }
+                                        />
+                                        <Td className='max-w-[380px]'>
+                                            <div className='flex items-center gap-3 min-w-0'>
+                                                <Thumb
+                                                    url={video.videoUrl}
+                                                    className='w-[72px] h-[42px] rounded-md shrink-0'
+                                                />
+                                                <div className='flex flex-col gap-0.5 min-w-0'>
+                                                    <Link
+                                                        to={videoUrl(video)}
+                                                        onClick={(e) =>
+                                                            e.stopPropagation()
                                                         }
+                                                        className='font-medium text-ink hover:underline truncate'
                                                     >
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <div className='flex items-center'>
-                                                                <div className='flex-shrink-0 h-12 w-20'>
-                                                                    {video.thumbnailUrl ? (
-                                                                        <img
-                                                                            src={
-                                                                                video.thumbnailUrl
-                                                                            }
-                                                                            alt={
-                                                                                video.title
-                                                                            }
-                                                                            className='h-12 w-20 rounded object-cover'
-                                                                        />
-                                                                    ) : (
-                                                                        <div className='h-12 w-20 rounded bg-gradient-to-r from-red-400 to-pink-400 flex items-center justify-center'>
-                                                                            <Play className='h-6 w-6 text-white' />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div className='ml-4'>
-                                                                    <div className='text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-40'>
-                                                                        {
-                                                                            video.title
-                                                                        }
-                                                                    </div>
-                                                                    <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-40'>
-                                                                        {video.description ||
-                                                                            'No description'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                                <BookOpen className='h-4 w-4 text-blue-500 mr-2' />
-                                                                {video.subject
-                                                                    ?.subjectName ||
-                                                                    video.subject ||
-                                                                    'N/A'}
-                                                            </div>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <span
-                                                                className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                                                                    video.submissionStatus,
-                                                                )}`}
-                                                            >
-                                                                {getStatusIcon(
-                                                                    video.submissionStatus,
-                                                                )}
-                                                                <span className='capitalize'>
-                                                                    {
-                                                                        video.submissionStatus
-                                                                    }
-                                                                </span>
-                                                            </span>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                                <User className='h-4 w-4 text-gray-400 mr-2' />
-                                                                {video.owner
-                                                                    ?.username ||
-                                                                    'Unknown'}
-                                                            </div>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <div className='space-y-1'>
-                                                                <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                                    <Eye className='h-4 w-4 mr-2' />
-                                                                    {video.clickCounts ||
-                                                                        0}{' '}
-                                                                    views
-                                                                </div>
-                                                                <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                                    <Calendar className='h-4 w-4 mr-2' />
-                                                                    {new Date(
-                                                                        video.createdAt,
-                                                                    ).toLocaleDateString()}
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
-                                                            <div className='flex items-center justify-end space-x-2'>
-                                                                {video.videoUrl && (
-                                                                    <button
-                                                                        onClick={(
-                                                                            e,
-                                                                        ) => {
-                                                                            e.stopPropagation();
-                                                                            window.open(
-                                                                                video.videoUrl,
-                                                                                '_blank',
-                                                                            );
-                                                                        }}
-                                                                        className='text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors p-1 rounded'
-                                                                        title='Watch Video'
-                                                                    >
-                                                                        <ExternalLink className='h-4 w-4' />
-                                                                    </button>
-                                                                )}
-                                                                <button
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        handleEdit(
-                                                                            video,
-                                                                        );
-                                                                    }}
-                                                                    className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
-                                                                    title='Edit Video'
-                                                                >
-                                                                    <Edit2 className='h-4 w-4' />
-                                                                </button>
-                                                                <button
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        handleDelete(
-                                                                            video,
-                                                                        );
-                                                                    }}
-                                                                    className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
-                                                                    title='Delete Video'
-                                                                >
-                                                                    <Trash2 className='h-4 w-4' />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Grid View */}
-                            {viewMode === 'grid' && (
-                                <div className='grid md:grid-cols-2 lg:grid-cols-3 gap-6'>
-                                    {current.map((video) => (
-                                        <div
-                                            key={video._id}
-                                            className='bg-gray-50 dark:bg-gray-700 rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer'
-                                            onClick={() => handleView(video)}
-                                        >
-                                            {/* Video Thumbnail */}
-                                            <div className='relative aspect-video bg-gray-200 dark:bg-gray-600'>
-                                                {video.thumbnailUrl ? (
-                                                    <img
-                                                        src={video.thumbnailUrl}
-                                                        alt={video.title}
-                                                        className='w-full h-full object-cover'
-                                                    />
-                                                ) : (
-                                                    <div className='w-full h-full flex items-center justify-center'>
-                                                        <Play className='h-12 w-12 text-gray-400' />
-                                                    </div>
-                                                )}
-                                                {/* Status Badge */}
-                                                <div className='absolute top-2 left-2'>
-                                                    <span
-                                                        className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                                                            video.submissionStatus,
-                                                        )}`}
-                                                    >
-                                                        {getStatusIcon(
-                                                            video.submissionStatus,
-                                                        )}
-                                                        <span className='capitalize'>
-                                                            {
-                                                                video.submissionStatus
-                                                            }
-                                                        </span>
+                                                        {video.title ||
+                                                            'Untitled video'}
+                                                    </Link>
+                                                    <span className='text-[12.5px] text-muted truncate'>
+                                                        {video.description ||
+                                                            'No description'}
                                                     </span>
                                                 </div>
                                             </div>
-
-                                            {/* Video Info */}
-                                            <div className='p-4'>
-                                                <h3 className='font-semibold text-gray-900 dark:text-gray-100 mb-2 line-clamp-2'>
-                                                    {video.title}
-                                                </h3>
-                                                <p className='text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2'>
-                                                    {video.description}
-                                                </p>
-
-                                                {/* Video Meta */}
-                                                <div className='flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-3'>
-                                                    <div className='flex items-center space-x-1'>
-                                                        <Calendar className='h-3 w-3' />
-                                                        <span>
-                                                            {new Date(
-                                                                video.createdAt,
-                                                            ).toLocaleDateString()}
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Subject and Creator */}
-                                                <div className='flex items-center justify-between text-xs'>
-                                                    <div className='flex items-center space-x-1'>
-                                                        <BookOpen className='h-3 w-3 text-blue-500' />
-                                                        <span className='text-blue-600 dark:text-blue-400 font-medium'>
-                                                            {video.subject
-                                                                ?.subjectName ||
-                                                                video.subject}
-                                                        </span>
-                                                    </div>
-                                                    <div className='flex items-center space-x-1'>
-                                                        <User className='h-3 w-3 text-gray-400' />
-                                                        <span className='text-gray-500 dark:text-gray-400'>
-                                                            {
-                                                                video.owner
-                                                                    .username
-                                                            }
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Action Buttons */}
-                                                <div className='flex items-center justify-end mt-4 pt-3 border-t border-gray-200 dark:border-gray-600'>
-                                                    <div className='flex space-x-1'>
-                                                        {video.videoUrl && (
-                                                            <button
-                                                                onClick={(
-                                                                    e,
-                                                                ) => {
-                                                                    e.stopPropagation();
-                                                                    window.open(
-                                                                        video.videoUrl,
-                                                                        '_blank',
-                                                                    );
-                                                                }}
-                                                                className='p-1 text-gray-400 hover:text-blue-600 transition-colors'
-                                                                title='Watch Video'
-                                                            >
-                                                                <ExternalLink className='h-4 w-4' />
-                                                            </button>
-                                                        )}
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleEdit(
-                                                                    video,
-                                                                );
-                                                            }}
-                                                            className='p-1 text-gray-400 hover:text-yellow-600 transition-colors'
-                                                            title='Edit Video'
-                                                        >
-                                                            <Edit2 className='h-4 w-4' />
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDelete(
-                                                                    video,
-                                                                );
-                                                            }}
-                                                            className='p-1 text-gray-400 hover:text-red-600 transition-colors'
-                                                            title='Delete Video'
-                                                        >
-                                                            <Trash2 className='h-4 w-4' />
-                                                        </button>
-                                                    </div>
-                                                </div>
+                                        </Td>
+                                        <Td className='max-w-[240px]'>
+                                            <div className='flex flex-col gap-0.5 min-w-0'>
+                                                <span className='truncate'>
+                                                    {video.subject
+                                                        ?.subjectName || '—'}
+                                                </span>
+                                                <span className='text-[12.5px] text-muted truncate'>
+                                                    {subjectLine(video)}
+                                                </span>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Pagination */}
-                            {totalPages > 1 && (
-                                <div className='mt-6'>
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={totalPages}
-                                        onPageChange={setPage}
-                                        pageSize={pageSize}
-                                        onPageSizeChange={setPageSize}
-                                        totalItems={totalItems}
-                                    />
-                                </div>
-                            )}
-                        </>
+                                        </Td>
+                                        <Td>
+                                            <div className='flex flex-col items-start gap-1'>
+                                                <StatusBadge
+                                                    status={
+                                                        video.submissionStatus
+                                                    }
+                                                />
+                                                {video.clickCounts > 0 && (
+                                                    <span className='text-xs text-muted'>
+                                                        {formatNumber(
+                                                            video.clickCounts,
+                                                        )}{' '}
+                                                        views
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </Td>
+                                        <Td>
+                                            <div className='flex flex-col gap-0.5'>
+                                                <span className='whitespace-nowrap'>
+                                                    {formatShortDateTime(
+                                                        video.createdAt,
+                                                    )}
+                                                </span>
+                                                <span className='text-[12.5px] text-muted'>
+                                                    {video.owner?.username
+                                                        ? `@${video.owner.username}`
+                                                        : 'Unknown'}
+                                                </span>
+                                            </div>
+                                        </Td>
+                                        <Td align='right'>
+                                            <div className='flex justify-end gap-1'>
+                                                {watchLink(video, false)}
+                                                {rowActions(video)}
+                                            </div>
+                                        </Td>
+                                    </Tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                    {sorted.length > 0 && (
+                        <div className='px-4 py-3 border-t border-line-soft'>
+                            {pagination}
+                        </div>
                     )}
                 </div>
-            </main>
-
-            {/* Modals */}
-            <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={closeConfirm}
-                onConfirm={confirmModal.onConfirm}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                variant={confirmModal.variant}
-            />
+            ) : current.length === 0 ? (
+                <div className='bg-sheet border border-line rounded-xl'>
+                    {empty}
+                </div>
+            ) : (
+                <div className='flex flex-col gap-4'>
+                    <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4'>
+                        {current.map((video) => (
+                            <article
+                                key={video._id}
+                                onClick={() => navigate(videoUrl(video))}
+                                className='flex flex-col bg-sheet border border-line rounded-xl overflow-hidden hover:border-line-strong cursor-pointer transition-colors'
+                            >
+                                <div className='relative'>
+                                    <Thumb
+                                        url={video.videoUrl}
+                                        className='w-full aspect-video'
+                                    />
+                                    {video.subject?.subjectCode && (
+                                        <span className='absolute top-2.5 left-2.5 px-1.5 py-0.5 rounded bg-black/60 font-mono text-[11px] text-white'>
+                                            {video.subject.subjectCode}
+                                        </span>
+                                    )}
+                                    <StatusBadge
+                                        status={video.submissionStatus}
+                                        className='absolute bottom-2.5 left-2.5'
+                                    />
+                                </div>
+                                <div className='flex-1 flex flex-col gap-1 p-4'>
+                                    <Link
+                                        to={videoUrl(video)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className='font-medium text-ink leading-snug hover:underline line-clamp-2'
+                                    >
+                                        {video.title || 'Untitled video'}
+                                    </Link>
+                                    <span className='text-[13px] text-ink-2 truncate'>
+                                        {video.subject?.subjectName ||
+                                            'No subject'}
+                                    </span>
+                                    <span className='text-xs text-muted'>
+                                        {[
+                                            video.owner?.username &&
+                                                `@${video.owner.username}`,
+                                            age(video.createdAt),
+                                            video.clickCounts > 0 &&
+                                                `${formatNumber(video.clickCounts)} views`,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' · ')}
+                                    </span>
+                                </div>
+                                <div className='flex items-center gap-1 px-4 py-2.5 border-t border-line-soft'>
+                                    <span className='flex-1'>
+                                        {watchLink(video, true)}
+                                    </span>
+                                    {rowActions(video)}
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                    <div className='bg-sheet border border-line rounded-xl px-4 py-3'>
+                        {pagination}
+                    </div>
+                </div>
+            )}
 
             <VideoEditModal
-                isOpen={showModal}
-                onClose={handleModalClose}
+                isOpen={Boolean(editingVideo)}
+                onClose={() => setEditingVideo(null)}
                 video={editingVideo}
-                onSuccess={handleModalSuccess}
+                onSuccess={(updated) => {
+                    if (updated?._id)
+                        setVideos((prev) =>
+                            prev.map((v) =>
+                                v._id === updated._id ? updated : v,
+                            ),
+                        );
+                    setEditingVideo(null);
+                }}
+            />
+
+            <ConfirmModal
+                isOpen={Boolean(confirm)}
+                onClose={() => setConfirm(null)}
+                onConfirm={() => confirm?.onConfirm()}
+                title={confirm?.title}
+                message={confirm?.message}
+                confirmText={confirm?.confirmText}
+                variant='danger'
+            />
+
+            <RejectDialog
+                open={Boolean(rejecting)}
+                onClose={() => setRejecting(null)}
+                title={
+                    rejecting?.length > 1
+                        ? `Reject ${formatNumber(rejecting.length)} videos?`
+                        : 'Reject this video?'
+                }
+                description={
+                    rejecting?.length > 1
+                        ? 'Everyone who shared them gets the same reason, so keep it general.'
+                        : undefined
+                }
+                onSubmit={(reason) => reject(rejecting, reason)}
             />
         </div>
     );

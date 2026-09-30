@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**
  * Reusable Pagination component with ellipsis and optional page size selector.
@@ -72,65 +73,83 @@ const Pagination = ({
         return range;
     };
 
+    // Page sizes the caller uses may not be in the list (several pages use 12).
+    const sizeOptions = pageSizeOptions.includes(pageSize)
+        ? pageSizeOptions
+        : [...pageSizeOptions, pageSize].sort((a, b) => a - b);
+
+    const box =
+        'min-w-[30px] h-[30px] px-1.5 inline-flex items-center justify-center rounded-[7px] border text-xs font-mono';
+
     return (
         <div
-            className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${className}`}
+            className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-[13px] text-ink-2 ${className}`}
         >
-            {showSummary && typeof totalItems === 'number' && (
-                <p className='text-sm text-gray-700 dark:text-gray-300'>
-                    Showing <span className='font-medium'>{startIndex}</span> to
-                    <span className='font-medium'> {endIndex}</span> of
-                    <span className='font-medium'> {totalItems}</span> results
+            {showSummary && typeof totalItems === 'number' ? (
+                <p>
+                    Showing{' '}
+                    <span className='font-medium text-ink'>
+                        {totalItems ? `${startIndex}–${endIndex}` : 0}
+                    </span>{' '}
+                    of {totalItems.toLocaleString('en-IN')}
                 </p>
+            ) : (
+                <span />
             )}
 
-            <div className='flex flex-col sm:flex-row items-center gap-3'>
+            <div className='flex flex-wrap items-center gap-3'>
                 {onPageSizeChange && (
-                    <div className='flex items-center gap-2'>
-                        <span className='text-sm text-gray-600 dark:text-gray-300'>
-                            Rows per page
-                        </span>
+                    <label className='flex items-center gap-2 text-muted'>
+                        Rows
                         <select
                             value={pageSize}
                             onChange={(e) =>
                                 onPageSizeChange(Number(e.target.value))
                             }
-                            className='px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500'
+                            className='h-[30px] px-1.5 rounded-[7px] border border-line-strong bg-sheet text-[13px] text-ink cursor-pointer'
                         >
-                            {pageSizeOptions.map((opt) => (
+                            {sizeOptions.map((opt) => (
                                 <option key={opt} value={opt}>
                                     {opt}
                                 </option>
                             ))}
                         </select>
-                    </div>
+                    </label>
                 )}
 
-                <nav className='relative z-0 inline-flex rounded-md shadow-sm -space-x-px'>
+                <nav
+                    aria-label='Pagination'
+                    className='flex items-center gap-1'
+                >
                     <button
+                        type='button'
                         onClick={() => goToPage(currentPage - 1)}
                         disabled={currentPage <= 1}
-                        className='relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50'
+                        className={`${box} border-line bg-sheet text-ink hover:bg-sunken disabled:text-faint disabled:hover:bg-sheet disabled:cursor-not-allowed cursor-pointer`}
                         aria-label='Previous page'
                     >
-                        Previous
+                        <ChevronLeft
+                            className='w-3.5 h-3.5'
+                            aria-hidden='true'
+                        />
                     </button>
                     {getPageRange().map((p, idx) =>
                         p === '...' ? (
                             <span
                                 key={`ellipsis-${idx}`}
-                                className='relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 select-none'
+                                className='min-w-6 text-center text-muted select-none'
                             >
                                 …
                             </span>
                         ) : (
                             <button
+                                type='button'
                                 key={p}
                                 onClick={() => goToPage(p)}
                                 className={
                                     p === currentPage
-                                        ? 'relative inline-flex items-center px-4 py-2 border border-blue-500 bg-blue-50 dark:bg-blue-900 text-sm font-medium text-blue-600 dark:text-blue-300 z-10'
-                                        : 'relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+                                        ? `${box} border-inverse bg-inverse text-on-inverse`
+                                        : `${box} border-line bg-sheet text-ink hover:bg-sunken cursor-pointer`
                                 }
                                 aria-current={
                                     p === currentPage ? 'page' : undefined
@@ -141,12 +160,16 @@ const Pagination = ({
                         ),
                     )}
                     <button
+                        type='button'
                         onClick={() => goToPage(currentPage + 1)}
                         disabled={currentPage >= totalPages}
-                        className='relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50'
+                        className={`${box} border-line bg-sheet text-ink hover:bg-sunken disabled:text-faint disabled:hover:bg-sheet disabled:cursor-not-allowed cursor-pointer`}
                         aria-label='Next page'
                     >
-                        Next
+                        <ChevronRight
+                            className='w-3.5 h-3.5'
+                            aria-hidden='true'
+                        />
                     </button>
                 </nav>
             </div>

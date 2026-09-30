@@ -1,73 +1,88 @@
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { formatNumber } from '../../utils/format';
+import { Panel, Table, Td, Th, Tr } from '../ui';
+import { CONTENT_TYPES, percentChange } from './analyticsData';
 
+function Change({ current, previous }) {
+    if (!previous) {
+        return current > 0 ? (
+            <span className='text-ink-2'>New</span>
+        ) : (
+            <span className='text-muted'>—</span>
+        );
+    }
+    const pct = percentChange(current, previous);
+    if (pct === 0) return <span className='text-ink-2'>No change</span>;
+    const Arrow = pct > 0 ? ArrowUpRight : ArrowDownRight;
+    return (
+        <span
+            className={`inline-flex items-center gap-0.5 font-medium ${
+                pct > 0 ? 'text-ok-ink' : 'text-bad-ink'
+            }`}
+        >
+            <Arrow className='w-3.5 h-3.5' aria-hidden='true' />
+            {pct > 0 ? '+' : '−'}
+            {Math.abs(pct)}%
+        </span>
+    );
+}
+
+/** New items per type in the last 7 days against the 7 days before. */
 function GrowthTrends({ percentageChanges }) {
     if (!percentageChanges || Object.keys(percentageChanges).length === 0) {
         return null;
     }
 
-    const colors = [
-        'from-green-500 to-emerald-500',
-        'from-blue-500 to-cyan-500',
-        'from-purple-500 to-pink-500',
-        'from-orange-500 to-red-500',
-    ];
+    const rows = CONTENT_TYPES.filter((type) => percentageChanges[type.change])
+        .map((type) => ({
+            label: type.label,
+            ...percentageChanges[type.change],
+        }))
+        .sort((a, b) => b.current - a.current);
 
     return (
-        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6'>
-            <div className='flex items-center justify-between mb-4 md:mb-6'>
-                <h2 className='text-lg md:text-xl font-semibold text-gray-900 dark:text-white'>
-                    Growth Trends (Last 7 Days)
-                </h2>
-                <TrendingUp className='w-4 h-4 md:w-5 md:h-5 text-green-500' />
-            </div>
-
-            <div className='space-y-4 md:space-y-6'>
-                {Object.entries(percentageChanges)
-                    .slice(0, 4)
-                    .map(([key, trend], idx) => {
-                        const index = idx % 4;
-                        const TrendIcon =
-                            trend.trend === 'up' ? TrendingUp : TrendingDown;
-                        const trendColor =
-                            trend.trend === 'up'
-                                ? 'text-green-600 dark:text-green-400'
-                                : 'text-red-600 dark:text-red-400';
-
-                        return (
-                            <div key={key}>
-                                <div className='flex items-center justify-between mb-2'>
-                                    <span className='text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400 capitalize'>
-                                        {key}
-                                    </span>
-                                    <div className='flex items-center space-x-2'>
-                                        <span
-                                            className={`text-base md:text-lg font-bold ${trendColor}`}
-                                        >
-                                            {trend.percentChange > 0 ? '+' : ''}
-                                            {trend.percentChange}%
-                                        </span>
-                                        <TrendIcon
-                                            className={`w-3 h-3 md:w-4 md:h-4 ${trendColor}`}
-                                        />
-                                    </div>
-                                </div>
-                                <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 md:h-3'>
-                                    <div
-                                        className={`bg-gradient-to-r ${colors[index]} h-2 md:h-3 rounded-full transition-all duration-300`}
-                                        style={{
-                                            width: `${Math.min(Math.abs(trend.percentChange), 100)}%`,
-                                        }}
-                                    ></div>
-                                </div>
-                                <div className='flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                    <span>Previous: {trend.previous}</span>
-                                    <span>Current: {trend.current}</span>
-                                </div>
-                            </div>
-                        );
-                    })}
-            </div>
-        </div>
+        <Panel
+            title='Week on week'
+            titleId='weekly-title'
+            action={
+                <span className='text-[12.5px] text-muted'>
+                    Items added, by type
+                </span>
+            }
+        >
+            <Table minWidth={340}>
+                <thead>
+                    <tr>
+                        <Th>Type</Th>
+                        <Th align='right'>This week</Th>
+                        <Th align='right'>Week before</Th>
+                        <Th align='right'>Change</Th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows.map((row) => (
+                        <Tr key={row.label}>
+                            <Td>{row.label}</Td>
+                            <Td align='right' mono>
+                                {formatNumber(row.current)}
+                            </Td>
+                            <Td align='right' mono className='text-ink-2'>
+                                {formatNumber(row.previous)}
+                            </Td>
+                            <Td
+                                align='right'
+                                className='text-[13px] whitespace-nowrap'
+                            >
+                                <Change
+                                    current={row.current}
+                                    previous={row.previous}
+                                />
+                            </Td>
+                        </Tr>
+                    ))}
+                </tbody>
+            </Table>
+        </Panel>
     );
 }
 

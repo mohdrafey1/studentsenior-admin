@@ -1,29 +1,55 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
-    Plus,
-    Edit,
-    Trash2,
-    ChevronLeft,
+    BookOpen,
+    CheckCircle2,
+    CircleDashed,
+    FileUp,
+    Layers,
+    List,
     Loader2,
-    Sparkles,
-    LayoutGrid,
-    Table,
+    Pencil,
+    Plus,
     Search,
+    Trash2,
 } from 'lucide-react';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
+import { formatNumber } from '../../utils/format';
+import { collegeInitials } from '../../utils/initials';
 import BulkSubjectModal from '../../components/BulkSubjectModal';
 import AddSubjectModal from '../../components/AddSubjectModal';
+import ConfirmModal from '../../components/ConfirmModal';
+import Loader from '../../components/Common/Loader';
+import {
+    Alert,
+    Button,
+    EmptyState,
+    PageHeader,
+    Segmented,
+    Select,
+    Table,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+import {
+    SEMESTERS,
+    hasSyllabus,
+    quickNotesPath,
+    syllabusPath,
+} from './catalogUtils';
+
+const plural = (n, one, many) => `${formatNumber(n)} ${n === 1 ? one : many}`;
 
 const BranchSubjects = () => {
     const { branchId } = useParams();
-    const navigate = useNavigate();
 
     const [branch, setBranch] = useState(null);
     const [colleges, setColleges] = useState([]);
     const [subjects, setSubjects] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [viewMode, setViewMode] = useState('grid');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSemester, setSelectedSemester] = useState('all');
@@ -34,35 +60,38 @@ const BranchSubjects = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingSubject, setEditingSubject] = useState(null);
     const [deleting, setDeleting] = useState(null);
+    const [confirmDelete, setConfirmDelete] = useState(null);
 
     // Fetch initial data
+    const fetchData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const [branchRes, subjectsRes, collegesRes] = await Promise.all([
+                api.get(`/resource/branches`),
+                api.get(`/resource/subjects/${branchId}`),
+                api.get('/college'),
+            ]);
+
+            const branchData = branchRes.data.data.find(
+                (b) => b._id === branchId,
+            );
+            setBranch(branchData);
+            setSubjects(subjectsRes.data.data || []);
+            setColleges(collegesRes.data.data || []);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            setError(
+                'Couldn’t load this branch. Check your connection and try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const [branchRes, subjectsRes, collegesRes] = await Promise.all(
-                    [
-                        api.get(`/resource/branches`),
-                        api.get(`/resource/subjects/${branchId}`),
-                        api.get('/college'),
-                    ],
-                );
-
-                const branchData = branchRes.data.data.find(
-                    (b) => b._id === branchId,
-                );
-                setBranch(branchData);
-                setSubjects(subjectsRes.data.data || []);
-                setColleges(collegesRes.data.data || []);
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                toast.error('Failed to fetch data');
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [branchId]);
 
     // Filter subjects
@@ -98,7 +127,7 @@ const BranchSubjects = () => {
         const groups = {};
         filteredSubjects.forEach((subject) => {
             const collegeId = subject.college?._id || 'no-college';
-            const collegeName = subject.college?.name || 'No College';
+            const collegeName = subject.college?.name || 'No college';
             if (!groups[collegeId]) {
                 groups[collegeId] = {
                     name: collegeName,
@@ -121,18 +150,14 @@ const BranchSubjects = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this subject?')) {
-            return;
-        }
-
         setDeleting(id);
         try {
             await api.delete(`/resource/subjects/${id}`);
-            toast.success('Subject deleted successfully');
-            setSubjects(subjects.filter((s) => s._id !== id));
+            toast.success('Subject deleted');
+            setSubjects((prev) => prev.filter((s) => s._id !== id));
         } catch (error) {
             console.error('Error deleting subject:', error);
-            toast.error('Failed to delete subject');
+            toast.error('Couldn’t delete the subject. Try again.');
         } finally {
             setDeleting(null);
         }
@@ -144,257 +169,350 @@ const BranchSubjects = () => {
     };
 
     if (loading) {
+        return <Loader />;
+    }
+
+    if (error || !branch) {
         return (
-            <div className='flex items-center justify-center h-64'>
-                <Loader2 className='w-8 h-8 animate-spin text-blue-500' />
+            <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+                <div className='bg-sheet border border-line rounded-xl'>
+                    <EmptyState
+                        icon={BookOpen}
+                        tone='error'
+                        title={
+                            error
+                                ? 'Couldn’t load this branch'
+                                : 'Branch not found'
+                        }
+                        description={
+                            error ||
+                            'It may have been deleted. Pick another branch from the list.'
+                        }
+                        action={
+                            error ? (
+                                <Button onClick={fetchData}>Try again</Button>
+                            ) : (
+                                <Button to='/reports/branches'>
+                                    All branches
+                                </Button>
+                            )
+                        }
+                    />
+                </div>
             </div>
         );
     }
 
+    const collegeCount = new Set(subjects.map((s) => s.college?._id || 'none'))
+        .size;
+    const filtersActive = Boolean(
+        searchQuery || selectedSemester !== 'all' || selectedCollege !== 'all',
+    );
+    const clearFilters = () => {
+        setSearchQuery('');
+        setSelectedSemester('all');
+        setSelectedCollege('all');
+    };
+
+    const syllabusCell = (subject) => {
+        if (!hasSyllabus(subject)) {
+            return (
+                <span className='inline-flex items-center gap-1.5 text-[13px] text-warn-ink'>
+                    <CircleDashed
+                        className='w-3.5 h-3.5 shrink-0'
+                        aria-hidden='true'
+                    />
+                    Missing
+                </span>
+            );
+        }
+        const path = syllabusPath(subject);
+        const content = (
+            <>
+                <CheckCircle2
+                    className='w-3.5 h-3.5 shrink-0'
+                    aria-hidden='true'
+                />
+                Ready
+            </>
+        );
+        return path ? (
+            <Link
+                to={path}
+                className='inline-flex items-center gap-1.5 text-[13px] text-ok-ink hover:underline'
+                aria-label={`Syllabus ready for ${subject.subjectName}, open it`}
+            >
+                {content}
+            </Link>
+        ) : (
+            <span className='inline-flex items-center gap-1.5 text-[13px] text-ok-ink'>
+                {content}
+            </span>
+        );
+    };
+
+    const rowActions = (subject) => (
+        <div className='flex justify-end items-center gap-1'>
+            <Button
+                variant='ghost'
+                size='sm'
+                iconOnly
+                icon={Pencil}
+                aria-label={`Edit ${subject.subjectName}`}
+                onClick={() => handleEdit(subject)}
+            />
+            <Button
+                variant='ghost'
+                size='sm'
+                iconOnly
+                icon={deleting === subject._id ? Loader2 : Trash2}
+                aria-label={`Delete ${subject.subjectName}`}
+                disabled={deleting === subject._id}
+                className={`text-bad-ink hover:text-bad-ink ${
+                    deleting === subject._id ? '[&>svg]:animate-spin' : ''
+                }`}
+                onClick={() => setConfirmDelete(subject)}
+            />
+        </div>
+    );
+
+    const subjectTable = (list, showCollege) => (
+        <Table
+            minWidth={showCollege ? 900 : 720}
+            className='[&_table]:table-fixed'
+        >
+            <colgroup>
+                <col />
+                <col className='w-[110px]' />
+                <col className='w-[64px]' />
+                {showCollege && <col className='w-[200px]' />}
+                <col className='w-[120px]' />
+                <col className='w-[150px]' />
+                <col className='w-[100px]' />
+            </colgroup>
+            <thead>
+                <tr>
+                    <Th>Subject</Th>
+                    <Th>Code</Th>
+                    <Th>Sem</Th>
+                    {showCollege && <Th>College</Th>}
+                    <Th>Syllabus</Th>
+                    <Th>Quick notes</Th>
+                    <Th>
+                        <span className='sr-only'>Actions</span>
+                    </Th>
+                </tr>
+            </thead>
+            <tbody>
+                {list.map((subject) => (
+                    <Tr key={subject._id}>
+                        <Td className='font-medium truncate'>
+                            {subject.subjectName}
+                        </Td>
+                        <Td mono className='text-ink-2 whitespace-nowrap'>
+                            {subject.subjectCode}
+                        </Td>
+                        <Td mono>{subject.semester}</Td>
+                        {showCollege && (
+                            <Td className='text-ink-2 truncate'>
+                                {subject.college?.name || '—'}
+                            </Td>
+                        )}
+                        <Td>{syllabusCell(subject)}</Td>
+                        <Td>
+                            {hasSyllabus(subject) ? (
+                                <Link
+                                    to={quickNotesPath(subject)}
+                                    className='text-[13px] text-link hover:underline'
+                                    aria-label={`Quick notes for ${subject.subjectName}`}
+                                >
+                                    Open editor
+                                </Link>
+                            ) : (
+                                <span className='text-[13px] text-muted'>
+                                    Needs a syllabus
+                                </span>
+                            )}
+                        </Td>
+                        <Td align='right'>{rowActions(subject)}</Td>
+                    </Tr>
+                ))}
+            </tbody>
+        </Table>
+    );
+
     return (
-        <div className='p-4 md:p-6'>
-            {/* Header */}
-            <div className='flex items-center gap-4 mb-6'>
-                <button
-                    onClick={() => navigate('/reports/branches')}
-                    className='p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors'
-                >
-                    <ChevronLeft className='w-5 h-5 text-gray-600 dark:text-gray-400' />
-                </button>
-                <div>
-                    <h1 className='text-xl md:text-2xl font-semibold text-gray-900 dark:text-white'>
-                        {branch?.branchName || 'Branch'} - Subjects
-                    </h1>
-                    <p className='text-sm text-gray-500 dark:text-gray-400'>
-                        {branch?.branchCode} • {subjects.length} subjects
-                    </p>
-                </div>
-            </div>
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                eyebrow={[
+                    'Branch',
+                    branch.branchCode,
+                    branch.course?.courseName,
+                ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                title={branch.branchName || 'Branch'}
+                description={`${plural(subjects.length, 'subject', 'subjects')}${
+                    subjects.length
+                        ? ` across ${plural(collegeCount, 'college', 'colleges')}`
+                        : ''
+                }`}
+                actions={
+                    <>
+                        <Button
+                            icon={FileUp}
+                            onClick={() => setShowBulkModal(true)}
+                        >
+                            Add from a syllabus file
+                        </Button>
+                        <Button
+                            variant='primary'
+                            icon={Plus}
+                            onClick={() => {
+                                setEditingSubject(null);
+                                setShowAddModal(true);
+                            }}
+                        >
+                            Add subject
+                        </Button>
+                    </>
+                }
+            />
 
-            {/* Actions Bar */}
-            <div className='flex flex-wrap items-center gap-3 mb-6'>
-                <button
-                    onClick={() => setShowAddModal(true)}
-                    className='inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm'
-                >
-                    <Plus className='w-4 h-4' />
-                    Add Subject
-                </button>
-                <button
-                    onClick={() => setShowBulkModal(true)}
-                    className='inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm'
-                >
-                    <Sparkles className='w-4 h-4' />
-                    Bulk Add with AI
-                </button>
-
-                <div className='flex-1'></div>
-
-                {/* Filters */}
-                <div className='relative'>
-                    <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400' />
-                    <input
-                        type='text'
-                        placeholder='Search subjects...'
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className='pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white w-48'
+            {/* Filters */}
+            <div className='flex flex-wrap items-center gap-2 mb-5'>
+                <div className='max-w-full overflow-x-auto'>
+                    <Segmented
+                        label='Semester'
+                        className='[&>button]:whitespace-nowrap'
+                        value={selectedSemester}
+                        onChange={setSelectedSemester}
+                        options={[
+                            { value: 'all', label: 'All' },
+                            ...SEMESTERS.map((sem) => ({
+                                value: String(sem),
+                                label: `Sem ${sem}`,
+                            })),
+                        ]}
                     />
                 </div>
-
-                <select
-                    value={selectedSemester}
-                    onChange={(e) => setSelectedSemester(e.target.value)}
-                    className='px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                >
-                    <option value='all'>All Semesters</option>
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
-                        <option key={sem} value={sem}>
-                            Semester {sem}
-                        </option>
-                    ))}
-                </select>
-
-                <select
+                <span className='flex-1' />
+                <Select
+                    aria-label='College'
                     value={selectedCollege}
                     onChange={(e) => setSelectedCollege(e.target.value)}
-                    className='px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                >
-                    <option value='all'>All Colleges</option>
-                    {colleges.map((college) => (
-                        <option key={college._id} value={college._id}>
-                            {college.name}
-                        </option>
-                    ))}
-                </select>
-
-                {/* View Toggle */}
-                <div className='flex items-center border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden'>
-                    <button
-                        onClick={() => setViewMode('grid')}
-                        className={`p-2 ${viewMode === 'grid' ? 'bg-blue-100 dark:bg-blue-900 text-blue-600' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}
-                    >
-                        <LayoutGrid className='w-4 h-4' />
-                    </button>
-                    <button
-                        onClick={() => setViewMode('table')}
-                        className={`p-2 ${viewMode === 'table' ? 'bg-blue-100 dark:bg-blue-900 text-blue-600' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}
-                    >
-                        <Table className='w-4 h-4' />
-                    </button>
-                </div>
+                    className='!w-auto max-w-[240px]'
+                    options={[
+                        { value: 'all', label: 'All colleges' },
+                        ...colleges.map((college) => ({
+                            value: college._id,
+                            label: college.name,
+                        })),
+                    ]}
+                />
+                <label className='flex items-center gap-2 flex-1 sm:flex-none sm:w-64 min-w-[200px] h-9 px-3 rounded-lg border border-line-strong bg-sheet text-muted focus-within:ring-2 focus-within:ring-brand/30'>
+                    <Search
+                        className='w-[15px] h-[15px] shrink-0'
+                        aria-hidden='true'
+                    />
+                    <input
+                        type='search'
+                        placeholder='Search subjects'
+                        aria-label='Search subjects'
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className='flex-1 min-w-0 bg-transparent outline-none text-[13.5px] text-ink placeholder:text-muted'
+                    />
+                </label>
+                <Segmented
+                    label='Layout'
+                    value={viewMode}
+                    onChange={setViewMode}
+                    options={[
+                        {
+                            value: 'grid',
+                            icon: Layers,
+                            ariaLabel: 'Group by college',
+                        },
+                        {
+                            value: 'table',
+                            icon: List,
+                            ariaLabel: 'One list',
+                        },
+                    ]}
+                />
             </div>
 
             {/* Subjects List */}
             {filteredSubjects.length === 0 ? (
-                <div className='text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg'>
-                    <p className='text-gray-500 dark:text-gray-400'>
-                        No subjects found.{' '}
-                        <button
-                            onClick={() => setShowBulkModal(true)}
-                            className='text-purple-600 hover:underline'
-                        >
-                            Bulk add with AI
-                        </button>
-                    </p>
+                <div className='bg-sheet border border-line rounded-xl'>
+                    <EmptyState
+                        icon={BookOpen}
+                        title={
+                            subjects.length === 0
+                                ? 'No subjects in this branch yet'
+                                : 'No subjects match'
+                        }
+                        description={
+                            subjects.length === 0
+                                ? 'Add them one at a time, or upload a scheme PDF and let AI list them.'
+                                : 'Try another semester, college or search.'
+                        }
+                        action={
+                            subjects.length === 0 ? (
+                                <Button
+                                    icon={FileUp}
+                                    onClick={() => setShowBulkModal(true)}
+                                >
+                                    Add from a syllabus file
+                                </Button>
+                            ) : filtersActive ? (
+                                <Button onClick={clearFilters}>
+                                    Clear filters
+                                </Button>
+                            ) : undefined
+                        }
+                    />
                 </div>
             ) : viewMode === 'grid' ? (
-                // Grid View - Grouped by College
-                Object.entries(groupedSubjects).map(([collegeId, group]) => (
-                    <div key={collegeId} className='mb-8'>
-                        <h2 className='text-lg font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2'>
-                            {group.name}
-                            <span className='text-xs text-gray-500 dark:text-gray-400 font-normal'>
-                                ({group.subjects.length} subjects)
-                            </span>
-                        </h2>
-                        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3'>
-                            {group.subjects.map((subject) => (
-                                <div
-                                    key={subject._id}
-                                    className='bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:shadow-md transition-shadow'
-                                >
-                                    <div className='flex justify-between items-start mb-2'>
-                                        <div>
-                                            <h3 className='font-medium text-gray-900 dark:text-white text-sm'>
-                                                {subject.subjectName}
-                                            </h3>
-                                            <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                                {subject.subjectCode} • Sem{' '}
-                                                {subject.semester}
-                                            </p>
-                                        </div>
-                                        <span className='px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-xs rounded'>
-                                            Sem {subject.semester}
-                                        </span>
-                                    </div>
-                                    <div className='flex items-center gap-2 mt-3 pt-2 border-t border-gray-100 dark:border-gray-700'>
-                                        <button
-                                            onClick={() => handleEdit(subject)}
-                                            className='text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1'
-                                        >
-                                            <Edit className='w-3 h-3' />
-                                            Edit
-                                        </button>
-
-                                        <button
-                                            onClick={() =>
-                                                handleDelete(subject._id)
-                                            }
-                                            disabled={deleting === subject._id}
-                                            className='text-xs text-red-600 hover:text-red-700 flex items-center gap-1 ml-auto'
-                                        >
-                                            {deleting === subject._id ? (
-                                                <Loader2 className='w-3 h-3 animate-spin' />
-                                            ) : (
-                                                <Trash2 className='w-3 h-3' />
-                                            )}
-                                            Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ))
-            ) : (
-                // Table View
-                <div className='bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                    <div className='overflow-x-auto'>
-                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                            <thead className='bg-gray-50 dark:bg-gray-900'>
-                                <tr>
-                                    <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                        Subject Name
-                                    </th>
-                                    <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                        Code
-                                    </th>
-                                    <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                        Semester
-                                    </th>
-                                    <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                        College
-                                    </th>
-                                    <th className='px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className='divide-y divide-gray-200 dark:divide-gray-700'>
-                                {filteredSubjects.map((subject) => (
-                                    <tr
-                                        key={subject._id}
-                                        className='hover:bg-gray-50 dark:hover:bg-gray-700'
+                // Grouped by college
+                <div className='flex flex-col gap-5'>
+                    {Object.entries(groupedSubjects).map(
+                        ([collegeId, group]) => (
+                            <section
+                                key={collegeId}
+                                aria-labelledby={`college-${collegeId}`}
+                                className='bg-sheet border border-line rounded-xl overflow-hidden'
+                            >
+                                <div className='flex items-center gap-2.5 px-5 py-3 border-b border-line-soft bg-sunken'>
+                                    <span
+                                        aria-hidden='true'
+                                        className='w-[26px] h-[26px] rounded-[7px] bg-brand-soft text-brand-ink flex items-center justify-center text-[10.5px] font-semibold shrink-0'
                                     >
-                                        <td className='px-4 py-3 text-sm text-gray-900 dark:text-white'>
-                                            {subject.subjectName}
-                                        </td>
-                                        <td className='px-4 py-3 text-sm text-gray-500 dark:text-gray-400'>
-                                            {subject.subjectCode}
-                                        </td>
-                                        <td className='px-4 py-3 text-sm text-gray-500 dark:text-gray-400'>
-                                            {subject.semester}
-                                        </td>
-                                        <td className='px-4 py-3 text-xs text-gray-500 dark:text-gray-400'>
-                                            {subject.college?.name || '-'}
-                                        </td>
-                                        <td className='px-4 py-3 text-right'>
-                                            <div className='flex items-center justify-end gap-2'>
-                                                <button
-                                                    onClick={() =>
-                                                        handleEdit(subject)
-                                                    }
-                                                    className='text-blue-600 hover:text-blue-700'
-                                                >
-                                                    <Edit className='w-4 h-4' />
-                                                </button>
-
-                                                <button
-                                                    onClick={() =>
-                                                        handleDelete(
-                                                            subject._id,
-                                                        )
-                                                    }
-                                                    disabled={
-                                                        deleting === subject._id
-                                                    }
-                                                    className='text-red-600 hover:text-red-700'
-                                                >
-                                                    {deleting ===
-                                                    subject._id ? (
-                                                        <Loader2 className='w-4 h-4 animate-spin' />
-                                                    ) : (
-                                                        <Trash2 className='w-4 h-4' />
-                                                    )}
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        {collegeInitials(group.name)}
+                                    </span>
+                                    <h2
+                                        id={`college-${collegeId}`}
+                                        className='flex-1 min-w-0 text-[14.5px] font-semibold text-ink truncate'
+                                    >
+                                        {group.name}
+                                    </h2>
+                                    <span className='text-[12.5px] text-muted whitespace-nowrap'>
+                                        {plural(
+                                            group.subjects.length,
+                                            'subject',
+                                            'subjects',
+                                        )}
+                                    </span>
+                                </div>
+                                {subjectTable(group.subjects, false)}
+                            </section>
+                        ),
+                    )}
+                </div>
+            ) : (
+                <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
+                    {subjectTable(filteredSubjects, true)}
                 </div>
             )}
 
@@ -426,6 +544,16 @@ const BranchSubjects = () => {
                     onSuccess={handleRefresh}
                 />
             )}
+
+            <ConfirmModal
+                isOpen={Boolean(confirmDelete)}
+                onClose={() => setConfirmDelete(null)}
+                onConfirm={() => handleDelete(confirmDelete._id)}
+                title={`Delete ${confirmDelete?.subjectName || 'this subject'}?`}
+                message='Students can no longer find it in this branch, and PYQs and notes linked to it lose their subject. This can’t be undone.'
+                confirmText='Delete subject'
+                variant='danger'
+            />
         </div>
     );
 };

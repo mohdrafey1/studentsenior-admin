@@ -1,82 +1,142 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import Header from '../../components/Header';
-import api from '../../utils/api';
+import React, { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
-    User,
-    ArrowLeft,
+    CalendarDays,
+    Crown,
+    Gift,
+    GraduationCap,
     Mail,
     Phone,
-    MapPin,
-    Calendar,
-    Wallet,
-    Gift,
-    AlertTriangle,
     ShieldBan,
     ShieldCheck,
-    Code,
-    FileText,
-    BookOpen,
-    ShoppingBag,
-    Users,
-    Lightbulb,
-    Search,
-    Diamond,
+    UserX,
 } from 'lucide-react';
+import api from '../../utils/api';
+import { useColleges } from '../../context/CollegeContext';
+import {
+    formatDate,
+    formatDateTime,
+    formatNumber,
+    formatShortDateTime,
+} from '../../utils/format';
 import ConfirmModal from '../../components/ConfirmModal';
 import Loader from '../../components/Common/Loader';
+import {
+    Avatar,
+    Button,
+    EmptyState,
+    MetaList,
+    PageHeader,
+    Panel,
+    SkeletonRows,
+    StatusBadge,
+    Tabs,
+} from '../../components/ui';
+import { BonusDialog, PremiumDialog } from './UserActionDialogs';
+import {
+    CONTENT_TABS,
+    EMPTY_CONTENT,
+    TRANSACTION_LABELS,
+    describeItem,
+    itemViews,
+    pointsWorth,
+} from './userDetailHelpers';
+
+const WalletCell = ({ label, points, note, className = '' }) => (
+    <div className={`flex flex-col gap-2 px-5 py-[18px] ${className}`}>
+        <span className='text-[13px] text-ink-2'>{label}</span>
+        <span className='font-serif font-bold text-[28px] leading-none text-ink'>
+            {formatNumber(points)}{' '}
+            <span className='font-sans text-sm font-medium text-muted'>
+                pts
+            </span>
+        </span>
+        <span className='text-[12.5px] text-muted'>{note}</span>
+    </div>
+);
 
 const UserDetail = () => {
+    const { userId } = useParams();
+    const { colleges } = useColleges();
+
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [bonusPoints, setBonusPoints] = useState('');
-    const [bonusDescription, setBonusDescription] = useState('');
-    const [showBonusModal, setShowBonusModal] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
-    const [showRawData, setShowRawData] = useState(false);
-    const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-    const [subscriptionDays, setSubscriptionDays] = useState('30');
-    const [subscriptionReason, setSubscriptionReason] = useState('');
-    const [userContent, setUserContent] = useState({
-        notes: [],
-        pyqs: [],
-        products: [],
-        groups: [],
-        opportunities: [],
-        lostFound: [],
-    });
+    const [userContent, setUserContent] = useState(EMPTY_CONTENT);
     const [contentLoading, setContentLoading] = useState(true);
-
-    const { userId } = useParams();
-    const navigate = useNavigate();
-
-    const [confirmModal, setConfirmModal] = useState({
-        isOpen: false,
-        title: '',
-        message: '',
-        onConfirm: null,
-        variant: 'danger',
+    const [contentError, setContentError] = useState(false);
+    const [tab, setTab] = useState('notes');
+    const [activity, setActivity] = useState({
+        loading: true,
+        error: false,
+        items: [],
     });
+    const [dialog, setDialog] = useState(null); // 'bonus' | 'premium'
+    const [confirm, setConfirm] = useState(null);
+    const [showRawData, setShowRawData] = useState(false);
 
-    const showConfirm = (config) => {
-        return new Promise((resolve) => {
-            setConfirmModal({
-                isOpen: true,
-                title: config.title || 'Confirm Action',
-                message: config.message,
-                variant: config.variant || 'danger',
-                onConfirm: () => {
-                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-                    resolve(true);
-                },
-            });
-        });
+    const fetchUser = async () => {
+        try {
+            setLoading(true);
+            // There is no single-user endpoint; find the user in the full list.
+            const response = await api.get(`/user/users`);
+            const foundUser = response.data.data.find((u) => u._id === userId);
+            if (foundUser) {
+                setUser(foundUser);
+                setError(null);
+            } else {
+                setError('This user doesn’t exist or was deleted.');
+            }
+        } catch (e) {
+            console.error('Error fetching user:', e);
+            setError(
+                'Couldn’t load this user. Check your connection and try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleCloseConfirm = () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+    const fetchUserContent = async () => {
+        try {
+            setContentLoading(true);
+            setContentError(false);
+            const response = await api.get(`/user/content/${user._id}`);
+            const data = { ...EMPTY_CONTENT, ...(response.data.data || {}) };
+            setUserContent(data);
+            // Open the first tab that has something in it.
+            const first = CONTENT_TABS.find((t) => data[t.key]?.length);
+            setTab(first ? first.key : 'notes');
+        } catch (e) {
+            console.error('Error fetching user content:', e);
+            setContentError(true);
+        } finally {
+            setContentLoading(false);
+        }
+    };
+
+    // Recent wallet transactions. The transactions list searches by username,
+    // so keep only rows that belong to this user.
+    const fetchActivity = async () => {
+        setActivity((prev) => ({ ...prev, loading: true, error: false }));
+        try {
+            const response = await api.get('/transactions/all', {
+                params: {
+                    search: user.username,
+                    pageSize: 50,
+                    sortBy: 'createdAt',
+                    sortOrder: 'desc',
+                },
+            });
+            const items = (response.data.data?.items || []).filter(
+                (t) => (t.user?._id || t.user) === user._id,
+            );
+            setActivity({ loading: false, error: false, items });
+        } catch (e) {
+            console.error('Error fetching transactions:', e);
+            setActivity({ loading: false, error: true, items: [] });
+        }
     };
 
     useEffect(() => {
@@ -86,778 +146,563 @@ const UserDetail = () => {
     useEffect(() => {
         if (user?._id) {
             fetchUserContent();
+            fetchActivity();
         }
     }, [user?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const fetchUserContent = async () => {
-        try {
-            setContentLoading(true);
-            const response = await api.get(`/user/content/${user._id}`);
-
-            const data = response.data.data || {
-                notes: [],
-                pyqs: [],
-                products: [],
-                groups: [],
-                opportunities: [],
-                lostFound: [],
-            };
-
-            setUserContent(data);
-        } catch (error) {
-            console.error('Error fetching user content:', error);
-        } finally {
-            setContentLoading(false);
-        }
-    };
-
-    const fetchUser = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get(`/user/users`);
-            const foundUser = response.data.data.find((u) => u._id === userId);
-            if (foundUser) {
-                setUser(foundUser);
-                setError(null);
-            } else {
-                setError('User not found');
-                toast.error('User not found');
-            }
-        } catch (error) {
-            console.error('Error fetching user:', error);
-            setError('Failed to fetch user details');
-            toast.error('Failed to fetch user details');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleBlock = async () => {
-        const confirmed = await showConfirm({
-            title: 'Block User',
-            message: `Are you sure you want to block "${user.username}"? They will not be able to access their account.`,
-            variant: 'danger',
-        });
-
-        if (confirmed) {
-            try {
-                const response = await api.patch(
-                    `/user/users/${user._id}/block`,
-                );
-                setUser(response.data.data);
-                toast.success('User blocked successfully');
-            } catch (error) {
-                console.error('Error blocking user:', error);
-                toast.error('Failed to block user');
-            }
-        }
-    };
-
-    const handleUnblock = async () => {
-        const confirmed = await showConfirm({
-            title: 'Unblock User',
-            message: `Are you sure you want to unblock "${user.username}"? They will regain access to their account.`,
-            variant: 'info',
-        });
-
-        if (confirmed) {
-            try {
-                const response = await api.patch(
-                    `/user/users/${user._id}/unblock`,
-                );
-                setUser(response.data.data);
-                toast.success('User unblocked successfully');
-            } catch (error) {
-                console.error('Error unblocking user:', error);
-                toast.error('Failed to unblock user');
-            }
-        }
-    };
-
-    const handleGiveBonus = async () => {
-        if (!bonusPoints || parseInt(bonusPoints) <= 0) {
-            toast.error('Please enter valid points');
-            return;
-        }
-
-        const confirmed = await showConfirm({
-            title: 'Give Bonus Points',
-            message: `Give ${bonusPoints} points to "${user.username}"? This will update their wallet and create a transaction record.`,
-            variant: 'info',
-        });
-
-        if (confirmed) {
-            try {
-                setSubmitting(true);
-                const response = await api.patch(
-                    `/user/users/${user._id}/bonus`,
-                    {
-                        points: parseInt(bonusPoints),
-                        description:
-                            bonusDescription ||
-                            `Admin bonus of ${bonusPoints} points`,
-                    },
-                );
-                setUser(response.data.data.user);
-                toast.success('Bonus given successfully');
-                setBonusPoints('');
-                setBonusDescription('');
-                setShowBonusModal(false);
-            } catch (error) {
-                console.error('Error giving bonus:', error);
-                toast.error('Failed to give bonus');
-            } finally {
-                setSubmitting(false);
-            }
-        }
-    };
-
-    const handleGrantSubscription = async () => {
-        const days = parseInt(subscriptionDays);
-        if (!days || days <= 0) {
-            toast.error('Please select a valid duration');
-            return;
-        }
-
-        const confirmed = await showConfirm({
-            title: 'Grant Free Subscription',
-            message: `Grant ${days} days of premium subscription to "${user.username}"? This will activate their premium status immediately.`,
-            variant: 'info',
-        });
-
-        if (confirmed) {
-            try {
-                setSubmitting(true);
-                const response = await api.post(
-                    `/user/users/${user._id}/grant-subscription`,
-                    {
-                        durationDays: days,
-                        reason:
-                            subscriptionReason ||
-                            `Admin granted ${days} days free subscription`,
-                    },
-                );
-                setUser(response.data.data.user);
-                toast.success(`Premium subscription granted for ${days} days!`);
-                setSubscriptionDays('30');
-                setSubscriptionReason('');
-                setShowSubscriptionModal(false);
-            } catch (error) {
-                console.error('Error granting subscription:', error);
-                toast.error(
-                    error.response?.data?.message ||
-                        'Failed to grant subscription',
-                );
-            } finally {
-                setSubmitting(false);
-            }
-        }
-    };
-
-    if (loading) {
-        return <Loader />;
-    }
+    if (loading) return <Loader />;
 
     if (error || !user) {
         return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <div className='flex items-center justify-center min-h-[60vh]'>
-                    <div className='text-center'>
-                        <AlertTriangle className='w-12 h-12 text-red-500 mx-auto mb-4' />
-                        <p className='text-gray-600 dark:text-gray-400 mb-4'>
-                            {error || 'User not found'}
-                        </p>
-                        <button
-                            onClick={() => navigate('/users')}
-                            className='px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors'
-                        >
-                            Back to Users
-                        </button>
-                    </div>
+            <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+                <div className='bg-sheet border border-line rounded-xl'>
+                    <EmptyState
+                        icon={UserX}
+                        tone='error'
+                        title='User not found'
+                        description={error}
+                        action={
+                            <div className='flex gap-2'>
+                                <Button onClick={fetchUser}>Try again</Button>
+                                <Button to='/users'>Back to users</Button>
+                            </div>
+                        }
+                    />
                 </div>
             </div>
         );
     }
 
-    const createdDate = new Date(user.createdAt).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
+    const handle = `@${user.username}`;
+
+    const askBlock = () =>
+        setConfirm({
+            title: `Block ${handle}?`,
+            message:
+                'They can’t use their StudentSenior account until you unblock them.',
+            confirmText: 'Block user',
+            variant: 'danger',
+            onConfirm: async () => {
+                try {
+                    const response = await api.patch(
+                        `/user/users/${user._id}/block`,
+                    );
+                    setUser(response.data.data);
+                    toast.success('User blocked');
+                } catch (e) {
+                    console.error('Error blocking user:', e);
+                    toast.error('Couldn’t block the user. Try again.');
+                }
+            },
+        });
+
+    const askUnblock = () =>
+        setConfirm({
+            title: `Unblock ${handle}?`,
+            message: 'They can use their account again straight away.',
+            confirmText: 'Unblock user',
+            variant: 'info',
+            onConfirm: async () => {
+                try {
+                    const response = await api.patch(
+                        `/user/users/${user._id}/unblock`,
+                    );
+                    setUser(response.data.data);
+                    toast.success('User unblocked');
+                } catch (e) {
+                    console.error('Error unblocking user:', e);
+                    toast.error('Couldn’t unblock the user. Try again.');
+                }
+            },
+        });
+
+    const premiumEnd = user.premiumExpiryDate
+        ? new Date(user.premiumExpiryDate)
+        : null;
+    const premiumActive =
+        user.isPremium && premiumEnd && premiumEnd > new Date();
+
+    const balance = Number(user.wallet?.currentBalance || 0);
+    const earned = Number(user.wallet?.totalEarning || 0);
+    const withdrawn = Number(user.wallet?.totalWithdrawal || 0);
+
+    // Contribution totals across every kind of upload.
+    const allItems = CONTENT_TABS.flatMap((t) => userContent[t.key] || []);
+    const byStatus = allItems.reduce(
+        (acc, item) => {
+            const status = item.submissionStatus || 'pending';
+            acc[status] = (acc[status] || 0) + 1;
+            return acc;
+        },
+        { approved: 0, pending: 0, rejected: 0 },
+    );
+    const totalViews = allItems.reduce((sum, item) => sum + itemViews(item), 0);
+
+    const collegeSlug = (id) => colleges.find((c) => c._id === id)?.slug;
+    const activeTab =
+        CONTENT_TABS.find((t) => t.key === tab) || CONTENT_TABS[0];
+    const tabItems = userContent[activeTab.key] || [];
+
+    const academic = user.academicDetails || {};
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <main className='pt-6 pb-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto'>
-                {/* Header */}
-                <div className='flex items-center mb-8'>
-                    <button
-                        onClick={() => navigate('/users')}
-                        className='mr-4 p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors'
-                    >
-                        <ArrowLeft className='w-5 h-5' />
-                    </button>
-                    <div className='flex items-center'>
-                        <div className='bg-indigo-600 text-white p-3 rounded-lg mr-4'>
-                            <User className='w-6 h-6' />
-                        </div>
-                        <div>
-                            <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
-                                {user.username}
-                            </h1>
-                            <p className='text-gray-600 dark:text-gray-400 mt-1'>
-                                User Details
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                {/* User Info Card */}
-                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6'>
-                    <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                        {/* Email */}
-                        <div>
-                            <div className='flex items-center text-gray-600 dark:text-gray-400 mb-2'>
-                                <Mail className='w-4 h-4 mr-2' />
-                                <span className='text-sm font-medium'>
-                                    Email
-                                </span>
-                            </div>
-                            <p className='text-gray-900 dark:text-white font-semibold'>
-                                {user.email}
-                            </p>
-                        </div>
-
-                        {/* Phone */}
-                        <div>
-                            <div className='flex items-center text-gray-600 dark:text-gray-400 mb-2'>
-                                <Phone className='w-4 h-4 mr-2' />
-                                <span className='text-sm font-medium'>
-                                    Phone
-                                </span>
-                            </div>
-                            <p className='text-gray-900 dark:text-white font-semibold'>
-                                {user.phone || 'Not provided'}
-                            </p>
-                        </div>
-
-                        {/* College */}
-                        <div>
-                            <div className='flex items-center text-gray-600 dark:text-gray-400 mb-2'>
-                                <MapPin className='w-4 h-4 mr-2' />
-                                <span className='text-sm font-medium'>
-                                    College
-                                </span>
-                            </div>
-                            <p className='text-gray-900 dark:text-white font-semibold'>
-                                {user.college || 'Not provided'}
-                            </p>
-                        </div>
-
-                        {/* Joined Date */}
-                        <div>
-                            <div className='flex items-center text-gray-600 dark:text-gray-400 mb-2'>
-                                <Calendar className='w-4 h-4 mr-2' />
-                                <span className='text-sm font-medium'>
-                                    Joined
-                                </span>
-                            </div>
-                            <p className='text-gray-900 dark:text-white font-semibold'>
-                                {createdDate}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                {/* Wallet & Status Card */}
-                <div className='grid grid-cols-1 md:grid-cols-2 gap-6 mb-6'>
-                    {/* Wallet Card */}
-                    <div className='bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg shadow-sm p-6 text-white'>
-                        <div className='flex items-center mb-4'>
-                            <Wallet className='w-6 h-6 mr-2' />
-                            <h2 className='text-lg font-semibold'>Wallet</h2>
-                        </div>
-                        <div className='space-y-3'>
-                            <div className='flex justify-between items-center py-2 border-b border-indigo-400'>
-                                <span className='text-indigo-100'>
-                                    Current Balance
-                                </span>
-                                <span className='text-2xl font-bold'>
-                                    {user.wallet?.currentBalance || 0} pts
-                                </span>
-                            </div>
-                            <div className='flex justify-between items-center py-2 border-b border-indigo-400'>
-                                <span className='text-indigo-100'>
-                                    Total Earning
-                                </span>
-                                <span className='text-xl font-semibold'>
-                                    {user.wallet?.totalEarning || 0} pts
-                                </span>
-                            </div>
-                            <div className='flex justify-between items-center py-2'>
-                                <span className='text-indigo-100'>
-                                    Total Withdrawal
-                                </span>
-                                <span className='text-xl font-semibold'>
-                                    {user.wallet?.totalWithdrawal || 0} pts
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Status Card */}
-                    <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                        <h2 className='text-lg font-semibold text-gray-900 dark:text-white mb-4'>
-                            Account Status
-                        </h2>
-                        <div className='flex items-center mb-4'>
-                            {user.blocked ? (
-                                <div className='flex items-center'>
-                                    <div className='bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-3 py-1 rounded-full flex items-center'>
-                                        <AlertTriangle className='w-4 h-4 mr-2' />
-                                        <span className='font-semibold text-sm'>
-                                            Blocked
-                                        </span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className='bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 px-3 py-1 rounded-full flex items-center'>
-                                    <ShieldCheck className='w-4 h-4 mr-2' />
-                                    <span className='font-semibold text-sm'>
-                                        Active
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <div className='flex items-start gap-4 sm:gap-5'>
+                <Avatar
+                    name={user.username}
+                    src={user.profilePicture}
+                    size='lg'
+                    className='mt-1 font-serif'
+                />
+                <div className='flex-1 min-w-0'>
+                    <PageHeader
+                        eyebrow='Student'
+                        badge={
+                            <>
+                                {user.blocked ? (
+                                    <StatusBadge tone='bad'>
+                                        Blocked
+                                    </StatusBadge>
+                                ) : (
+                                    <StatusBadge tone='ok'>Active</StatusBadge>
+                                )}
+                                {premiumActive && (
+                                    <StatusBadge tone='info'>
+                                        Premium until {formatDate(premiumEnd)}
+                                    </StatusBadge>
+                                )}
+                                {user.isPremium && !premiumActive && (
+                                    <StatusBadge tone='neutral'>
+                                        Premium ended
+                                        {premiumEnd
+                                            ? ` ${formatDate(premiumEnd)}`
+                                            : ''}
+                                    </StatusBadge>
+                                )}
+                            </>
+                        }
+                        title={user.username}
+                        meta={
+                            <ul className='flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-ink-2'>
+                                <li className='inline-flex items-center gap-1.5 min-w-0'>
+                                    <Mail
+                                        className='w-[15px] h-[15px] text-muted shrink-0'
+                                        aria-hidden='true'
+                                    />
+                                    <span className='sr-only'>Email: </span>
+                                    <span className='truncate'>
+                                        {user.email}
                                     </span>
-                                </div>
-                            )}
-                        </div>
-                        <p className='text-gray-600 dark:text-gray-400 text-sm mb-4'>
-                            {user.blocked
-                                ? 'This user is currently blocked and cannot access their account.'
-                                : 'This user is active and can access their account.'}
-                        </p>
-                    </div>
+                                </li>
+                                <li className='inline-flex items-center gap-1.5'>
+                                    <Phone
+                                        className='w-[15px] h-[15px] text-muted'
+                                        aria-hidden='true'
+                                    />
+                                    <span className='sr-only'>Phone: </span>
+                                    {user.phone || 'No phone number'}
+                                </li>
+                                <li className='inline-flex items-center gap-1.5'>
+                                    <GraduationCap
+                                        className='w-[15px] h-[15px] text-muted'
+                                        aria-hidden='true'
+                                    />
+                                    <span className='sr-only'>College: </span>
+                                    {user.college || 'No college given'}
+                                </li>
+                                <li className='inline-flex items-center gap-1.5'>
+                                    <CalendarDays
+                                        className='w-[15px] h-[15px] text-muted'
+                                        aria-hidden='true'
+                                    />
+                                    Joined {formatDate(user.createdAt)}
+                                </li>
+                            </ul>
+                        }
+                        actions={
+                            <>
+                                <Button
+                                    icon={Gift}
+                                    onClick={() => setDialog('bonus')}
+                                >
+                                    Give bonus points
+                                </Button>
+                                <Button
+                                    icon={Crown}
+                                    onClick={() => setDialog('premium')}
+                                >
+                                    Grant premium
+                                </Button>
+                                {user.blocked ? (
+                                    <Button
+                                        icon={ShieldCheck}
+                                        onClick={askUnblock}
+                                    >
+                                        Unblock
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant='danger'
+                                        icon={ShieldBan}
+                                        onClick={askBlock}
+                                    >
+                                        Block
+                                    </Button>
+                                )}
+                            </>
+                        }
+                    />
                 </div>
-                {/* Action Buttons */}
-                <div className='flex flex-wrap gap-4 mb-6'>
-                    <button
-                        onClick={() => setShowBonusModal(true)}
-                        className='flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-lg font-semibold hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-sm'
-                    >
-                        <Gift className='w-5 h-5 mr-2' />
-                        Give Bonus Points
-                    </button>
+            </div>
 
-                    <button
-                        onClick={() => setShowSubscriptionModal(true)}
-                        className='flex items-center px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg font-semibold hover:from-amber-600 hover:to-amber-700 transition-all shadow-sm'
-                    >
-                        <Diamond className='w-5 h-5 mr-2' />
-                        Grant Subscription
-                    </button>
+            <div className='grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5 mb-5'>
+                <Panel
+                    title='Wallet'
+                    titleId='wallet-title'
+                    action={
+                        <span className='text-[12.5px] text-muted'>
+                            5 pts = ₹1
+                        </span>
+                    }
+                    bodyClassName='grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-line-soft'
+                >
+                    <WalletCell
+                        label='Current balance'
+                        points={balance}
+                        note={`Worth ${pointsWorth(balance)}`}
+                    />
+                    <WalletCell
+                        label='Total earned'
+                        points={earned}
+                        note={`Worth ${pointsWorth(earned)}`}
+                    />
+                    <WalletCell
+                        label='Spent or redeemed'
+                        points={withdrawn}
+                        note={`Worth ${pointsWorth(withdrawn)}`}
+                    />
+                </Panel>
 
-                    {user.blocked ? (
-                        <button
-                            onClick={handleUnblock}
-                            className='flex items-center px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all shadow-sm'
-                        >
-                            <ShieldCheck className='w-5 h-5 mr-2' />
-                            Unblock User
-                        </button>
+                <Panel
+                    title='Contributions'
+                    titleId='contrib-title'
+                    bodyClassName='px-5 py-4'
+                >
+                    {contentLoading ? (
+                        <SkeletonRows rows={2} className='-mx-5 -my-4' />
+                    ) : contentError ? (
+                        <p className='text-[13.5px] text-muted'>
+                            Couldn’t load uploads.
+                        </p>
+                    ) : allItems.length === 0 ? (
+                        <p className='text-[13.5px] text-muted'>
+                            {handle} hasn’t uploaded anything yet.
+                        </p>
                     ) : (
-                        <button
-                            onClick={handleBlock}
-                            className='flex items-center px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all shadow-sm'
-                        >
-                            <ShieldBan className='w-5 h-5 mr-2' />
-                            Block User
-                        </button>
+                        <div className='flex flex-col gap-3.5'>
+                            <div
+                                className='flex h-2.5 rounded-full overflow-hidden gap-0.5 bg-line-soft'
+                                aria-hidden='true'
+                            >
+                                <span
+                                    className='bg-ok'
+                                    style={{ flexGrow: byStatus.approved }}
+                                />
+                                <span
+                                    className='bg-warn'
+                                    style={{ flexGrow: byStatus.pending }}
+                                />
+                                <span
+                                    className='bg-bad'
+                                    style={{ flexGrow: byStatus.rejected }}
+                                />
+                            </div>
+                            <dl className='grid grid-cols-2 gap-y-2.5 gap-x-3 text-[13px]'>
+                                {[
+                                    ['Approved', byStatus.approved, 'bg-ok'],
+                                    ['Pending', byStatus.pending, 'bg-warn'],
+                                    ['Rejected', byStatus.rejected, 'bg-bad'],
+                                ].map(([label, count, dot]) => (
+                                    <div
+                                        key={label}
+                                        className='flex items-center gap-2'
+                                    >
+                                        <span
+                                            className={`w-2 h-2 rounded-full ${dot}`}
+                                            aria-hidden='true'
+                                        />
+                                        <dt>{label}</dt>
+                                        <dd className='font-mono text-[12.5px] font-semibold'>
+                                            {formatNumber(count)}
+                                        </dd>
+                                    </div>
+                                ))}
+                                <div className='flex items-center gap-2 text-ink-2'>
+                                    <dt>Total views</dt>
+                                    <dd className='font-mono text-[12.5px] font-semibold text-ink'>
+                                        {formatNumber(totalViews)}
+                                    </dd>
+                                </div>
+                            </dl>
+                        </div>
                     )}
-                </div>
+                </Panel>
+            </div>
 
-                {/* User Content Sections */}
-                {contentLoading ? (
-                    <div className='flex items-center justify-center py-8'>
-                        <Loader className='w-6 h-6 text-indigo-600 animate-spin mr-2' />
-                        <p className='text-gray-600 dark:text-gray-400'>
-                            Loading user content...
-                        </p>
-                    </div>
-                ) : (
-                    <>
-                        {/* Notes Section */}
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6'>
-                            <div className='flex items-center mb-4'>
-                                <FileText className='w-5 h-5 text-blue-600 dark:text-blue-400 mr-2' />
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                    Notes ({userContent.notes.length})
-                                </h3>
-                            </div>
-                            {userContent.notes.length > 0 ? (
-                                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                                    {userContent.notes.map((note) => (
-                                        <div
-                                            key={note._id}
-                                            className='p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow'
-                                        >
-                                            <p className='font-semibold text-gray-900 dark:text-white truncate'>
-                                                {note.title || 'Untitled'}
-                                            </p>
-                                            <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                                {note.subject || 'No subject'}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className='text-gray-500 dark:text-gray-400'>
-                                    No notes uploaded
-                                </p>
-                            )}
-                        </div>
-
-                        {/* PYQs Section */}
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6'>
-                            <div className='flex items-center mb-4'>
-                                <BookOpen className='w-5 h-5 text-purple-600 dark:text-purple-400 mr-2' />
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                    PYQs ({userContent.pyqs.length})
-                                </h3>
-                            </div>
-                            {userContent.pyqs.length > 0 ? (
-                                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                                    {userContent.pyqs.map((pyq) => (
-                                        <div
-                                            key={pyq._id}
-                                            className='p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow'
-                                        >
-                                            <p className='font-semibold text-gray-900 dark:text-white truncate'>
-                                                {pyq.slug || 'Untitled'}
-                                            </p>
-                                            <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                                {pyq.examType || 'No exam info'}{' '}
-                                                - {pyq.year || 'N/A'}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className='text-gray-500 dark:text-gray-400'>
-                                    No PYQs uploaded
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Products Section */}
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6'>
-                            <div className='flex items-center mb-4'>
-                                <ShoppingBag className='w-5 h-5 text-green-600 dark:text-green-400 mr-2' />
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                    Products ({userContent.products.length})
-                                </h3>
-                            </div>
-                            {userContent.products.length > 0 ? (
-                                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                                    {userContent.products.map((product) => (
-                                        <div
-                                            key={product._id}
-                                            className='p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow'
-                                        >
-                                            <p className='font-semibold text-gray-900 dark:text-white truncate'>
-                                                {product.name || 'Untitled'}
-                                            </p>
-                                            <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                                Price: ₹{product.price || 0}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className='text-gray-500 dark:text-gray-400'>
-                                    No products created
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Groups Section */}
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6'>
-                            <div className='flex items-center mb-4'>
-                                <Users className='w-5 h-5 text-orange-600 dark:text-orange-400 mr-2' />
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                    Groups ({userContent.groups.length})
-                                </h3>
-                            </div>
-                            {userContent.groups.length > 0 ? (
-                                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                                    {userContent.groups.map((group) => (
-                                        <div
-                                            key={group._id}
-                                            className='p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow'
-                                        >
-                                            <p className='font-semibold text-gray-900 dark:text-white truncate'>
-                                                {group.name || 'Untitled'}
-                                            </p>
-                                            <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                                {group.description ||
-                                                    'No description'}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className='text-gray-500 dark:text-gray-400'>
-                                    No groups created
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Opportunities Section */}
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6'>
-                            <div className='flex items-center mb-4'>
-                                <Lightbulb className='w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2' />
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                    Opportunities (
-                                    {userContent.opportunities.length})
-                                </h3>
-                            </div>
-                            {userContent.opportunities.length > 0 ? (
-                                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                                    {userContent.opportunities.map((opp) => (
-                                        <div
-                                            key={opp._id}
-                                            className='p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow'
-                                        >
-                                            <p className='font-semibold text-gray-900 dark:text-white truncate'>
-                                                {opp.name || 'Untitled'}
-                                            </p>
-                                            <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                                {opp.email || 'No company'}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className='text-gray-500 dark:text-gray-400'>
-                                    No opportunities posted
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Lost & Found Section */}
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6'>
-                            <div className='flex items-center mb-4'>
-                                <Search className='w-5 h-5 text-red-600 dark:text-red-400 mr-2' />
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                    Lost & Found ({userContent.lostFound.length}
-                                    )
-                                </h3>
-                            </div>
-                            {userContent.lostFound.length > 0 ? (
-                                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                                    {userContent.lostFound.map((item) => (
-                                        <div
-                                            key={item._id}
-                                            className='p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow'
-                                        >
-                                            <p className='font-semibold text-gray-900 dark:text-white truncate'>
-                                                {item.title || 'Untitled'}
-                                            </p>
-                                            <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                                {item.type || 'No type'} -{' '}
-                                                {item.location || 'No location'}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className='text-gray-500 dark:text-gray-400'>
-                                    No lost & found items posted
-                                </p>
-                            )}
-                        </div>
-                    </>
-                )}
-
-                {/* Raw JSON Data Section */}
-                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6'>
-                    <button
-                        onClick={() => setShowRawData(!showRawData)}
-                        className='flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'
+            <div className='grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5 items-start'>
+                <section
+                    aria-labelledby='uploads-title'
+                    className='bg-sheet border border-line rounded-xl overflow-hidden'
+                >
+                    <h2
+                        id='uploads-title'
+                        className='px-5 pt-4 pb-1 text-[15px] font-semibold text-ink'
                     >
-                        <Code className='w-5 h-5' />
-                        {showRawData ? 'Hide' : 'Show'} Raw JSON
-                    </button>
-                    {showRawData && (
-                        <div className='mt-4 p-4 bg-gray-900 rounded-lg border border-gray-700 overflow-auto max-h-96'>
-                            <pre className='text-gray-100 text-sm font-mono whitespace-pre-wrap break-words'>
+                        Uploads
+                    </h2>
+                    <Tabs
+                        label='Upload type'
+                        className='px-5'
+                        value={tab}
+                        onChange={setTab}
+                        items={CONTENT_TABS.map((t) => ({
+                            value: t.key,
+                            label: t.label,
+                            count: contentLoading
+                                ? undefined
+                                : (userContent[t.key] || []).length,
+                        }))}
+                    />
+                    {contentLoading ? (
+                        <SkeletonRows rows={4} />
+                    ) : contentError ? (
+                        <EmptyState
+                            tone='error'
+                            title='Couldn’t load uploads'
+                            description='Check your connection and try again.'
+                            action={
+                                <Button size='sm' onClick={fetchUserContent}>
+                                    Try again
+                                </Button>
+                            }
+                        />
+                    ) : tabItems.length === 0 ? (
+                        <div className='flex flex-col items-center gap-1.5 px-5 py-10 text-center'>
+                            <span className='text-[13.5px] font-medium text-ink'>
+                                Nothing here yet
+                            </span>
+                            <span className='text-[12.5px] text-muted'>
+                                {handle} hasn’t posted any {activeTab.noun}.
+                            </span>
+                        </div>
+                    ) : (
+                        <ul>
+                            {tabItems.map((item) => {
+                                const { title, meta } = describeItem(
+                                    activeTab.key,
+                                    item,
+                                );
+                                const slug = collegeSlug(item.college);
+                                const views = itemViews(item);
+                                return (
+                                    <li
+                                        key={item._id}
+                                        className='flex flex-wrap sm:flex-nowrap items-center gap-x-3.5 gap-y-2 px-5 py-3 border-b border-line-soft last:border-b-0'
+                                    >
+                                        <div className='flex-1 basis-full sm:basis-auto min-w-0 flex flex-col gap-0.5'>
+                                            {slug ? (
+                                                <Link
+                                                    to={`/${slug}/${activeTab.path}/${item._id}`}
+                                                    className='text-[13.5px] font-medium text-ink hover:underline truncate'
+                                                >
+                                                    {title}
+                                                </Link>
+                                            ) : (
+                                                <span className='text-[13.5px] font-medium text-ink truncate'>
+                                                    {title}
+                                                </span>
+                                            )}
+                                            <span className='text-[12.5px] text-muted truncate'>
+                                                {meta}
+                                            </span>
+                                        </div>
+                                        <span className='sm:w-24 sm:text-right font-mono text-[12.5px] text-ink-2 whitespace-nowrap'>
+                                            {views
+                                                ? `${formatNumber(views)} views`
+                                                : 'No views'}
+                                        </span>
+                                        <span className='flex gap-1 sm:w-[104px]'>
+                                            <StatusBadge
+                                                status={item.submissionStatus}
+                                            />
+                                            {item.deleted && (
+                                                <StatusBadge tone='outline'>
+                                                    Deleted
+                                                </StatusBadge>
+                                            )}
+                                        </span>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </section>
+
+                <div className='flex flex-col gap-5 min-w-0'>
+                    <Panel
+                        title='Points activity'
+                        titleId='points-title'
+                        action={
+                            <Link
+                                to={`/reports/transactions?search=${encodeURIComponent(user.username)}`}
+                                className='text-[13px] font-medium text-link hover:underline'
+                            >
+                                All transactions
+                            </Link>
+                        }
+                        bodyClassName='px-5'
+                    >
+                        {activity.loading ? (
+                            <SkeletonRows rows={3} className='-mx-5' />
+                        ) : activity.error ? (
+                            <p className='py-4 text-[13.5px] text-muted'>
+                                Couldn’t load points activity.{' '}
+                                <button
+                                    type='button'
+                                    onClick={fetchActivity}
+                                    className='font-medium text-link hover:underline cursor-pointer'
+                                >
+                                    Try again
+                                </button>
+                            </p>
+                        ) : activity.items.length === 0 ? (
+                            <p className='py-4 text-[13.5px] text-muted'>
+                                No points earned or spent yet.
+                            </p>
+                        ) : (
+                            <ul>
+                                {activity.items.slice(0, 6).map((t) => {
+                                    const points = Number(t.points || 0);
+                                    return (
+                                        <li
+                                            key={t._id}
+                                            className='flex items-center gap-3 py-2.5 border-b border-line-soft last:border-b-0'
+                                        >
+                                            <div className='flex-1 min-w-0 flex flex-col gap-0.5'>
+                                                <span className='text-[13px] text-ink truncate'>
+                                                    {t.description ||
+                                                        TRANSACTION_LABELS[
+                                                            t.type
+                                                        ] ||
+                                                        t.type}
+                                                </span>
+                                                <span className='text-xs text-muted'>
+                                                    {TRANSACTION_LABELS[
+                                                        t.type
+                                                    ] || t.type}{' '}
+                                                    ·{' '}
+                                                    {formatShortDateTime(
+                                                        t.createdAt,
+                                                    )}
+                                                </span>
+                                            </div>
+                                            <span
+                                                className={`font-mono text-[13px] font-medium whitespace-nowrap ${
+                                                    points < 0
+                                                        ? 'text-bad-ink'
+                                                        : 'text-ok-ink'
+                                                }`}
+                                            >
+                                                {points < 0 ? '−' : '+'}
+                                                {formatNumber(Math.abs(points))}
+                                            </span>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </Panel>
+
+                    <Panel
+                        title='Details'
+                        titleId='details-title'
+                        bodyClassName='px-5 py-4 flex flex-col gap-3'
+                    >
+                        <MetaList
+                            labelWidth={104}
+                            items={[
+                                { label: 'Course', value: academic.course },
+                                { label: 'Branch', value: academic.branch },
+                                { label: 'Semester', value: academic.semester },
+                                {
+                                    label: 'Premium',
+                                    value: premiumActive
+                                        ? `Until ${formatDate(premiumEnd)}`
+                                        : 'No',
+                                },
+                                user.trialClaimedAt && {
+                                    label: 'Trial claimed',
+                                    value: formatDate(user.trialClaimedAt),
+                                },
+                                {
+                                    label: 'Joined',
+                                    value: formatDateTime(user.createdAt),
+                                },
+                                {
+                                    label: 'Updated',
+                                    value: formatDateTime(user.updatedAt),
+                                },
+                                { label: 'ID', value: user._id, mono: true },
+                            ]}
+                        />
+                        <button
+                            type='button'
+                            aria-expanded={showRawData}
+                            onClick={() => setShowRawData((v) => !v)}
+                            className='self-start text-[13px] font-medium text-link hover:underline cursor-pointer'
+                        >
+                            {showRawData ? 'Hide raw data' : 'Show raw data'}
+                        </button>
+                        {showRawData && (
+                            <pre className='max-h-80 overflow-auto p-3 rounded-lg bg-sunken font-mono text-[11.5px] leading-relaxed text-ink-2'>
                                 {JSON.stringify(user, null, 2)}
                             </pre>
-                        </div>
-                    )}
+                        )}
+                    </Panel>
                 </div>
-                {/* 
-                {/* Bonus Modal */}
-                {showBonusModal && (
-                    <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50'>
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6'>
-                            <div className='flex items-center mb-4'>
-                                <div className='bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 p-3 rounded-lg mr-3'>
-                                    <Gift className='w-6 h-6' />
-                                </div>
-                                <h3 className='text-xl font-semibold text-gray-900 dark:text-white'>
-                                    Give Bonus Points
-                                </h3>
-                            </div>
+            </div>
 
-                            <div className='mb-4'>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                                    Points
-                                </label>
-                                <input
-                                    type='number'
-                                    value={bonusPoints}
-                                    onChange={(e) =>
-                                        setBonusPoints(e.target.value)
-                                    }
-                                    placeholder='Enter points'
-                                    className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white'
-                                />
-                            </div>
-
-                            <div className='mb-6'>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                                    Description (Optional)
-                                </label>
-                                <textarea
-                                    value={bonusDescription}
-                                    onChange={(e) =>
-                                        setBonusDescription(e.target.value)
-                                    }
-                                    placeholder='Reason for bonus...'
-                                    rows='3'
-                                    className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white'
-                                />
-                            </div>
-
-                            <div className='flex gap-3'>
-                                <button
-                                    onClick={() => {
-                                        setShowBonusModal(false);
-                                        setBonusPoints('');
-                                        setBonusDescription('');
-                                    }}
-                                    disabled={submitting}
-                                    className='flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleGiveBonus}
-                                    disabled={submitting}
-                                    className='flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center'
-                                >
-                                    {submitting ? (
-                                        <Loader className='w-4 h-4 animate-spin' />
-                                    ) : (
-                                        'Give Bonus'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                {/* Subscription Modal */}
-                {showSubscriptionModal && (
-                    <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50'>
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6'>
-                            <div className='flex items-center mb-4'>
-                                <div className='bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 p-3 rounded-lg mr-3'>
-                                    <Diamond className='w-6 h-6' />
-                                </div>
-                                <div>
-                                    <h3 className='text-xl font-semibold text-gray-900 dark:text-white'>
-                                        Grant Free Subscription
-                                    </h3>
-                                    {user.isPremium && (
-                                        <p className='text-xs text-amber-600 dark:text-amber-400'>
-                                            Currently premium until{' '}
-                                            {new Date(
-                                                user.premiumExpiryDate,
-                                            ).toLocaleDateString()}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className='mb-4'>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                                    Duration
-                                </label>
-                                <select
-                                    value={subscriptionDays}
-                                    onChange={(e) =>
-                                        setSubscriptionDays(e.target.value)
-                                    }
-                                    className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 dark:bg-gray-700 dark:text-white'
-                                >
-                                    <option value='7'>7 Days</option>
-                                    <option value='30'>30 Days</option>
-                                    <option value='90'>90 Days</option>
-                                    <option value='180'>180 Days</option>
-                                    <option value='365'>
-                                        365 Days (1 Year)
-                                    </option>
-                                </select>
-                            </div>
-
-                            <div className='mb-6'>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                                    Reason (Optional)
-                                </label>
-                                <textarea
-                                    value={subscriptionReason}
-                                    onChange={(e) =>
-                                        setSubscriptionReason(e.target.value)
-                                    }
-                                    placeholder='Reason for granting subscription...'
-                                    rows='3'
-                                    className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 dark:bg-gray-700 dark:text-white'
-                                />
-                            </div>
-
-                            <div className='flex gap-3'>
-                                <button
-                                    onClick={() => {
-                                        setShowSubscriptionModal(false);
-                                        setSubscriptionDays('30');
-                                        setSubscriptionReason('');
-                                    }}
-                                    disabled={submitting}
-                                    className='flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleGrantSubscription}
-                                    disabled={submitting}
-                                    className='flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center'
-                                >
-                                    {submitting ? (
-                                        <Loader className='w-4 h-4 animate-spin' />
-                                    ) : (
-                                        'Grant Subscription'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                <ConfirmModal
-                    isOpen={confirmModal.isOpen}
-                    title={confirmModal.title}
-                    message={confirmModal.message}
-                    onConfirm={confirmModal.onConfirm}
-                    onCancel={handleCloseConfirm}
-                    variant={confirmModal.variant}
+            {dialog === 'bonus' && (
+                <BonusDialog
+                    user={user}
+                    onClose={() => setDialog(null)}
+                    onGiven={(updated) => {
+                        if (updated) setUser(updated);
+                        setDialog(null);
+                        fetchActivity();
+                    }}
                 />
-            </main>
+            )}
+            {dialog === 'premium' && (
+                <PremiumDialog
+                    user={user}
+                    onClose={() => setDialog(null)}
+                    onGranted={(updated) => {
+                        if (updated) setUser(updated);
+                        setDialog(null);
+                    }}
+                />
+            )}
+
+            <ConfirmModal
+                isOpen={Boolean(confirm)}
+                onClose={() => setConfirm(null)}
+                onConfirm={() => confirm?.onConfirm()}
+                title={confirm?.title}
+                message={confirm?.message}
+                confirmText={confirm?.confirmText}
+                variant={confirm?.variant}
+            />
         </div>
     );
 };

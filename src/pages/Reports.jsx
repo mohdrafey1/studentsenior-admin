@@ -1,36 +1,252 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import DeltaBadge from '../components/DeltaBadge';
-import { useSidebarLayout } from '../hooks/useSidebarLayout';
 import { useStatsWithDelta } from '../hooks/useStatsWithDelta';
 import api from '../utils/api';
-import toast from 'react-hot-toast';
-import {
-    BarChart3,
-    Users,
-    Book,
-    Building,
-    GraduationCap,
-    ShoppingBag,
-    Gift,
-    CreditCard,
-    PhoneCall,
-    AlertCircle,
-    Diamond,
-} from 'lucide-react';
+import { formatINR, formatNumber } from '../utils/format';
 import Loader from '../components/Common/Loader';
+import { Alert, Button, PageHeader, Skeleton } from '../components/ui';
+
+// Report groups. `statKey` is the /stats/stats field shown as the row's
+// number; rows without one are links only (the API has no total for them).
+const GROUPS = [
+    {
+        title: 'Money',
+        rows: [
+            {
+                label: 'Payments',
+                desc: 'Razorpay payments from students',
+                href: '/reports/payments',
+                statKey: 'totalPayments',
+            },
+            {
+                label: 'Transactions',
+                desc: 'Every points credit and debit',
+                href: '/reports/transactions',
+                statKey: 'totalTransactions',
+            },
+            {
+                label: 'Orders',
+                desc: 'PYQ, note and points top-up orders',
+                href: '/reports/orders',
+                statKey: 'totalOrders',
+            },
+            {
+                label: 'Refund requests',
+                desc: 'Reviewed before Razorpay refunds',
+                href: '/reports/refunds',
+            },
+            {
+                label: 'Redemptions',
+                desc: 'Points withdrawn over UPI',
+                href: '/reports/redemptions',
+                statKey: 'totalRedemptionRequest',
+            },
+            {
+                label: 'Subscriptions',
+                desc: 'Premium plans, trials and churn',
+                href: '/reports/subscriptions',
+                statKey: 'totalSubscriptions',
+            },
+            {
+                label: 'Content purchases',
+                desc: 'In-app purchases of PYQs and notes',
+                href: '/reports/content-purchases',
+            },
+        ],
+    },
+    {
+        title: 'People & support',
+        rows: [
+            {
+                label: 'Users',
+                desc: 'Students with an account',
+                href: '/reports/clients',
+                statKey: 'totalClient',
+            },
+            {
+                label: 'Contact requests',
+                desc: 'Messages sent from the website',
+                href: '/reports/contacts',
+                statKey: 'totalContactUs',
+            },
+            {
+                label: 'Admin team',
+                desc: 'People who can open this console',
+                href: '/reports/dashboard-users',
+                statKey: 'totalDashboardUsers',
+            },
+            {
+                label: 'Affiliate products',
+                desc: 'Recommended products and their clicks',
+                href: '/affiliate-products',
+                statKey: 'totalAffiliateProduct',
+            },
+        ],
+    },
+    {
+        title: 'Catalog',
+        rows: [
+            {
+                label: 'Courses',
+                desc: 'Degrees such as B.Tech and BCA',
+                href: '/reports/courses',
+                statKey: 'totalCourse',
+            },
+            {
+                label: 'Branches',
+                desc: 'Specialisations within a course',
+                href: '/reports/branches',
+                statKey: 'totalBranch',
+            },
+            {
+                label: 'Subjects',
+                desc: 'With syllabus and quick notes',
+                href: '/reports/subjects',
+                statKey: 'totalSubjects',
+            },
+        ],
+    },
+];
+
+// A failed or forbidden request (moderators can't read money endpoints)
+// becomes null, so that tile is left out instead of failing the page.
+const settle = (request) =>
+    request.then((response) => response.data?.data ?? null).catch(() => null);
+
+/** Counts of things waiting on a person, from the same queries as Home. */
+function useWaitingCounts() {
+    const [state, setState] = useState({ loading: true });
+
+    useEffect(() => {
+        let cancelled = false;
+        const tz = new Date().getTimezoneOffset();
+        Promise.all([
+            settle(
+                api.get('/refunds', {
+                    params: { status: 'requested', limit: 1 },
+                }),
+            ),
+            settle(
+                api.get('/refunds', {
+                    params: { status: 'reviewing', limit: 1 },
+                }),
+            ),
+            settle(
+                api.get('/transactions/redemption-requests', {
+                    params: {
+                        status: 'pending',
+                        page: 1,
+                        pageSize: 1,
+                        timezoneOffset: tz,
+                    },
+                }),
+            ),
+            settle(api.get('/stats/contact-us')),
+            settle(
+                api.get('/community-chat/reports', {
+                    params: { status: 'open' },
+                }),
+            ),
+        ]).then(([requested, reviewing, redemptions, contacts, reports]) => {
+            if (cancelled) return;
+            const tiles = [];
+            if (requested || reviewing) {
+                const count =
+                    (requested?.pagination?.totalItems || 0) +
+                    (reviewing?.pagination?.totalItems || 0);
+                tiles.push({
+                    label: 'Refund requests',
+                    value: count,
+                    note: count
+                        ? 'Waiting for a decision'
+                        : 'No refunds waiting',
+                    href: '/reports/refunds',
+                });
+            }
+            if (redemptions) {
+                const count = redemptions.pagination?.total || 0;
+                tiles.push({
+                    label: 'UPI redemptions',
+                    value: count,
+                    note: count
+                        ? `${formatINR(redemptions.totals?.rupees)} to pay out`
+                        : 'No payouts waiting',
+                    href: '/reports/redemptions',
+                });
+            }
+            if (Array.isArray(contacts)) {
+                const count = contacts.filter(
+                    (c) => (c.status || 'pending') === 'pending',
+                ).length;
+                tiles.push({
+                    label: 'Contact requests',
+                    value: count,
+                    note: count ? 'Not answered yet' : 'Every message answered',
+                    href: '/reports/contacts',
+                });
+            }
+            if (reports) {
+                const count = (reports.reports || []).length;
+                tiles.push({
+                    label: 'Community reports',
+                    value: count,
+                    note: count
+                        ? 'Messages flagged in group chats'
+                        : 'No flagged messages',
+                    href: '/community',
+                });
+            }
+            setState({ loading: false, tiles });
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    return state;
+}
+
+function WaitingTile({ label, value, note, href }) {
+    const waiting = value > 0;
+    return (
+        <Link
+            to={href}
+            className={`flex flex-col gap-2 px-[18px] py-4 rounded-xl border transition-colors ${
+                waiting
+                    ? 'bg-warn-soft border-warn/30 hover:border-warn/60'
+                    : 'bg-sheet border-line hover:border-line-strong'
+            }`}
+        >
+            <span className='flex items-center gap-2'>
+                <span className='flex-1 text-[13.5px] font-medium text-ink'>
+                    {label}
+                </span>
+                <ChevronRight
+                    className={`w-3.5 h-3.5 ${waiting ? 'text-warn-ink' : 'text-muted'}`}
+                    aria-hidden='true'
+                />
+            </span>
+            <span className='font-serif font-bold text-[28px] leading-none text-ink'>
+                {formatNumber(value)}
+            </span>
+            <span
+                className={`text-[12.5px] ${waiting ? 'text-warn-ink' : 'text-muted'}`}
+            >
+                {note}
+            </span>
+        </Link>
+    );
+}
 
 const Reports = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const { mainContentMargin } = useSidebarLayout();
     const { deltaStats, lastViewedAt, setStats, acknowledgeStat } =
         useStatsWithDelta();
-
-    const navigate = useNavigate();
+    const waiting = useWaitingCounts();
 
     const fetchReportStats = async () => {
         try {
@@ -41,8 +257,9 @@ const Reports = () => {
             setStats(statsData);
         } catch (error) {
             console.error('Error fetching stats:', error);
-            setError('Failed to load statistics');
-            toast.error('Failed to load statistics');
+            setError(
+                'Couldn’t load the report totals. Check your connection and try again.',
+            );
         } finally {
             setLoading(false);
         }
@@ -53,296 +270,146 @@ const Reports = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const statsCategories = [
-        {
-            title: 'Financial',
-            stats: [
-                {
-                    id: 'payments',
-                    title: 'Total Payments',
-                    value: data?.totalPayments || 0,
-                    icon: <CreditCard className='w-5 h-5' />,
-                    bgColor: 'bg-green-100 dark:bg-green-900',
-                    textColor: 'text-green-600 dark:text-green-400',
-                    iconColor: 'text-green-500 dark:text-green-300',
-                    href: '/reports/payments',
-                    statKey: 'totalPayments',
-                },
-
-                {
-                    id: 'orders',
-                    title: 'Total Orders',
-                    value: data?.totalOrders || 0,
-                    icon: <ShoppingBag className='w-5 h-5' />,
-                    bgColor: 'bg-orange-100 dark:bg-orange-900',
-                    textColor: 'text-orange-600 dark:text-orange-400',
-                    iconColor: 'text-orange-500 dark:text-orange-300',
-                    href: '/reports/orders',
-                    statKey: 'totalOrders',
-                },
-                {
-                    id: 'redemption',
-                    title: 'Redemption Requests',
-                    value: data?.totalRedemptionRequest || 0,
-                    icon: <Gift className='w-5 h-5' />,
-                    bgColor: 'bg-purple-100 dark:bg-purple-900',
-                    textColor: 'text-purple-600 dark:text-purple-400',
-                    iconColor: 'text-purple-500 dark:text-purple-300',
-                    href: '/reports/redemptions',
-                    statKey: 'totalRedemptionRequest',
-                },
-                {
-                    id: 'transactions',
-                    title: 'Total Transactions',
-                    value: data?.totalTransactions || 0,
-                    icon: <BarChart3 className='w-5 h-5' />,
-                    bgColor: 'bg-blue-100 dark:bg-blue-900',
-                    textColor: 'text-blue-600 dark:text-blue-400',
-                    iconColor: 'text-blue-500 dark:text-blue-300',
-                    href: '/reports/transactions',
-                    statKey: 'totalTransactions',
-                },
-            ],
-        },
-        {
-            title: 'Users & Support',
-            stats: [
-                {
-                    id: 'users',
-                    title: 'Total Clients',
-                    value: data?.totalClient || 0,
-                    icon: <Users className='w-5 h-5' />,
-                    bgColor: 'bg-indigo-100 dark:bg-indigo-900',
-                    textColor: 'text-indigo-600 dark:text-indigo-400',
-                    iconColor: 'text-indigo-500 dark:text-indigo-300',
-                    href: '/reports/clients',
-                    statKey: 'totalClient',
-                },
-                {
-                    id: 'dashboardUsers',
-                    title: 'Dashboard Users',
-                    value: data?.totalDashboardUsers || 0,
-                    icon: <Users className='w-5 h-5' />,
-                    bgColor: 'bg-indigo-100 dark:bg-indigo-900',
-                    textColor: 'text-indigo-600 dark:text-indigo-400',
-                    iconColor: 'text-indigo-500 dark:text-indigo-300',
-                    href: '/reports/dashboard-users',
-                    statKey: 'totalDashboardUsers',
-                },
-                {
-                    id: 'contactUs',
-                    title: 'Contact Requests',
-                    value: data?.totalContactUs || 0,
-                    icon: <PhoneCall className='w-5 h-5' />,
-                    bgColor: 'bg-pink-100 dark:bg-pink-900',
-                    textColor: 'text-pink-600 dark:text-pink-400',
-                    iconColor: 'text-pink-500 dark:text-pink-300',
-                    href: '/reports/contacts',
-                    statKey: 'totalContactUs',
-                },
-                {
-                    id: 'subscriptions',
-                    title: 'Subscriptions',
-                    value: data?.totalSubscriptions || 0,
-                    icon: <Diamond className='w-5 h-5' />,
-                    bgColor: 'bg-amber-100 dark:bg-amber-900',
-                    textColor: 'text-amber-600 dark:text-amber-400',
-                    iconColor: 'text-amber-500 dark:text-amber-300',
-                    href: '/reports/subscriptions',
-                    statKey: 'totalSubscriptions',
-                },
-            ],
-        },
-        {
-            title: 'Education & Products',
-            stats: [
-                {
-                    id: 'subjects',
-                    title: 'Total Subjects',
-                    value: data?.totalSubjects || 0,
-                    icon: <Book className='w-5 h-5' />,
-                    bgColor: 'bg-cyan-100 dark:bg-cyan-900',
-                    textColor: 'text-cyan-600 dark:text-cyan-400',
-                    iconColor: 'text-cyan-500 dark:text-cyan-300',
-                    href: '/reports/subjects',
-                    statKey: 'totalSubjects',
-                },
-                {
-                    id: 'branches',
-                    title: 'Total Branches',
-                    value: data?.totalBranch || 0,
-                    icon: <Building className='w-5 h-5' />,
-                    bgColor: 'bg-teal-100 dark:bg-teal-900',
-                    textColor: 'text-teal-600 dark:text-teal-400',
-                    iconColor: 'text-teal-500 dark:text-teal-300',
-                    href: '/reports/branches',
-                    statKey: 'totalBranch',
-                },
-                {
-                    id: 'courses',
-                    title: 'Total Courses',
-                    value: data?.totalCourse || 0,
-                    icon: <GraduationCap className='w-5 h-5' />,
-                    bgColor: 'bg-emerald-100 dark:bg-emerald-900',
-                    textColor: 'text-emerald-600 dark:text-emerald-400',
-                    iconColor: 'text-emerald-500 dark:text-emerald-300',
-                    href: '/reports/courses',
-                    statKey: 'totalCourse',
-                },
-            ],
-        },
-    ];
-
     if (loading) {
         return <Loader />;
     }
 
+    const attention = (waiting.tiles || []).some((tile) => tile.value > 0);
+
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Reports'
+                description='Every platform total, grouped by what you’d do next.'
+            />
 
-            <main
-                className={`pt-4 pb-6 ${mainContentMargin} transition-all duration-300`}
-            >
-                <div className='max-w-7xl mx-auto px-3 sm:px-4 lg:px-6'>
-                    {/* Error Message */}
-                    {error && (
-                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-3 rounded-lg mb-4'>
-                            <div className='flex items-center'>
-                                <AlertCircle className='w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0' />
-                                <span className='text-sm'>{error}</span>
-                            </div>
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-6'
+                    action={
+                        <Button size='sm' onClick={fetchReportStats}>
+                            Try again
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
+
+            {(waiting.loading || waiting.tiles.length > 0) && (
+                <section
+                    aria-labelledby='waiting-title'
+                    className='flex flex-col gap-3 mb-7'
+                >
+                    <h2
+                        id='waiting-title'
+                        className='flex items-center gap-2 text-[15px] font-semibold text-ink'
+                    >
+                        <span
+                            aria-hidden='true'
+                            className={`w-2 h-2 rounded-full ${
+                                attention ? 'bg-warn' : 'bg-ok'
+                            }`}
+                        />
+                        Needs action
+                    </h2>
+                    <div className='grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-3.5'>
+                        {waiting.loading
+                            ? Array.from({ length: 4 }, (_, i) => (
+                                  <div
+                                      key={i}
+                                      className='flex flex-col gap-3 px-[18px] py-4 rounded-xl border border-line bg-sheet'
+                                  >
+                                      <Skeleton className='h-3 w-28' />
+                                      <Skeleton className='h-7 w-12' />
+                                      <Skeleton className='h-3 w-36' />
+                                  </div>
+                              ))
+                            : waiting.tiles.map((tile) => (
+                                  <WaitingTile key={tile.label} {...tile} />
+                              ))}
+                    </div>
+                </section>
+            )}
+
+            <div className='grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5 items-start'>
+                {GROUPS.map((group) => (
+                    <section
+                        key={group.title}
+                        aria-labelledby={`group-${group.title}`}
+                        className='bg-sheet border border-line rounded-xl overflow-hidden'
+                    >
+                        <div className='flex items-center gap-3 px-5 py-4 border-b border-line-soft'>
+                            <h2
+                                id={`group-${group.title}`}
+                                className='flex-1 text-[15px] font-semibold text-ink'
+                            >
+                                {group.title}
+                            </h2>
+                            <span className='eyebrow'>
+                                {group.rows.length} reports
+                            </span>
                         </div>
-                    )}
-
-                    {/* Statistics Categories */}
-                    {data ? (
-                        <div className='space-y-5'>
-                            {statsCategories.map((category, index) => (
-                                <div
-                                    key={index}
-                                    className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'
-                                >
-                                    {/* Category Header */}
-                                    <div className='px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'>
-                                        <h2 className='text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide'>
-                                            {category.title}
-                                        </h2>
-                                    </div>
-
-                                    {/* Stats Grid */}
-                                    <div className='p-4'>
-                                        <div className='grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3'>
-                                            {category.stats.map((stat) => (
-                                                <button
-                                                    key={stat.id}
-                                                    onClick={() => {
-                                                        if (stat.statKey) {
-                                                            acknowledgeStat(
-                                                                stat.statKey,
-                                                            );
+                        <ul>
+                            {group.rows.map((row) => {
+                                const value = row.statKey
+                                    ? data?.[row.statKey]
+                                    : undefined;
+                                const delta = row.statKey
+                                    ? deltaStats[row.statKey]
+                                    : undefined;
+                                return (
+                                    <li
+                                        key={row.label}
+                                        className='border-b border-line-soft last:border-b-0'
+                                    >
+                                        <Link
+                                            to={row.href}
+                                            onClick={() => {
+                                                if (row.statKey) {
+                                                    acknowledgeStat(
+                                                        row.statKey,
+                                                    );
+                                                }
+                                            }}
+                                            className='flex items-center gap-3 px-5 py-3 hover:bg-sunken transition-colors'
+                                        >
+                                            <span className='flex-1 min-w-0 flex flex-col gap-0.5'>
+                                                <span className='text-[13.5px] font-medium text-ink'>
+                                                    {row.label}
+                                                </span>
+                                                <span className='text-[12.5px] text-muted'>
+                                                    {row.desc}
+                                                </span>
+                                            </span>
+                                            <span className='flex flex-col items-end gap-1'>
+                                                {value !== undefined && (
+                                                    <span className='font-mono text-[13px] text-ink'>
+                                                        {formatNumber(value)}
+                                                    </span>
+                                                )}
+                                                {delta !== undefined && (
+                                                    <DeltaBadge
+                                                        value={delta}
+                                                        lastViewedAt={
+                                                            lastViewedAt
                                                         }
-                                                        navigate(stat.href);
-                                                    }}
-                                                    className='block group w-full text-left'
-                                                >
-                                                    <div className='bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200'>
-                                                        {/* Stat Content */}
-                                                        <div className='p-3.5'>
-                                                            <div className='flex items-start justify-between gap-2 mb-2'>
-                                                                <div className='flex-1 min-w-0'>
-                                                                    <h3
-                                                                        className={`text-xs font-medium ${stat.textColor} truncate leading-tight`}
-                                                                    >
-                                                                        {
-                                                                            stat.title
-                                                                        }
-                                                                    </h3>
-                                                                </div>
-                                                                <div
-                                                                    className={`p-1.5 rounded-md ${stat.bgColor} ${stat.iconColor} flex-shrink-0`}
-                                                                >
-                                                                    {React.cloneElement(
-                                                                        stat.icon,
-                                                                        {
-                                                                            className:
-                                                                                'w-3.5 h-3.5',
-                                                                        },
-                                                                    )}
-                                                                </div>
-                                                            </div>
-
-                                                            <div className='flex items-baseline gap-1.5'>
-                                                                <p className='text-xl sm:text-2xl font-bold text-gray-900 dark:text-white'>
-                                                                    {stat.value.toLocaleString()}
-                                                                </p>
-                                                                {stat.statKey &&
-                                                                    deltaStats[
-                                                                        stat
-                                                                            .statKey
-                                                                    ] !==
-                                                                        undefined && (
-                                                                        <DeltaBadge
-                                                                            value={
-                                                                                deltaStats[
-                                                                                    stat
-                                                                                        .statKey
-                                                                                ]
-                                                                            }
-                                                                            lastViewedAt={
-                                                                                lastViewedAt
-                                                                            }
-                                                                        />
-                                                                    )}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Footer Action */}
-                                                        <div className='px-3.5 py-2 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700'>
-                                                            <div className='text-xs text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center transition-colors'>
-                                                                <span>
-                                                                    View details
-                                                                </span>
-                                                                <svg
-                                                                    className='ml-1 w-3 h-3 transition-transform group-hover:translate-x-0.5'
-                                                                    fill='none'
-                                                                    stroke='currentColor'
-                                                                    viewBox='0 0 24 24'
-                                                                >
-                                                                    <path
-                                                                        strokeLinecap='round'
-                                                                        strokeLinejoin='round'
-                                                                        strokeWidth='2'
-                                                                        d='M9 5l7 7-7 7'
-                                                                    />
-                                                                </svg>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-center p-8'>
-                            <div className='mx-auto max-w-md'>
-                                <BarChart3 className='w-12 h-12 mx-auto text-gray-400 mb-3' />
-                                <h3 className='text-lg font-medium text-gray-900 dark:text-white mb-2'>
-                                    No Statistics Available
-                                </h3>
-                                <p className='text-sm text-gray-600 dark:text-gray-400'>
-                                    There are no statistics available to display
-                                    at this time.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </main>
+                                                    />
+                                                )}
+                                            </span>
+                                            <ChevronRight
+                                                className='w-3.5 h-3.5 text-muted shrink-0'
+                                                aria-hidden='true'
+                                            />
+                                        </Link>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </section>
+                ))}
+            </div>
         </div>
     );
 };

@@ -1,25 +1,108 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
-import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import {
-    Diamond,
-    TrendingUp,
-    TrendingDown,
-    Gift,
-    Clock,
-    CheckCircle,
-    XCircle,
-    AlertCircle,
-} from 'lucide-react';
+import { Gem } from 'lucide-react';
+import api from '../../utils/api';
+import { formatDate, formatNumber } from '../../utils/format';
 import Pagination from '../../components/Pagination';
-import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
 import FilterBar from '../../components/Common/FilterBar';
 import { filterByTime } from '../../components/Common/timeFilterUtils';
+import {
+    Alert,
+    Button,
+    EmptyState,
+    PageHeader,
+    Panel,
+    Stat,
+    StatusBadge,
+    Table,
+    Tabs,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+import { humanize } from './financeFormat';
+import { UserCell } from './financeParts';
+
+const STATUS_TABS = [
+    ['', 'All'],
+    ['active', 'Active'],
+    ['trial', 'Trial'],
+    ['pending', 'Pending'],
+    ['expired', 'Expired'],
+    ['cancelled', 'Cancelled'],
+];
+
+const PLATFORM_LABELS = { android: 'Android', ios: 'iOS' };
+const platformLabel = (p) => PLATFORM_LABELS[p] || humanize(p) || '—';
+const planLabel = (productId) => humanize(productId) || 'Unknown plan';
+
+/** "in 13 days", "today", "3 days ago" for an expiry date. */
+const untilText = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const days = Math.round((date.getTime() - Date.now()) / 864e5);
+    if (days === 0) return 'today';
+    if (days > 0) return days === 1 ? 'in 1 day' : `in ${days} days`;
+    return days === -1 ? '1 day ago' : `${-days} days ago`;
+};
+
+/** Share of active subscriptions by some key, as rows for a bar list. */
+const splitBy = (subs, keyOf, labelOf) => {
+    const counts = {};
+    subs.forEach((s) => {
+        const key = keyOf(s) || 'unknown';
+        counts[key] = (counts[key] || 0) + 1;
+    });
+    const total = subs.length || 1;
+    const max = Math.max(1, ...Object.values(counts));
+    return Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([key, count]) => ({
+            key,
+            label: labelOf(key),
+            count,
+            share: Math.round((count / total) * 100),
+            width: Math.max(2, Math.round((count / max) * 100)),
+        }));
+};
+
+const SplitPanel = ({ title, titleId, rows }) => (
+    <Panel title={title} titleId={titleId} bodyClassName='px-5 py-4'>
+        {rows.length === 0 ? (
+            <p className='text-[13.5px] text-muted'>
+                No active subscriptions yet.
+            </p>
+        ) : (
+            <ul className='flex flex-col gap-3'>
+                {rows.map((row) => (
+                    <li key={row.key} className='flex flex-col gap-1.5'>
+                        <div className='flex items-baseline gap-2 text-[13.5px]'>
+                            <span className='flex-1 text-ink'>{row.label}</span>
+                            <span className='font-mono text-[13px] text-ink'>
+                                {formatNumber(row.count)}
+                            </span>
+                            <span className='w-10 text-right text-xs text-muted'>
+                                {row.share}%
+                            </span>
+                        </div>
+                        <div
+                            className='h-1.5 rounded-full bg-line-soft overflow-hidden'
+                            aria-hidden='true'
+                        >
+                            <div
+                                className='h-full rounded-full bg-brand'
+                                style={{ width: `${row.width}%` }}
+                            />
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        )}
+    </Panel>
+);
 
 const Subscriptions = () => {
     const [subscriptions, setSubscriptions] = useState([]);
@@ -38,7 +121,6 @@ const Subscriptions = () => {
     const [viewMode, setViewMode] = useState(() => {
         return window.innerWidth >= 1024 ? 'table' : 'grid';
     });
-    const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -49,11 +131,9 @@ const Subscriptions = () => {
             const response = await api.get('/subscription');
             setSubscriptions(response?.data?.data || []);
         } catch (error) {
-            console.error('Error fetching subscriptions:', error);
             const errorMessage =
                 error.response?.data?.message ||
-                error.message ||
-                'Failed to load subscriptions';
+                'Couldn’t load subscriptions. Check your connection and try again.';
             setError(errorMessage);
             toast.error(errorMessage);
         } finally {
@@ -130,19 +210,9 @@ const Subscriptions = () => {
         navigate,
     ]);
 
-    // Responsive view mode
-    useEffect(() => {
-        const handleResize = () => {
-            const newMode = window.innerWidth >= 1024 ? 'table' : 'grid';
-            setViewMode(newMode);
-        };
-
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    // Client-side filtering and sorting
-    const filteredAndSortedSubscriptions = useMemo(() => {
+    // Search and time filters; the status tab is applied after, so tab
+    // counts reflect everything else.
+    const baseSubscriptions = useMemo(() => {
         let filtered = [...subscriptions];
 
         // Search filter
@@ -160,13 +230,18 @@ const Subscriptions = () => {
             );
         }
 
+        // Time filter
+        return filtered.filter((s) => filterByTime(s, timeFilter));
+    }, [subscriptions, search, timeFilter]);
+
+    // Client-side status filter and sorting
+    const filteredAndSortedSubscriptions = useMemo(() => {
+        let filtered = [...baseSubscriptions];
+
         // Status filter
         if (filterStatus) {
             filtered = filtered.filter((s) => s.status === filterStatus);
         }
-
-        // Time filter
-        filtered = filtered.filter((s) => filterByTime(s, timeFilter));
 
         // Sorting
         filtered.sort((a, b) => {
@@ -182,7 +257,24 @@ const Subscriptions = () => {
         });
 
         return filtered;
-    }, [subscriptions, search, filterStatus, timeFilter, sortBy, sortOrder]);
+    }, [baseSubscriptions, filterStatus, sortBy, sortOrder]);
+
+    const counts = useMemo(
+        () =>
+            baseSubscriptions.reduce(
+                (acc, s) => {
+                    acc[s.status] = (acc[s.status] || 0) + 1;
+                    return acc;
+                },
+                { '': baseSubscriptions.length },
+            ),
+        [baseSubscriptions],
+    );
+
+    const active = useMemo(
+        () => subscriptions.filter((s) => s.status === 'active'),
+        [subscriptions],
+    );
 
     // Pagination
     const totalItems = filteredAndSortedSubscriptions.length;
@@ -197,419 +289,331 @@ const Subscriptions = () => {
         setPage(newPage);
     };
 
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'active':
-                return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-            case 'trial':
-                return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-            case 'expired':
-                return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-            case 'cancelled':
-                return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-            case 'pending':
-                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-            default:
-                return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-        }
-    };
-
-    const getStatusIcon = (status) => {
-        switch (status) {
-            case 'active':
-                return <CheckCircle className='w-3.5 h-3.5' />;
-            case 'trial':
-                return <Gift className='w-3.5 h-3.5' />;
-            case 'expired':
-                return <Clock className='w-3.5 h-3.5' />;
-            case 'cancelled':
-                return <XCircle className='w-3.5 h-3.5' />;
-            default:
-                return <AlertCircle className='w-3.5 h-3.5' />;
-        }
+    const hasFilters = Boolean(search || (timeFilter && timeFilter !== 'all'));
+    const clearFilters = () => {
+        setSearch('');
+        setTimeFilter('');
+        setPage(1);
     };
 
     if (loading && analyticsLoading) {
         return <Loader />;
     }
 
+    const pagination = (
+        <Pagination
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={handlePageChange}
+            onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+            }}
+        />
+    );
+
+    const empty = (
+        <EmptyState
+            icon={Gem}
+            title={
+                subscriptions.length === 0
+                    ? 'No subscriptions yet'
+                    : 'No subscriptions match'
+            }
+            description={
+                subscriptions.length === 0
+                    ? 'Premium plans bought in the apps appear here.'
+                    : 'Try another search, status or date range.'
+            }
+            action={
+                hasFilters ? (
+                    <Button onClick={clearFilters}>Clear filters</Button>
+                ) : undefined
+            }
+        />
+    );
+
+    const expiryCell = (s) => (
+        <div className='flex flex-col gap-0.5 whitespace-nowrap'>
+            <span>{formatDate(s.expiryDate)}</span>
+            {s.expiryDate && (
+                <span
+                    className={`text-xs ${
+                        s.status === 'active' &&
+                        !s.autoRenewing &&
+                        new Date(s.expiryDate) - Date.now() < 7 * 864e5 &&
+                        new Date(s.expiryDate) > Date.now()
+                            ? 'text-warn-ink'
+                            : 'text-muted'
+                    }`}
+                >
+                    {untilText(s.expiryDate)}
+                    {s.status === 'active' &&
+                        s.autoRenewing === false &&
+                        ', not renewing'}
+                </span>
+            )}
+        </div>
+    );
+
+    const renewLabel = (s) =>
+        s.autoRenewing === undefined || s.autoRenewing === null
+            ? '—'
+            : s.autoRenewing
+              ? 'On'
+              : 'Off';
+
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Subscriptions'
+                description='Premium plans bought in the Android and iOS apps.'
+            />
 
-            <main
-                className={`py-4 ${mainContentMargin} transition-all duration-300`}
-            >
-                <div className='max-w-7xl mx-auto px-4 sm:px-6'>
-                    {/* Header */}
-                    <BackButton title='Subscriptions' TitleIcon={Diamond} />
+            {(analytics || analyticsLoading) && (
+                <div className='grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-6'>
+                    <Stat
+                        label='Active'
+                        loading={analyticsLoading}
+                        value={formatNumber(
+                            analytics?.overview?.activeSubscriptions,
+                        )}
+                        note='Paid and current'
+                    />
+                    <Stat
+                        label='Trials claimed'
+                        loading={analyticsLoading}
+                        value={formatNumber(analytics?.trials?.total)}
+                        note={`${formatNumber(analytics?.trials?.today)} today`}
+                    />
+                    <Stat
+                        label='Premium users'
+                        loading={analyticsLoading}
+                        value={formatNumber(analytics?.overview?.premiumUsers)}
+                        note='Currently premium'
+                    />
+                    <Stat
+                        label='Trial to paid'
+                        loading={analyticsLoading}
+                        value={`${analytics?.metrics?.conversionRate || 0}%`}
+                        note='Trials that converted'
+                    />
+                    <Stat
+                        label='Churn'
+                        loading={analyticsLoading}
+                        value={`${analytics?.metrics?.churnRate || 0}%`}
+                        note='Cancelled or expired'
+                    />
+                    <Stat
+                        label='Expired'
+                        loading={analyticsLoading}
+                        value={formatNumber(
+                            analytics?.overview?.expiredSubscriptions,
+                        )}
+                        note='No longer premium'
+                    />
+                </div>
+            )}
 
-                    {/* Analytics Cards */}
-                    {analytics && (
-                        <div className='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4'>
-                            {/* Active */}
-                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3'>
-                                <div className='flex items-center gap-2 mb-1'>
-                                    <div className='p-1.5 rounded bg-green-100 dark:bg-green-900/50'>
-                                        <CheckCircle className='w-3.5 h-3.5 text-green-600 dark:text-green-400' />
-                                    </div>
-                                    <span className='text-xs text-gray-500 dark:text-gray-400'>
-                                        Active
-                                    </span>
-                                </div>
-                                <p className='text-xl font-bold text-gray-900 dark:text-white'>
-                                    {analytics.overview?.activeSubscriptions ||
-                                        0}
-                                </p>
-                            </div>
+            {!loading && subscriptions.length > 0 && (
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mb-6'>
+                    <SplitPanel
+                        title='Active by plan'
+                        titleId='plan-split-title'
+                        rows={splitBy(active, (s) => s.productId, planLabel)}
+                    />
+                    <SplitPanel
+                        title='Active by platform'
+                        titleId='platform-split-title'
+                        rows={splitBy(active, (s) => s.platform, platformLabel)}
+                    />
+                </div>
+            )}
 
-                            {/* Trials */}
-                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3'>
-                                <div className='flex items-center gap-2 mb-1'>
-                                    <div className='p-1.5 rounded bg-blue-100 dark:bg-blue-900/50'>
-                                        <Gift className='w-3.5 h-3.5 text-blue-600 dark:text-blue-400' />
-                                    </div>
-                                    <span className='text-xs text-gray-500 dark:text-gray-400'>
-                                        Trials
-                                    </span>
-                                </div>
-                                <p className='text-xl font-bold text-gray-900 dark:text-white'>
-                                    {analytics.trials?.total || 0}
-                                </p>
-                                <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                    {analytics.trials?.today || 0} today
-                                </p>
-                            </div>
+            <Tabs
+                label='Subscription status'
+                className='mb-4'
+                value={filterStatus}
+                onChange={(value) => {
+                    setFilterStatus(value);
+                    setPage(1);
+                }}
+                items={STATUS_TABS.map(([value, label]) => ({
+                    value,
+                    label,
+                    count: counts[value] || 0,
+                }))}
+            />
 
-                            {/* Premium Users */}
-                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3'>
-                                <div className='flex items-center gap-2 mb-1'>
-                                    <div className='p-1.5 rounded bg-amber-100 dark:bg-amber-900/50'>
-                                        <Diamond className='w-3.5 h-3.5 text-amber-600 dark:text-amber-400' />
-                                    </div>
-                                    <span className='text-xs text-gray-500 dark:text-gray-400'>
-                                        Premium
-                                    </span>
-                                </div>
-                                <p className='text-xl font-bold text-gray-900 dark:text-white'>
-                                    {analytics.overview?.premiumUsers || 0}
-                                </p>
-                            </div>
+            <FilterBar
+                className='mb-4'
+                search={search}
+                onSearch={(value) => {
+                    setSearch(value);
+                    setPage(1);
+                }}
+                searchPlaceholder='Search by username, email or plan'
+                timeFilter={{
+                    value: timeFilter,
+                    onChange: (v) => {
+                        setTimeFilter(v);
+                        setPage(1);
+                    },
+                }}
+                sortBy={{
+                    value: sortBy,
+                    onChange: setSortBy,
+                    options: [
+                        { value: 'createdAt', label: 'Sort by date' },
+                        { value: 'expiryDate', label: 'Sort by expiry' },
+                    ],
+                }}
+                sortOrder={{
+                    value: sortOrder,
+                    onToggle: () =>
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                }}
+                viewMode={{
+                    value: viewMode,
+                    onChange: setViewMode,
+                }}
+                onClear={clearFilters}
+                showClear={hasFilters}
+            />
 
-                            {/* Conversion Rate */}
-                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3'>
-                                <div className='flex items-center gap-2 mb-1'>
-                                    <div className='p-1.5 rounded bg-emerald-100 dark:bg-emerald-900/50'>
-                                        <TrendingUp className='w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400' />
-                                    </div>
-                                    <span className='text-xs text-gray-500 dark:text-gray-400'>
-                                        Conversion
-                                    </span>
-                                </div>
-                                <p className='text-xl font-bold text-gray-900 dark:text-white'>
-                                    {analytics.metrics?.conversionRate || 0}%
-                                </p>
-                            </div>
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button size='sm' onClick={fetchSubscriptions}>
+                            Try again
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
 
-                            {/* Churn Rate */}
-                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3'>
-                                <div className='flex items-center gap-2 mb-1'>
-                                    <div className='p-1.5 rounded bg-red-100 dark:bg-red-900/50'>
-                                        <TrendingDown className='w-3.5 h-3.5 text-red-600 dark:text-red-400' />
-                                    </div>
-                                    <span className='text-xs text-gray-500 dark:text-gray-400'>
-                                        Churn
-                                    </span>
-                                </div>
-                                <p className='text-xl font-bold text-gray-900 dark:text-white'>
-                                    {analytics.metrics?.churnRate || 0}%
-                                </p>
-                            </div>
-
-                            {/* Expired */}
-                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3'>
-                                <div className='flex items-center gap-2 mb-1'>
-                                    <div className='p-1.5 rounded bg-gray-100 dark:bg-gray-700'>
-                                        <Clock className='w-3.5 h-3.5 text-gray-600 dark:text-gray-400' />
-                                    </div>
-                                    <span className='text-xs text-gray-500 dark:text-gray-400'>
-                                        Expired
-                                    </span>
-                                </div>
-                                <p className='text-xl font-bold text-gray-900 dark:text-white'>
-                                    {analytics.overview?.expiredSubscriptions ||
-                                        0}
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Filters */}
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3'>
-                        <FilterBar
-                            search={search}
-                            onSearch={setSearch}
-                            filters={[
-                                {
-                                    label: 'Status',
-                                    value: filterStatus,
-                                    onChange: setFilterStatus,
-                                    options: [
-                                        { value: '', label: 'All Statuses' },
-                                        { value: 'active', label: 'Active' },
-                                        { value: 'trial', label: 'Trial' },
-                                        { value: 'expired', label: 'Expired' },
-                                        {
-                                            value: 'cancelled',
-                                            label: 'Cancelled',
-                                        },
-                                        { value: 'pending', label: 'Pending' },
-                                    ],
-                                },
-                            ]}
-                            timeFilter={{
-                                value: timeFilter,
-                                onChange: (v) => {
-                                    setTimeFilter(v);
-                                    setPage(1);
-                                },
-                            }}
-                            sortBy={{
-                                value: sortBy,
-                                onChange: setSortBy,
-                                options: [
-                                    {
-                                        value: 'createdAt',
-                                        label: 'Sort by Date',
-                                    },
-                                    {
-                                        value: 'expiryDate',
-                                        label: 'Sort by Expiry',
-                                    },
-                                ],
-                            }}
-                            sortOrder={{
-                                value: sortOrder,
-                                onToggle: () =>
-                                    setSortOrder(
-                                        sortOrder === 'asc' ? 'desc' : 'asc',
-                                    ),
-                            }}
-                            viewMode={{
-                                value: viewMode,
-                                onChange: setViewMode,
-                            }}
-                            onClear={() => {
-                                setSearch('');
-                                setFilterStatus('');
-                                setTimeFilter('');
-                                setPage(1);
-                            }}
-                            showClear={!!(search || filterStatus || timeFilter)}
-                        />
-                    </div>
-
-                    {/* Error Message */}
-                    {error && (
-                        <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded text-sm mb-3'>
-                            {error}
-                        </div>
-                    )}
-
-                    {/* Subscriptions Display */}
-                    {currentSubscriptions.length > 0 ? (
-                        <>
-                            {/* Grid View */}
-                            {viewMode === 'grid' && (
-                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mb-3'>
-                                    {currentSubscriptions.map(
-                                        (subscription) => (
-                                            <div
-                                                key={subscription._id}
-                                                className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 hover:border-gray-300 dark:hover:border-gray-600 transition-colors'
-                                            >
-                                                {/* Status and Product */}
-                                                <div className='flex justify-between items-start mb-2'>
-                                                    <span
-                                                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded ${getStatusColor(subscription.status)}`}
-                                                    >
-                                                        {getStatusIcon(
-                                                            subscription.status,
-                                                        )}
-                                                        {subscription.status}
-                                                    </span>
-                                                    <span className='text-xs text-gray-500 dark:text-gray-400'>
-                                                        {subscription.productId ||
-                                                            'N/A'}
-                                                    </span>
-                                                </div>
-
-                                                {/* User Info */}
-                                                <div className='mb-2'>
-                                                    <div className='text-sm font-medium text-gray-900 dark:text-white truncate'>
-                                                        {subscription.client
-                                                            ?.username || 'N/A'}
-                                                    </div>
-                                                    <div className='text-xs text-gray-500 dark:text-gray-400 truncate'>
-                                                        {subscription.client
-                                                            ?.email || 'N/A'}
-                                                    </div>
-                                                </div>
-
-                                                {/* Dates */}
-                                                <div className='text-xs text-gray-500 dark:text-gray-400 space-y-0.5'>
-                                                    <div className='flex justify-between'>
-                                                        <span>Started:</span>
-                                                        <span>
-                                                            {subscription.startDate
-                                                                ? new Date(
-                                                                      subscription.startDate,
-                                                                  ).toLocaleDateString()
-                                                                : 'N/A'}
-                                                        </span>
-                                                    </div>
-                                                    <div className='flex justify-between'>
-                                                        <span>Expires:</span>
-                                                        <span>
-                                                            {subscription.expiryDate
-                                                                ? new Date(
-                                                                      subscription.expiryDate,
-                                                                  ).toLocaleDateString()
-                                                                : 'N/A'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ),
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Table View */}
-                            {viewMode === 'table' && (
-                                <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden mb-3'>
-                                    <div className='overflow-x-auto'>
-                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                            <thead className='bg-gray-50 dark:bg-gray-900'>
-                                                <tr>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        User
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Product
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Status
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Start Date
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Expiry Date
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Platform
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                                {currentSubscriptions.map(
-                                                    (subscription) => (
-                                                        <tr
-                                                            key={
-                                                                subscription._id
-                                                            }
-                                                            className='hover:bg-gray-50 dark:hover:bg-gray-900'
-                                                        >
-                                                            <td className='px-3 py-2 whitespace-nowrap'>
-                                                                <div className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                                    {subscription
-                                                                        .client
-                                                                        ?.username ||
-                                                                        'N/A'}
-                                                                </div>
-                                                                <div className='text-xs text-gray-500 dark:text-gray-400'>
-                                                                    {subscription
-                                                                        .client
-                                                                        ?.email ||
-                                                                        'N/A'}
-                                                                </div>
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap'>
-                                                                <span className='text-xs text-gray-600 dark:text-gray-400'>
-                                                                    {subscription.productId ||
-                                                                        'N/A'}
-                                                                </span>
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap'>
-                                                                <span
-                                                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded ${getStatusColor(subscription.status)}`}
-                                                                >
-                                                                    {getStatusIcon(
-                                                                        subscription.status,
-                                                                    )}
-                                                                    {
-                                                                        subscription.status
-                                                                    }
-                                                                </span>
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400'>
-                                                                {subscription.startDate
-                                                                    ? new Date(
-                                                                          subscription.startDate,
-                                                                      ).toLocaleDateString()
-                                                                    : 'N/A'}
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400'>
-                                                                {subscription.expiryDate
-                                                                    ? new Date(
-                                                                          subscription.expiryDate,
-                                                                      ).toLocaleDateString()
-                                                                    : 'N/A'}
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400'>
-                                                                {subscription.platform ||
-                                                                    'N/A'}
-                                                            </td>
-                                                        </tr>
-                                                    ),
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Pagination */}
-                            {totalItems > 0 && (
-                                <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 px-3 py-2'>
-                                    <Pagination
-                                        currentPage={page}
-                                        pageSize={pageSize}
-                                        totalItems={totalItems}
-                                        onPageChange={handlePageChange}
-                                        onPageSizeChange={(size) => {
-                                            setPageSize(size);
-                                            setPage(1);
-                                        }}
-                                    />
-                                </div>
-                            )}
-                        </>
+            {viewMode === 'table' ? (
+                <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
+                    {currentSubscriptions.length === 0 ? (
+                        empty
                     ) : (
-                        <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-center py-12'>
-                            <Diamond className='w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3' />
-                            <h3 className='text-sm font-medium text-gray-900 dark:text-white mb-1'>
-                                No Subscriptions Found
-                            </h3>
-                            <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                No subscriptions match your current filters.
-                            </p>
+                        <Table minWidth={960}>
+                            <thead>
+                                <tr>
+                                    <Th>Student</Th>
+                                    <Th>Plan</Th>
+                                    <Th>Status</Th>
+                                    <Th>Platform</Th>
+                                    <Th>Auto-renew</Th>
+                                    <Th>Started</Th>
+                                    <Th>Expires</Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {currentSubscriptions.map((subscription) => (
+                                    <Tr key={subscription._id}>
+                                        <Td className='max-w-[260px]'>
+                                            <UserCell
+                                                user={subscription.client}
+                                            />
+                                        </Td>
+                                        <Td>
+                                            <div className='flex flex-col gap-0.5'>
+                                                <span>
+                                                    {planLabel(
+                                                        subscription.productId,
+                                                    )}
+                                                </span>
+                                                {subscription.productId && (
+                                                    <code className='font-mono text-xs text-muted'>
+                                                        {subscription.productId}
+                                                    </code>
+                                                )}
+                                            </div>
+                                        </Td>
+                                        <Td>
+                                            <StatusBadge
+                                                status={subscription.status}
+                                            />
+                                        </Td>
+                                        <Td className='text-ink-2'>
+                                            {platformLabel(
+                                                subscription.platform,
+                                            )}
+                                        </Td>
+                                        <Td className='text-ink-2'>
+                                            {renewLabel(subscription)}
+                                        </Td>
+                                        <Td className='whitespace-nowrap'>
+                                            {formatDate(subscription.startDate)}
+                                        </Td>
+                                        <Td>{expiryCell(subscription)}</Td>
+                                    </Tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                    {totalItems > 0 && (
+                        <div className='px-4 py-3 border-t border-line-soft'>
+                            {pagination}
                         </div>
                     )}
                 </div>
-            </main>
+            ) : currentSubscriptions.length === 0 ? (
+                <div className='bg-sheet border border-line rounded-xl'>
+                    {empty}
+                </div>
+            ) : (
+                <div className='flex flex-col gap-4'>
+                    <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
+                        {currentSubscriptions.map((subscription) => (
+                            <article
+                                key={subscription._id}
+                                className='flex flex-col gap-3 p-4 bg-sheet border border-line rounded-xl'
+                            >
+                                <div className='flex items-start gap-2'>
+                                    <div className='flex-1 min-w-0'>
+                                        <UserCell user={subscription.client} />
+                                    </div>
+                                    <StatusBadge status={subscription.status} />
+                                </div>
+                                <div className='flex flex-wrap items-baseline gap-x-2 text-[13.5px]'>
+                                    <span className='font-medium text-ink'>
+                                        {planLabel(subscription.productId)}
+                                    </span>
+                                    <span className='text-muted'>
+                                        {platformLabel(subscription.platform)} ·
+                                        Auto-renew {renewLabel(subscription)}
+                                    </span>
+                                </div>
+                                <div className='grid grid-cols-2 gap-3 pt-3 border-t border-line-soft text-[13px]'>
+                                    <div className='flex flex-col gap-0.5'>
+                                        <span className='text-xs text-muted'>
+                                            Started
+                                        </span>
+                                        <span>
+                                            {formatDate(subscription.startDate)}
+                                        </span>
+                                    </div>
+                                    <div className='flex flex-col gap-0.5'>
+                                        <span className='text-xs text-muted'>
+                                            Expires
+                                        </span>
+                                        {expiryCell(subscription)}
+                                    </div>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                    <div className='bg-sheet border border-line rounded-xl px-4 py-3'>
+                        {pagination}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

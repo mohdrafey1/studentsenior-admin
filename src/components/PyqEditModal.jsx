@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
-import { X, AlertTriangle, Loader } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { Button, Checkbox, Dialog, Field, Input, Select, Textarea } from './ui';
+import { formatINR, pointsToRupees } from '../utils/format';
+import { EXAM_TYPES } from '../utils/labels';
 
 const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -12,7 +15,6 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
         rejectionReason: '',
         slug: '',
         price: 0,
-        solved: false,
         isPaid: false,
     });
     const [errors, setErrors] = useState({});
@@ -25,12 +27,7 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
         '2025-26',
     ];
 
-    const examTypes = [
-        { value: 'midsem1', label: 'Mid Semester 1' },
-        { value: 'midsem2', label: 'Mid Semester 2' },
-        { value: 'endsem', label: 'End Semester' },
-        { value: 'improvement', label: 'Improvement' },
-    ];
+    const examTypes = EXAM_TYPES;
 
     useEffect(() => {
         if (pyq && isOpen) {
@@ -41,7 +38,6 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
                 rejectionReason: pyq.rejectionReason || '',
                 slug: pyq.slug || '',
                 price: pyq.price || 0,
-                solved: pyq.solved || false,
                 isPaid: pyq.isPaid || false,
             });
             setErrors({});
@@ -69,11 +65,11 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
         if (formData.isPaid) {
             const price = Number(formData.price);
             if (!formData.price) {
-                newErrors.price = 'Price is required for paid resources';
+                newErrors.price = 'Enter a price in points';
             } else if (isNaN(price) || price <= 0) {
-                newErrors.price = 'Price must be a positive number';
+                newErrors.price = 'Price must be more than 0 points';
             } else if (price > 1000) {
-                newErrors.price = 'Price cannot exceed ₹1000';
+                newErrors.price = 'Price can’t be more than 1,000 points';
             }
         }
 
@@ -133,7 +129,7 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
         e.preventDefault();
 
         if (!validateForm()) {
-            toast.error('Please fix the validation errors');
+            toast.error('Check the highlighted fields');
             return;
         }
 
@@ -153,284 +149,170 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
             };
 
             await api.put(`/pyq/edit/${pyq._id}`, updatedPyq);
-            toast.success('PYQ updated successfully!');
+            toast.success('PYQ saved');
             onUpdate && onUpdate();
             onClose();
         } catch (error) {
             console.error(error);
             toast.error(
-                error.response?.data?.message || 'Failed to update PYQ',
+                error.response?.data?.message || 'Couldn’t save the PYQ',
             );
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    if (!isOpen) return null;
-
     return (
-        <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
-            <div className='flex items-center justify-center min-h-screen p-4'>
-                <div className='fixed inset-0' onClick={onClose}></div>
-
-                <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
-                    {/* Header */}
-                    <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
-                        <div>
-                            <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                Edit PYQ
-                            </h2>
-                            <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                {pyq?.subject?.subjectName}
-                            </p>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className='p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded'
-                            disabled={isSubmitting}
-                        >
-                            <X className='h-5 w-5' />
-                        </button>
-                    </div>
-
-                    <form onSubmit={handleSubmit}>
-                        <div className='p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto'>
-                            {/* Status */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Status{' '}
-                                    <span className='text-red-500'>*</span>
-                                </label>
-                                <select
-                                    name='submissionStatus'
-                                    value={formData.submissionStatus}
-                                    onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                        errors.submissionStatus
-                                            ? 'border-red-300'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                >
-                                    <option value='pending'>Pending</option>
-                                    <option value='approved'>Approved</option>
-                                    <option value='rejected'>Rejected</option>
-                                </select>
-                                {errors.submissionStatus && (
-                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                        <AlertTriangle className='h-3 w-3' />
-                                        {errors.submissionStatus}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Rejection Reason */}
-                            {formData.submissionStatus === 'rejected' && (
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Rejection Reason{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <textarea
-                                        name='rejectionReason'
-                                        value={formData.rejectionReason}
-                                        onChange={handleInputChange}
-                                        rows={2}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 dark:text-white resize-none ${
-                                            errors.rejectionReason
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                        placeholder='Enter rejection reason...'
-                                    />
-                                    {errors.rejectionReason && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.rejectionReason}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Slug */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Slug <span className='text-red-500'>*</span>
-                                </label>
-                                <input
-                                    type='text'
-                                    name='slug'
-                                    value={formData.slug}
-                                    onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                        errors.slug
-                                            ? 'border-red-300'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    placeholder='example-paper-2024'
-                                />
-                                {errors.slug && (
-                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                        <AlertTriangle className='h-3 w-3' />
-                                        {errors.slug}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Year and Exam Type */}
-                            <div className='grid grid-cols-2 gap-4'>
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Year{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <select
-                                        name='year'
-                                        value={formData.year}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                            errors.year
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                    >
-                                        <option value=''>Select year</option>
-                                        {academicYears.map((year) => (
-                                            <option key={year} value={year}>
-                                                {year}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.year && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.year}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Exam Type{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <select
-                                        name='examType'
-                                        value={formData.examType}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                            errors.examType
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                    >
-                                        <option value=''>Select type</option>
-                                        {examTypes.map((type) => (
-                                            <option
-                                                key={type.value}
-                                                value={type.value}
-                                            >
-                                                {type.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.examType && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.examType}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Checkboxes */}
-                            <div className='space-y-2'>
-                                <label className='flex items-center gap-2'>
-                                    <input
-                                        type='checkbox'
-                                        name='solved'
-                                        checked={formData.solved}
-                                        onChange={handleInputChange}
-                                        className='w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
-                                    />
-                                    <span className='text-sm text-gray-700 dark:text-gray-300'>
-                                        Solved Paper
-                                    </span>
-                                </label>
-
-                                <label className='flex items-center gap-2'>
-                                    <input
-                                        type='checkbox'
-                                        name='isPaid'
-                                        checked={formData.isPaid}
-                                        onChange={handleInputChange}
-                                        className='w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
-                                    />
-                                    <span className='text-sm text-gray-700 dark:text-gray-300'>
-                                        Paid Resource
-                                    </span>
-                                </label>
-                            </div>
-
-                            {/* Price */}
-                            {formData.isPaid && (
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Price (₹){' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <input
-                                        type='number'
-                                        name='price'
-                                        value={formData.price}
-                                        onChange={handleInputChange}
-                                        min='0'
-                                        max='1000'
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                            errors.price
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                        placeholder='0'
-                                    />
-                                    {errors.price && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.price}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer */}
-                        <div className='flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700'>
-                            <button
-                                type='button'
-                                onClick={onClose}
-                                disabled={isSubmitting}
-                                className='px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg disabled:opacity-50'
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type='submit'
-                                disabled={isSubmitting}
-                                className='px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 flex items-center gap-2'
-                            >
-                                {isSubmitting ? (
-                                    <>
-                                        <Loader className='h-4 w-4 animate-spin' />
-                                        Updating...
-                                    </>
-                                ) : (
-                                    'Update PYQ'
-                                )}
-                            </button>
-                        </div>
-                    </form>
+        <Dialog
+            open={isOpen}
+            onClose={onClose}
+            busy={isSubmitting}
+            title='Edit PYQ'
+            description={pyq?.subject?.subjectName}
+            footer={
+                <>
+                    <Button onClick={onClose} disabled={isSubmitting}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type='submit'
+                        form='pyq-edit-form'
+                        variant='primary'
+                        disabled={isSubmitting}
+                        icon={isSubmitting ? Loader2 : undefined}
+                        className={isSubmitting ? '[&>svg]:animate-spin' : ''}
+                    >
+                        {isSubmitting ? 'Saving…' : 'Save changes'}
+                    </Button>
+                </>
+            }
+        >
+            <form
+                id='pyq-edit-form'
+                onSubmit={handleSubmit}
+                noValidate
+                className='flex flex-col gap-4'
+            >
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                    <Field label='Year' required error={errors.year}>
+                        <Select
+                            name='year'
+                            value={formData.year}
+                            onChange={handleInputChange}
+                            placeholder='Choose a year'
+                            options={[
+                                ...academicYears.map((y) => ({
+                                    value: y,
+                                    label: y,
+                                })),
+                                // Keep an older value selectable.
+                                ...(formData.year &&
+                                !academicYears.includes(formData.year)
+                                    ? [
+                                          {
+                                              value: formData.year,
+                                              label: formData.year,
+                                          },
+                                      ]
+                                    : []),
+                            ]}
+                        />
+                    </Field>
+                    <Field label='Exam type' required error={errors.examType}>
+                        <Select
+                            name='examType'
+                            value={formData.examType}
+                            onChange={handleInputChange}
+                            placeholder='Choose an exam type'
+                            options={examTypes}
+                        />
+                    </Field>
                 </div>
-            </div>
-        </div>
+
+                <Field
+                    label='Slug'
+                    required
+                    error={errors.slug}
+                    hint='Lowercase letters, numbers and hyphens. Part of the paper’s link.'
+                >
+                    <Input
+                        name='slug'
+                        value={formData.slug}
+                        onChange={handleInputChange}
+                        placeholder='data-structures-endsem-2024'
+                        className='font-mono text-[13px]'
+                    />
+                </Field>
+
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                    <Field
+                        label='Status'
+                        required
+                        error={errors.submissionStatus}
+                    >
+                        <Select
+                            name='submissionStatus'
+                            value={formData.submissionStatus}
+                            onChange={handleInputChange}
+                            options={[
+                                { value: 'pending', label: 'Pending' },
+                                { value: 'approved', label: 'Approved' },
+                                { value: 'rejected', label: 'Rejected' },
+                            ]}
+                        />
+                    </Field>
+                    <div className='flex items-end pb-1.5'>
+                        <Checkbox
+                            name='isPaid'
+                            checked={formData.isPaid}
+                            onChange={handleInputChange}
+                            label='Paid PYQ'
+                            description='Students unlock it with points.'
+                        />
+                    </div>
+                </div>
+
+                {formData.submissionStatus === 'rejected' && (
+                    <Field
+                        label='Reason for the uploader'
+                        required
+                        error={errors.rejectionReason}
+                    >
+                        <Textarea
+                            name='rejectionReason'
+                            value={formData.rejectionReason}
+                            onChange={handleInputChange}
+                            rows={3}
+                            placeholder='What should the uploader fix?'
+                        />
+                    </Field>
+                )}
+
+                {formData.isPaid && (
+                    <Field
+                        label='Price in points'
+                        required
+                        error={errors.price}
+                        hint={
+                            Number(formData.price) > 0
+                                ? `Students pay ${formatINR(pointsToRupees(formData.price))} (5 points = ₹1).`
+                                : '5 points = ₹1.'
+                        }
+                    >
+                        <Input
+                            type='number'
+                            name='price'
+                            min='1'
+                            max='1000'
+                            value={formData.price}
+                            onChange={handleInputChange}
+                            placeholder='50'
+                            className='font-mono'
+                        />
+                    </Field>
+                )}
+            </form>
+        </Dialog>
     );
 };
 

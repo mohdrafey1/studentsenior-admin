@@ -1,56 +1,61 @@
-import { TrendingUp, Eye } from 'lucide-react';
+import { formatNumber } from '../../utils/format';
+import { Panel, Table, Td, Th, Tr } from '../ui';
 
+/**
+ * Most-viewed items. The API sends the top five of each type, identified by
+ * slug, so they're merged and ranked here.
+ */
 function TopPerformers({ topPerformers }) {
-    const formatNumber = (num) => {
-        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-        return num.toString();
-    };
+    const rows = [...(topPerformers || [])]
+        .sort((a, b) => (b.views || 0) - (a.views || 0))
+        .slice(0, 8);
 
     return (
-        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6'>
-            <div className='flex items-center justify-between mb-4 md:mb-6'>
-                <h2 className='text-lg md:text-xl font-semibold text-gray-900 dark:text-white'>
-                    Top Performing Content
-                </h2>
-                <TrendingUp className='w-4 h-4 md:w-5 md:h-5 text-green-500' />
-            </div>
-
-            <div className='space-y-3 md:space-y-4'>
-                {topPerformers && topPerformers.length > 0 ? (
-                    topPerformers.slice(0, 5).map((item, index) => (
-                        <div
-                            key={item.id}
-                            className='flex items-center justify-between p-3 md:p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'
-                        >
-                            <div className='flex items-center space-x-2 md:space-x-3 flex-1 min-w-0'>
-                                <div className='flex-shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs md:text-sm'>
+        <Panel
+            title='Most viewed'
+            titleId='top-title'
+            action={<span className='text-[12.5px] text-muted'>All time</span>}
+        >
+            {rows.length === 0 ? (
+                <p className='px-5 py-10 text-center text-[13.5px] text-muted'>
+                    Items with the most views appear here.
+                </p>
+            ) : (
+                <Table minWidth={460}>
+                    <thead>
+                        <tr>
+                            <Th className='w-10'>#</Th>
+                            <Th>Item</Th>
+                            <Th>Type</Th>
+                            <Th align='right'>Views</Th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map((item, index) => (
+                            <Tr key={item.id || `${item.type}-${item.title}`}>
+                                <Td mono className='text-muted text-xs'>
                                     {index + 1}
-                                </div>
-                                <div className='flex-1 min-w-0'>
-                                    <p className='text-xs md:text-sm truncate font-medium text-gray-900 dark:text-white'>
+                                </Td>
+                                <Td className='max-w-[360px]'>
+                                    <span
+                                        className='block truncate font-mono text-[12.5px] text-ink'
+                                        title={item.title}
+                                    >
                                         {item.title}
-                                    </p>
-                                    <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                        {item.type}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className='flex items-center space-x-1 text-gray-600 dark:text-gray-400 ml-2'>
-                                <Eye className='w-3 h-3 md:w-4 md:h-4' />
-                                <span className='text-xs md:text-sm font-medium'>
+                                    </span>
+                                </Td>
+                                <Td className='text-[12.5px] text-ink-2 whitespace-nowrap'>
+                                    {item.type}
+                                </Td>
+                                <Td align='right' mono>
                                     {formatNumber(item.views)}
-                                </span>
-                            </div>
-                        </div>
-                    ))
-                ) : (
-                    <p className='text-center text-sm text-gray-500 dark:text-gray-400 py-4'>
-                        No top performers data available
-                    </p>
-                )}
-            </div>
-        </div>
+                                </Td>
+                            </Tr>
+                        ))}
+                    </tbody>
+                </Table>
+            )}
+        </Panel>
     );
 }
 

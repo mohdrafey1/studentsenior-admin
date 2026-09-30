@@ -1,710 +1,858 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
-import api from '../../utils/api';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { Check, Download, Pencil, ShoppingBag, Trash2, X } from 'lucide-react';
+import api from '../../utils/api';
+import { useColleges } from '../../context/CollegeContext';
+import { useSelection } from '../../hooks/useSelection';
+import { downloadCsv } from '../../utils/csv';
 import {
-    ShoppingBag,
-    Edit2,
-    Trash2,
-    Eye,
-    Package,
-    CheckCircle,
-} from 'lucide-react';
+    formatDateTime,
+    formatINR,
+    formatNumber,
+    formatShortDate,
+    formatShortDateTime,
+} from '../../utils/format';
+import { relativeTime } from '../../utils/relativeTime';
+import FilterBar from '../../components/Common/FilterBar';
+import { filterByTime } from '../../components/Common/timeFilterUtils';
+import Loader from '../../components/Common/Loader';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
+import RejectDialog from '../../components/RejectDialog';
 import ProductEditModal from '../../components/ProductEditModal';
-import FilterBar from '../../components/Common/FilterBar';
-import BackButton from '../../components/Common/BackButton';
+import Price from './Price';
+import ProductImage from './ProductImage';
 import {
-    filterByTime,
-    getTimeFilterLabel,
-} from '../../components/Common/timeFilterUtils';
-import Loader from '../../components/Common/Loader';
+    Alert,
+    BulkBar,
+    BulkButton,
+    Button,
+    EmptyState,
+    PageHeader,
+    SelectCell,
+    StatusBadge,
+    Table,
+    Tabs,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+
+const STATUS_TABS = [
+    ['', 'All'],
+    ['pending', 'Pending'],
+    ['approved', 'Approved'],
+    ['rejected', 'Rejected'],
+];
+
+const EMPTY_FILTERS = {
+    submissionStatus: '',
+    available: '',
+    deleted: '',
+};
+
+const PAGE_SIZES = [12, 24, 48, 96];
+
+// The model field is `clickCount`; older records may carry `clickCounts`.
+const viewsOf = (product) => product.clickCount ?? product.clickCounts ?? 0;
+
+// "6 h ago" for the last two days, then "21 Sep".
+const listedAgo = (date) =>
+    Date.now() - new Date(date) < 2 * 864e5
+        ? relativeTime(date)
+        : formatShortDate(date);
+
+const UnavailableBadge = () => (
+    <span className='inline-flex items-center h-[22px] px-2 rounded-full bg-inverse text-on-inverse text-xs font-medium whitespace-nowrap'>
+        Unavailable
+    </span>
+);
 
 const ProductList = () => {
     const location = useLocation();
-    const { collegeslug } = useParams();
     const navigate = useNavigate();
+    const { collegeslug } = useParams();
+    const { currentCollege } = useColleges();
 
-    // Read URL params
+    // Filters live in the URL so a filtered list can be shared or reloaded.
     const params = new URLSearchParams(location.search);
-    const initialSearch = params.get('search') || '';
-    const initialTimeFilter = params.get('time') || '';
-    const initialPage = parseInt(params.get('page')) || 1;
-    const initialSubmissionStatus = params.get('submissionStatus') || '';
-    const initialAvailable = params.get('available') || '';
-    const initialDeleted = params.get('deleted') || '';
-
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [search, setSearch] = useState(initialSearch);
-    const [page, setPage] = useState(initialPage);
-    const [pageSize, setPageSize] = useState(12);
-    const [timeFilter, setTimeFilter] = useState(initialTimeFilter);
-    const [showModal, setShowModal] = useState(false);
-    const [editingProduct, setEditingProduct] = useState(null);
-    const { mainContentMargin } = useSidebarLayout();
-
-    // View mode - responsive default (small screens = grid, large screens = table)
-    const [viewMode, setViewMode] = useState(() => {
-        return window.innerWidth >= 1024 ? 'table' : 'grid';
-    });
-
-    // Filters state
-    const [filters, setFilters] = useState({
-        submissionStatus: initialSubmissionStatus,
-        available: initialAvailable,
-        deleted: initialDeleted,
-    });
+    const [search, setSearch] = useState(params.get('search') || '');
+    const [page, setPage] = useState(parseInt(params.get('page')) || 1);
+    const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+    const [timeFilter, setTimeFilter] = useState(params.get('time') || 'all');
+    const [filters, setFilters] = useState(() =>
+        Object.fromEntries(
+            Object.keys(EMPTY_FILTERS).map((key) => [
+                key,
+                params.get(key) || '',
+            ]),
+        ),
+    );
     const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState('desc');
+    // Photos read best as cards, so the store opens in the grid.
+    const [viewMode, setViewMode] = useState('grid');
 
-    // Confirmation modal state
-    const [confirmModal, setConfirmModal] = useState({
-        isOpen: false,
-        title: '',
-        message: '',
-        onConfirm: null,
-        variant: 'danger',
-    });
+    const [editingProduct, setEditingProduct] = useState(null);
+    const [confirm, setConfirm] = useState(null);
+    const [rejecting, setRejecting] = useState(null); // array of ids
+    const [bulkBusy, setBulkBusy] = useState(false);
 
-    const showConfirm = (config) => {
-        return new Promise((resolve) => {
-            setConfirmModal({
-                isOpen: true,
-                title: config.title || 'Confirm Action',
-                message: config.message,
-                variant: config.variant || 'danger',
-                onConfirm: () => {
-                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-                    resolve(true);
-                },
-            });
-        });
-    };
-
-    const handleCloseConfirm = () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+    const fetchProducts = async () => {
+        try {
+            setError(null);
+            const response = await api.get(`/store/all/${collegeslug}`);
+            setProducts(response.data.data || []);
+        } catch {
+            setError(
+                'Couldn’t load the store. Check your connection and try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
         fetchProducts();
     }, [collegeslug]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Persist filters in URL
     useEffect(() => {
-        const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (timeFilter) params.set('time', timeFilter);
-        if (filters.submissionStatus)
-            params.set('submissionStatus', filters.submissionStatus);
-        if (filters.available) params.set('available', filters.available);
-        if (filters.deleted) params.set('deleted', filters.deleted);
-        if (page > 1) params.set('page', page.toString());
-        navigate({ search: params.toString() }, { replace: true });
+        const next = new URLSearchParams();
+        if (search) next.set('search', search);
+        if (timeFilter && timeFilter !== 'all') next.set('time', timeFilter);
+        Object.entries(filters).forEach(
+            ([key, value]) => value && next.set(key, value),
+        );
+        if (page > 1) next.set('page', String(page));
+        navigate({ search: next.toString() }, { replace: true });
     }, [search, timeFilter, filters, page, navigate]);
 
-    // Responsive view mode - always auto-switch based on screen size
-    useEffect(() => {
-        const handleResize = () => {
-            const newMode = window.innerWidth >= 1024 ? 'table' : 'grid';
-            setViewMode(newMode);
-        };
-
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    const fetchProducts = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get(`/store/all/${collegeslug}`);
-            setProducts(response.data.data || []);
-            setError(null);
-        } catch (error) {
-            console.error('Error fetching products:', error);
-            setError('Failed to fetch products');
-            toast.error('Failed to fetch products');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleEdit = (product) => {
-        setEditingProduct(product);
-        setShowModal(true);
-    };
-
-    const handleDelete = async (product) => {
-        const confirmed = await showConfirm({
-            title: 'Delete Product',
-            message: `Are you sure you want to delete "${product.title}"? This action cannot be undone.`,
-            variant: 'danger',
-        });
-
-        if (confirmed) {
-            try {
-                await api.delete(`/store/delete/${product._id}`);
-                toast.success('Product deleted successfully');
-                fetchProducts();
-            } catch (error) {
-                console.error('Error deleting product:', error);
-                toast.error('Failed to delete product');
-            }
-        }
-    };
-
-    const handleView = (product) => {
-        navigate(`/${collegeslug}/products/${product._id}`);
-    };
-
-    const handleModalClose = () => {
-        setShowModal(false);
-        setEditingProduct(null);
-    };
-
-    const handleModalSuccess = () => {
-        fetchProducts();
-        handleModalClose();
-    };
-
-    // Get unique values for filters
-    const uniqueStatuses = ['pending', 'approved', 'rejected'];
-
-    // Apply filters and sorting
-    const filtered = products.filter((product) => {
-        const q = search.trim().toLowerCase();
-        const matchesSearch =
-            !q ||
-            product.name?.toLowerCase().includes(q) ||
-            product.description?.toLowerCase().includes(q);
-
-        const matchesStatus =
-            !filters.submissionStatus ||
-            product.submissionStatus === filters.submissionStatus;
-
-        const matchesAvailable =
-            filters.available === '' ||
-            (filters.available === 'true'
-                ? product.available
-                : !product.available);
-
-        const matchesDeleted =
-            filters.deleted === '' ||
-            (filters.deleted === 'true' ? product.deleted : !product.deleted);
-
-        // Time filter using the utility
-        const matchesTime = filterByTime(product, timeFilter);
-
-        return (
-            matchesSearch &&
-            matchesStatus &&
-            matchesAvailable &&
-            matchesDeleted &&
-            matchesTime
-        );
-    });
-
-    // Sort
-    const sorted = [...filtered].sort((a, b) => {
-        if (sortBy === 'createdAt') {
-            const dateA = new Date(a.createdAt);
-            const dateB = new Date(b.createdAt);
-            return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-        }
-        if (sortBy === 'clickCounts') {
-            const countA = a.clickCounts || 0;
-            const countB = b.clickCounts || 0;
-            return sortOrder === 'asc' ? countA - countB : countB - countA;
-        }
-        return 0;
-    });
-
-    const start = (page - 1) * pageSize;
-    const current = sorted.slice(start, start + pageSize);
-
-    const totalItems = sorted.length;
-    const totalPages = Math.ceil(totalItems / pageSize) || 1;
-    const totalProducts = sorted.length;
-
-    const resetFilters = () => {
-        setFilters({
-            submissionStatus: '',
-            available: '',
-            deleted: '',
-        });
-        setSortBy('createdAt');
-        setSortOrder('desc');
-    };
-
-    const clearAllFilters = () => {
-        setSearch('');
-        setTimeFilter('');
-        resetFilters();
+    const setFilter = (key, value) => {
+        setFilters((prev) => ({ ...prev, [key]: value }));
         setPage(1);
     };
 
-    const activeFiltersCount = Object.values(filters).filter(Boolean).length;
+    // Everything except the status tab, so tab counts reflect the other filters.
+    const matchesFilters = (p) => {
+        const q = search.trim().toLowerCase();
+        const matchesSearch =
+            !q ||
+            p.name?.toLowerCase().includes(q) ||
+            p.description?.toLowerCase().includes(q);
+        const bool = (filter, value) =>
+            filter === '' || (filter === 'true' ? value : !value);
+        return (
+            matchesSearch &&
+            filterByTime(p, timeFilter) &&
+            bool(filters.available, p.available) &&
+            bool(filters.deleted, p.deleted)
+        );
+    };
 
-    if (loading) {
-        return <Loader />;
-    }
+    const base = products.filter(matchesFilters);
+    const counts = base.reduce(
+        (acc, p) => {
+            const status = p.submissionStatus || 'pending';
+            acc[status] = (acc[status] || 0) + 1;
+            return acc;
+        },
+        { '': base.length },
+    );
+    const filtered = base.filter(
+        (p) =>
+            !filters.submissionStatus ||
+            (p.submissionStatus || 'pending') === filters.submissionStatus,
+    );
+    const sorted = [...filtered].sort((a, b) => {
+        const diff =
+            sortBy === 'clickCounts'
+                ? viewsOf(a) - viewsOf(b)
+                : new Date(a.createdAt) - new Date(b.createdAt);
+        return sortOrder === 'desc' ? -diff : diff;
+    });
+    const current = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+    const selection = useSelection(
+        useMemo(() => current.map((p) => p._id), [current]),
+    );
+
+    const activeFilters = Object.entries(filters).filter(
+        ([key, value]) => key !== 'submissionStatus' && value,
+    ).length;
+    const clearAll = () => {
+        setSearch('');
+        setTimeFilter('all');
+        setFilters((prev) => ({
+            ...EMPTY_FILTERS,
+            submissionStatus: prev.submissionStatus,
+        }));
+        setSortBy('createdAt');
+        setSortOrder('desc');
+        setPage(1);
+    };
+
+    const updateLocal = (ids, patch) =>
+        setProducts((prev) =>
+            prev.map((p) => (ids.includes(p._id) ? { ...p, ...patch } : p)),
+        );
+
+    // Runs one request per product and reports how many went through.
+    const runBulk = async (ids, request, verb) => {
+        setBulkBusy(true);
+        const results = await Promise.allSettled(ids.map(request));
+        setBulkBusy(false);
+        const done = ids.filter((_, i) => results[i].status === 'fulfilled');
+        const failed = ids.length - done.length;
+        if (done.length)
+            toast.success(
+                `${formatNumber(done.length)} listing${done.length === 1 ? '' : 's'} ${verb}`,
+            );
+        if (failed)
+            toast.error(
+                `${formatNumber(failed)} couldn’t be ${verb}. Try those again.`,
+            );
+        return done;
+    };
+
+    const approve = async (ids) => {
+        const done = await runBulk(
+            ids,
+            (id) =>
+                api.put(`/store/edit/${id}`, {
+                    submissionStatus: 'approved',
+                    rejectionReason: '',
+                }),
+            'approved',
+        );
+        updateLocal(done, {
+            submissionStatus: 'approved',
+            rejectionReason: '',
+        });
+        selection.clear();
+    };
+
+    const reject = async (ids, reason) => {
+        const done = await runBulk(
+            ids,
+            (id) =>
+                api.put(`/store/edit/${id}`, {
+                    submissionStatus: 'rejected',
+                    rejectionReason: reason,
+                }),
+            'rejected',
+        );
+        updateLocal(done, {
+            submissionStatus: 'rejected',
+            rejectionReason: reason,
+        });
+        selection.clear();
+        setRejecting(null);
+    };
+
+    const remove = (ids) =>
+        setConfirm({
+            title:
+                ids.length === 1
+                    ? 'Delete this listing?'
+                    : `Delete ${formatNumber(ids.length)} listings?`,
+            message:
+                'The listing disappears from the store and buyers can no longer contact the seller through it. This can’t be undone.',
+            confirmText: 'Delete',
+            onConfirm: async () => {
+                const done = await runBulk(
+                    ids,
+                    (id) => api.delete(`/store/delete/${id}`),
+                    'deleted',
+                );
+                setProducts((prev) =>
+                    prev.filter((p) => !done.includes(p._id)),
+                );
+                selection.clear();
+            },
+        });
+
+    const exportCsv = () =>
+        downloadCsv(
+            `store-${collegeslug}`,
+            [
+                { label: 'Name', value: (p) => p.name },
+                { label: 'Price (₹)', value: (p) => p.price || 0 },
+                {
+                    label: 'Status',
+                    value: (p) => p.submissionStatus || 'pending',
+                },
+                {
+                    label: 'Available',
+                    value: (p) => (p.available ? 'yes' : 'no'),
+                },
+                { label: 'Deleted', value: (p) => (p.deleted ? 'yes' : 'no') },
+                { label: 'Views', value: (p) => viewsOf(p) },
+                { label: 'Seller', value: (p) => p.owner?.username },
+                { label: 'Rejection reason', value: (p) => p.rejectionReason },
+                { label: 'Listed', value: (p) => formatDateTime(p.createdAt) },
+            ],
+            sorted,
+        );
+
+    if (loading) return <Loader />;
+
+    const selectedIds = [...selection.selected];
+    const productPath = (product) => `/${collegeslug}/products/${product._id}`;
+    const openProduct = (product) => navigate(productPath(product));
+    const stop = (fn) => (event) => {
+        event.stopPropagation();
+        fn();
+    };
+
+    const rowActions = (product) => {
+        const pending = (product.submissionStatus || 'pending') === 'pending';
+        const name = product.name || 'listing';
+        return pending ? (
+            <>
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={X}
+                    aria-label={`Reject ${name}`}
+                    className='text-bad-ink hover:text-bad-ink'
+                    onClick={stop(() => setRejecting([product._id]))}
+                />
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={Check}
+                    aria-label={`Approve ${name}`}
+                    className='text-ok-ink hover:text-ok-ink'
+                    onClick={stop(() => approve([product._id]))}
+                />
+            </>
+        ) : (
+            <>
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={Pencil}
+                    aria-label={`Edit ${name}`}
+                    onClick={stop(() => setEditingProduct(product))}
+                />
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={Trash2}
+                    aria-label={`Delete ${name}`}
+                    className='text-bad-ink hover:text-bad-ink'
+                    onClick={stop(() => remove([product._id]))}
+                />
+            </>
+        );
+    };
+
+    const views = (product) => {
+        const count = viewsOf(product);
+        if (count > 0) return `${formatNumber(count)} views`;
+        return (product.submissionStatus || 'pending') === 'approved'
+            ? 'No views yet'
+            : 'Not live yet';
+    };
+
+    const pagination = (
+        <Pagination
+            currentPage={page}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZES}
+            totalItems={sorted.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+            }}
+        />
+    );
+
+    const bulkBar = (
+        <BulkBar count={selection.count} onClear={selection.clear}>
+            <BulkButton
+                primary
+                icon={Check}
+                disabled={bulkBusy}
+                onClick={() => approve(selectedIds)}
+            >
+                Approve
+            </BulkButton>
+            <BulkButton
+                icon={X}
+                disabled={bulkBusy}
+                onClick={() => setRejecting(selectedIds)}
+            >
+                Reject…
+            </BulkButton>
+            <BulkButton
+                icon={Trash2}
+                disabled={bulkBusy}
+                onClick={() => remove(selectedIds)}
+            >
+                Delete
+            </BulkButton>
+        </BulkBar>
+    );
+
+    const queueCleared =
+        filters.submissionStatus === 'pending' && !activeFilters && !search;
+    const empty = (
+        <EmptyState
+            icon={ShoppingBag}
+            tone={queueCleared ? 'done' : 'neutral'}
+            title={
+                products.length === 0
+                    ? 'No listings yet'
+                    : queueCleared
+                      ? 'Nothing waiting for review'
+                      : 'No listings match'
+            }
+            description={
+                products.length === 0
+                    ? 'Items students put up for sale at this college appear here.'
+                    : 'Try another search or clear the filters.'
+            }
+            action={
+                activeFilters || search ? (
+                    <Button onClick={clearAll}>Clear filters</Button>
+                ) : undefined
+            }
+        />
+    );
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
-            <main className='pt-6 pb-12'>
-                <div
-                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
-                >
-                    {/* Header */}
-                    <BackButton
-                        title={`Products for ${collegeslug}`}
-                        TitleIcon={ShoppingBag}
-                    />
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
-                        <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
-                            <span className='text-gray-600 dark:text-gray-400'>
-                                Total ({getTimeFilterLabel(timeFilter)}):
-                            </span>
-                            <span className='font-semibold text-gray-900 dark:text-white'>
-                                {totalProducts}
-                            </span>
-                        </div>
-
-                        {/* FilterBar */}
-                        <FilterBar
-                            search={search}
-                            onSearch={setSearch}
-                            searchPlaceholder='Search by name or description...'
-                            filters={[
-                                {
-                                    label: 'Status',
-                                    value: filters.submissionStatus,
-                                    onChange: (v) =>
-                                        setFilters({
-                                            ...filters,
-                                            submissionStatus: v,
-                                        }),
-                                    options: [
-                                        { value: '', label: 'All Statuses' },
-                                        ...uniqueStatuses.map((s) => ({
-                                            value: s,
-                                            label: s,
-                                        })),
-                                    ],
-                                },
-                                {
-                                    label: 'Availability',
-                                    value: filters.available,
-                                    onChange: (v) =>
-                                        setFilters({
-                                            ...filters,
-                                            available: v,
-                                        }),
-                                    options: [
-                                        {
-                                            value: '',
-                                            label: 'All (Availability)',
-                                        },
-                                        { value: 'true', label: 'Available' },
-                                        {
-                                            value: 'false',
-                                            label: 'Unavailable',
-                                        },
-                                    ],
-                                },
-                                {
-                                    label: 'Deleted',
-                                    value: filters.deleted,
-                                    onChange: (v) =>
-                                        setFilters({ ...filters, deleted: v }),
-                                    options: [
-                                        { value: '', label: 'All (Deleted)' },
-                                        { value: 'true', label: 'Deleted' },
-                                        {
-                                            value: 'false',
-                                            label: 'Not Deleted',
-                                        },
-                                    ],
-                                },
-                            ]}
-                            timeFilter={{
-                                value: timeFilter,
-                                onChange: (v) => {
-                                    setTimeFilter(v);
-                                    setPage(1);
-                                },
-                            }}
-                            sortBy={{
-                                value: sortBy,
-                                onChange: setSortBy,
-                                options: [
-                                    {
-                                        value: 'createdAt',
-                                        label: 'Sort by Date',
-                                    },
-                                    {
-                                        value: 'clickCounts',
-                                        label: 'Sort by Views',
-                                    },
-                                ],
-                            }}
-                            sortOrder={{
-                                value: sortOrder,
-                                onToggle: () =>
-                                    setSortOrder(
-                                        sortOrder === 'asc' ? 'desc' : 'asc',
-                                    ),
-                            }}
-                            viewMode={{
-                                value: viewMode,
-                                onChange: setViewMode,
-                            }}
-                            onClear={clearAllFilters}
-                            showClear={
-                                !!(
-                                    search ||
-                                    timeFilter ||
-                                    activeFiltersCount > 0
-                                )
-                            }
-                        />
-                    </div>
-
-                    {error && (
-                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8'>
-                            {error}
-                        </div>
-                    )}
-
-                    {/* Products Table View */}
-                    {viewMode === 'table' && !loading && (
-                        <>
-                            <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                <div className='overflow-x-auto'>
-                                    <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                        <thead className='bg-gray-50 dark:bg-gray-700'>
-                                            <tr>
-                                                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                    Product
-                                                </th>
-                                                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                    status
-                                                </th>
-                                                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                    Price
-                                                </th>
-                                                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                    Owner
-                                                </th>
-
-                                                <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                    Actions
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                            {current.map((product) => (
-                                                <tr
-                                                    key={product._id}
-                                                    onClick={() =>
-                                                        handleView(product)
-                                                    }
-                                                    className='hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer'
-                                                >
-                                                    <td className='px-6 py-4 whitespace-nowrap'>
-                                                        <div className='flex items-center'>
-                                                            <div className='flex-shrink-0 h-12 w-12'>
-                                                                {product.image ? (
-                                                                    <img
-                                                                        className='h-12 w-12 rounded-lg object-cover'
-                                                                        src={
-                                                                            product.image
-                                                                        }
-                                                                        alt={
-                                                                            product.name
-                                                                        }
-                                                                    />
-                                                                ) : (
-                                                                    <div className='h-12 w-12 bg-gray-100 dark:bg-gray-600 rounded-lg flex items-center justify-center'>
-                                                                        <Package className='h-6 w-6 text-gray-400' />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <div className='ml-4'>
-                                                                <div className='text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-xs'>
-                                                                    {
-                                                                        product.name
-                                                                    }
-                                                                </div>
-                                                                <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs'>
-                                                                    {
-                                                                        product.description
-                                                                    }
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className='px-6 py-4 whitespace-nowrap'>
-                                                        <span
-                                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                                product.submissionStatus ===
-                                                                'approved'
-                                                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                                                                    : product.submissionStatus ===
-                                                                        'pending'
-                                                                      ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                                                                      : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                                                            }`}
-                                                        >
-                                                            <CheckCircle className='w-3 h-3 mr-1' />
-                                                            {product.submissionStatus ||
-                                                                'Pending Review'}
-                                                        </span>
-                                                        {product.clickCounts >
-                                                            0 && (
-                                                            <div className='flex items-center gap-1 text-gray-500 dark:text-gray-400'>
-                                                                <Eye className='w-4 h-4' />
-                                                                <span className='text-xs'>
-                                                                    {
-                                                                        product.clickCounts
-                                                                    }
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className='px-6 py-4 whitespace-nowrap'>
-                                                        <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
-                                                            ₹
-                                                            {product.price || 0}
-                                                        </div>
-                                                    </td>
-
-                                                    <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400'>
-                                                        <div>
-                                                            {product.owner
-                                                                ?.username ||
-                                                                'N/A'}
-                                                        </div>
-                                                        <div className='text-xs text-gray-400 dark:text-gray-500 mt-1'>
-                                                            {product.createdAt
-                                                                ? new Date(
-                                                                      product.createdAt,
-                                                                  ).toLocaleDateString()
-                                                                : 'N/A'}
-                                                        </div>
-                                                    </td>
-                                                    <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
-                                                        <div className='flex items-center justify-end space-x-2'>
-                                                            <button
-                                                                onClick={(
-                                                                    e,
-                                                                ) => {
-                                                                    e.stopPropagation();
-                                                                    handleEdit(
-                                                                        product,
-                                                                    );
-                                                                }}
-                                                                className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
-                                                                title='Edit Product'
-                                                            >
-                                                                <Edit2 className='h-4 w-4' />
-                                                            </button>
-                                                            <button
-                                                                onClick={(
-                                                                    e,
-                                                                ) => {
-                                                                    e.stopPropagation();
-                                                                    handleDelete(
-                                                                        product,
-                                                                    );
-                                                                }}
-                                                                className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
-                                                                title='Delete Product'
-                                                            >
-                                                                <Trash2 className='h-4 w-4' />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {/* Pagination */}
-                                {totalPages > 1 && (
-                                    <div className='bg-white dark:bg-gray-800 px-4 py-3 border-t border-gray-200 dark:border-gray-700'>
-                                        <Pagination
-                                            currentPage={page}
-                                            totalPages={totalPages}
-                                            onPageChange={setPage}
-                                            pageSize={pageSize}
-                                            onPageSizeChange={(newSize) => {
-                                                setPageSize(newSize);
-                                                setPage(1);
-                                            }}
-                                            totalItems={sorted.length}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        </>
-                    )}
-
-                    {/* Grid View */}
-                    {viewMode === 'grid' && !loading && (
-                        <>
-                            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
-                                {current.map((product) => (
-                                    <div
-                                        key={product._id}
-                                        onClick={() => handleView(product)}
-                                        className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow cursor-pointer'
-                                    >
-                                        {/* Product Image */}
-                                        <div className='relative h-48 bg-gray-100 dark:bg-gray-700'>
-                                            {product.image ? (
-                                                <img
-                                                    src={product.image}
-                                                    alt={product.name}
-                                                    className='w-full h-full object-cover'
-                                                />
-                                            ) : (
-                                                <div className='w-full h-full flex items-center justify-center'>
-                                                    <Package className='h-16 w-16 text-gray-400' />
-                                                </div>
-                                            )}
-                                            <div className='absolute top-2 right-2'>
-                                                <span
-                                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                        product.submissionStatus ===
-                                                        'Approved'
-                                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                                                            : product.submissionStatus ===
-                                                                'Pending Review'
-                                                              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                                                              : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                                                    }`}
-                                                >
-                                                    <CheckCircle className='w-3 h-3 mr-1' />
-                                                    {product.submissionStatus ||
-                                                        'Pending Review'}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Product Details */}
-                                        <div className='p-4'>
-                                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 truncate'>
-                                                {product.name}
-                                            </h3>
-                                            <p className='text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2'>
-                                                {product.description}
-                                            </p>
-
-                                            {/* Price and Views */}
-                                            <div className='flex items-center justify-between mb-3'>
-                                                <div className='text-xl font-bold text-green-600 dark:text-green-400'>
-                                                    ₹{product.price || 0}
-                                                </div>
-                                                <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                    <Eye className='w-4 h-4 mr-1' />
-                                                    {product.clickCounts || 0}
-                                                </div>
-                                            </div>
-
-                                            {/* Owner and Date */}
-                                            <div className='text-xs text-gray-500 dark:text-gray-400 mb-3'>
-                                                <div>
-                                                    By{' '}
-                                                    {product.owner?.username ||
-                                                        'N/A'}
-                                                </div>
-                                                <div>
-                                                    {product.createdAt
-                                                        ? new Date(
-                                                              product.createdAt,
-                                                          ).toLocaleDateString()
-                                                        : 'N/A'}
-                                                </div>
-                                            </div>
-
-                                            {/* Actions */}
-                                            {/* Actions */}
-                                            <div className='flex items-center justify-end pt-3 border-t border-gray-200 dark:border-gray-700'>
-                                                <div className='flex items-center space-x-2'>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleEdit(product);
-                                                        }}
-                                                        className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
-                                                        title='Edit Product'
-                                                    >
-                                                        <Edit2 className='h-4 w-4' />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDelete(
-                                                                product,
-                                                            );
-                                                        }}
-                                                        className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
-                                                        title='Delete Product'
-                                                    >
-                                                        <Trash2 className='h-4 w-4' />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Pagination for Grid */}
-                            {totalPages > 1 && (
-                                <div className='mt-6 bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700'>
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={totalPages}
-                                        onPageChange={setPage}
-                                        pageSize={pageSize}
-                                        onPageSizeChange={(newSize) => {
-                                            setPageSize(newSize);
-                                            setPage(1);
-                                        }}
-                                        totalItems={sorted.length}
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-            </main>
-
-            {/* Modals */}
-            <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={handleCloseConfirm}
-                onConfirm={confirmModal.onConfirm}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                variant={confirmModal.variant}
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Store'
+                description={`Second-hand books, calculators and kits that ${currentCollege?.name || collegeslug} students are selling to each other.`}
+                actions={
+                    <Button
+                        icon={Download}
+                        onClick={exportCsv}
+                        disabled={!sorted.length}
+                    >
+                        Export CSV
+                    </Button>
+                }
             />
 
+            <Tabs
+                label='Review status'
+                className='mb-4'
+                value={filters.submissionStatus}
+                onChange={(value) => {
+                    setFilter('submissionStatus', value);
+                    selection.clear();
+                }}
+                items={STATUS_TABS.map(([value, label]) => ({
+                    value,
+                    label,
+                    count: counts[value] || 0,
+                    attention: value === 'pending' && counts.pending > 0,
+                }))}
+            />
+
+            <FilterBar
+                className='mb-4'
+                search={search}
+                onSearch={(value) => {
+                    setSearch(value);
+                    setPage(1);
+                }}
+                searchPlaceholder='Search by name or description'
+                filters={[
+                    {
+                        label: 'Availability',
+                        value: filters.available,
+                        onChange: (v) => setFilter('available', v),
+                        options: [
+                            { value: '', label: 'Any availability' },
+                            { value: 'true', label: 'Available' },
+                            { value: 'false', label: 'Unavailable' },
+                        ],
+                    },
+                    {
+                        label: 'Deleted',
+                        value: filters.deleted,
+                        onChange: (v) => setFilter('deleted', v),
+                        options: [
+                            { value: '', label: 'Include deleted' },
+                            { value: 'false', label: 'Hide deleted' },
+                            { value: 'true', label: 'Only deleted' },
+                        ],
+                    },
+                ]}
+                timeFilter={{
+                    value: timeFilter,
+                    onChange: (v) => {
+                        setTimeFilter(v);
+                        setPage(1);
+                    },
+                }}
+                sortBy={{
+                    value: sortBy,
+                    onChange: setSortBy,
+                    options: [
+                        { value: 'createdAt', label: 'Newest first' },
+                        { value: 'clickCounts', label: 'Most viewed' },
+                    ],
+                }}
+                sortOrder={{
+                    value: sortOrder,
+                    onToggle: () =>
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                }}
+                viewMode={{ value: viewMode, onChange: setViewMode }}
+                onClear={clearAll}
+                showClear={Boolean(
+                    search || timeFilter !== 'all' || activeFilters,
+                )}
+            />
+
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button size='sm' onClick={fetchProducts}>
+                            Try again
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
+
+            {viewMode === 'table' ? (
+                <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
+                    {bulkBar}
+                    {current.length === 0 ? (
+                        empty
+                    ) : (
+                        <Table minWidth={960}>
+                            <thead>
+                                <tr>
+                                    <SelectCell
+                                        header
+                                        label='Select all listings on this page'
+                                        checked={selection.allVisible}
+                                        indeterminate={selection.someVisible}
+                                        onChange={selection.toggleAllVisible}
+                                    />
+                                    <Th>Listing</Th>
+                                    <Th>Price</Th>
+                                    <Th>Status</Th>
+                                    <Th>Listed</Th>
+                                    <Th>
+                                        <span className='sr-only'>Actions</span>
+                                    </Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {current.map((product) => (
+                                    <Tr
+                                        key={product._id}
+                                        selected={selection.isSelected(
+                                            product._id,
+                                        )}
+                                        onClick={() => openProduct(product)}
+                                    >
+                                        <SelectCell
+                                            label={`Select ${product.name || 'listing'}`}
+                                            checked={selection.isSelected(
+                                                product._id,
+                                            )}
+                                            onChange={(on) =>
+                                                selection.toggle(
+                                                    product._id,
+                                                    on,
+                                                )
+                                            }
+                                        />
+                                        <Td className='max-w-[380px]'>
+                                            <div className='flex items-center gap-3 min-w-0'>
+                                                <ProductImage
+                                                    src={product.image}
+                                                    className='w-11 h-11 rounded-lg shrink-0'
+                                                    iconClassName='w-4 h-4'
+                                                />
+                                                <div className='flex flex-col gap-0.5 min-w-0'>
+                                                    <Link
+                                                        to={productPath(
+                                                            product,
+                                                        )}
+                                                        onClick={(e) =>
+                                                            e.stopPropagation()
+                                                        }
+                                                        className='font-medium text-ink hover:underline truncate'
+                                                    >
+                                                        {product.name ||
+                                                            'Untitled listing'}
+                                                    </Link>
+                                                    <span className='text-[12.5px] text-muted truncate'>
+                                                        {product.description}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </Td>
+                                        <Td>
+                                            <div className='flex flex-col gap-0.5'>
+                                                <span className='font-mono text-[13px]'>
+                                                    {formatINR(product.price)}
+                                                </span>
+                                                <span className='text-[12.5px] text-muted'>
+                                                    {product.available
+                                                        ? 'Available'
+                                                        : 'Unavailable'}
+                                                </span>
+                                            </div>
+                                        </Td>
+                                        <Td>
+                                            <div className='flex flex-col items-start gap-1'>
+                                                <div className='flex flex-wrap gap-1'>
+                                                    <StatusBadge
+                                                        status={
+                                                            product.submissionStatus
+                                                        }
+                                                    />
+                                                    {product.deleted && (
+                                                        <StatusBadge tone='outline'>
+                                                            Deleted
+                                                        </StatusBadge>
+                                                    )}
+                                                </div>
+                                                {viewsOf(product) > 0 && (
+                                                    <span className='text-xs text-muted'>
+                                                        {formatNumber(
+                                                            viewsOf(product),
+                                                        )}{' '}
+                                                        views
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </Td>
+                                        <Td>
+                                            <div className='flex flex-col gap-0.5'>
+                                                <span className='whitespace-nowrap'>
+                                                    {formatShortDateTime(
+                                                        product.createdAt,
+                                                    )}
+                                                </span>
+                                                <span className='text-[12.5px] text-muted'>
+                                                    {product.owner?.username
+                                                        ? `@${product.owner.username}`
+                                                        : 'Unknown seller'}
+                                                </span>
+                                            </div>
+                                        </Td>
+                                        <Td align='right'>
+                                            <div className='flex justify-end gap-1'>
+                                                {rowActions(product)}
+                                            </div>
+                                        </Td>
+                                    </Tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                    {sorted.length > 0 && (
+                        <div className='px-4 py-3 border-t border-line-soft'>
+                            {pagination}
+                        </div>
+                    )}
+                </div>
+            ) : current.length === 0 ? (
+                <div className='bg-sheet border border-line rounded-xl'>
+                    {empty}
+                </div>
+            ) : (
+                <div className='flex flex-col gap-4'>
+                    {selection.count > 0 && (
+                        <div className='rounded-xl overflow-hidden'>
+                            {bulkBar}
+                        </div>
+                    )}
+                    <div className='grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'>
+                        {current.map((product) => {
+                            const pending =
+                                (product.submissionStatus || 'pending') ===
+                                'pending';
+                            const selected = selection.isSelected(product._id);
+                            const name = product.name || 'Untitled listing';
+                            return (
+                                <article
+                                    key={product._id}
+                                    onClick={() => openProduct(product)}
+                                    className={`flex flex-col bg-sheet border rounded-xl overflow-hidden cursor-pointer transition-colors ${
+                                        selected
+                                            ? 'border-brand ring-1 ring-brand'
+                                            : 'border-line hover:border-line-strong'
+                                    }`}
+                                >
+                                    <div className='relative'>
+                                        <ProductImage
+                                            src={product.image}
+                                            className='w-full aspect-[4/3]'
+                                        />
+                                        <div className='absolute top-2.5 left-2.5 right-12 flex flex-wrap gap-1.5'>
+                                            <StatusBadge
+                                                status={
+                                                    product.submissionStatus
+                                                }
+                                            />
+                                            {!product.available && (
+                                                <UnavailableBadge />
+                                            )}
+                                            {product.deleted && (
+                                                <StatusBadge tone='outline'>
+                                                    Deleted
+                                                </StatusBadge>
+                                            )}
+                                        </div>
+                                        <label
+                                            onClick={(e) => e.stopPropagation()}
+                                            className='absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-lg bg-sheet/90 border border-line cursor-pointer'
+                                        >
+                                            <input
+                                                type='checkbox'
+                                                aria-label={`Select ${name}`}
+                                                checked={selected}
+                                                onChange={(e) =>
+                                                    selection.toggle(
+                                                        product._id,
+                                                        e.target.checked,
+                                                    )
+                                                }
+                                                className='w-4 h-4 accent-brand cursor-pointer'
+                                            />
+                                        </label>
+                                    </div>
+                                    <div className='flex-1 flex flex-col gap-1.5 px-3.5 pt-3 pb-1.5'>
+                                        <div className='flex items-baseline gap-2'>
+                                            <Link
+                                                to={productPath(product)}
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
+                                                }
+                                                className='flex-1 min-w-0 text-sm font-medium leading-snug text-ink hover:underline line-clamp-2'
+                                            >
+                                                {name}
+                                            </Link>
+                                            <Price
+                                                value={product.price}
+                                                className='text-[17px] whitespace-nowrap'
+                                            />
+                                        </div>
+                                        <span className='text-xs text-muted'>
+                                            {[
+                                                product.owner?.username &&
+                                                    `@${product.owner.username}`,
+                                                listedAgo(product.createdAt),
+                                                views(product),
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' · ')}
+                                        </span>
+                                    </div>
+                                    {pending ? (
+                                        <div className='flex gap-1.5 px-3 pt-1.5 pb-3'>
+                                            <Button
+                                                size='sm'
+                                                icon={X}
+                                                className='flex-1 text-bad-ink'
+                                                aria-label={`Reject ${name}`}
+                                                onClick={stop(() =>
+                                                    setRejecting([product._id]),
+                                                )}
+                                            >
+                                                Reject
+                                            </Button>
+                                            <Button
+                                                size='sm'
+                                                variant='primary'
+                                                icon={Check}
+                                                className='flex-1'
+                                                aria-label={`Approve ${name}`}
+                                                onClick={stop(() =>
+                                                    approve([product._id]),
+                                                )}
+                                            >
+                                                Approve
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className='flex items-center gap-0.5 px-2 pt-1 pb-2'>
+                                            <span
+                                                className={`flex-1 min-w-0 pl-1.5 text-[12.5px] truncate ${
+                                                    product.submissionStatus ===
+                                                    'rejected'
+                                                        ? 'text-bad-ink'
+                                                        : 'text-ink-2'
+                                                }`}
+                                            >
+                                                {product.submissionStatus ===
+                                                'rejected'
+                                                    ? product.rejectionReason
+                                                        ? `Rejected: ${product.rejectionReason}`
+                                                        : 'Rejected'
+                                                    : product.available
+                                                      ? 'Available'
+                                                      : 'Unavailable'}
+                                            </span>
+                                            {rowActions(product)}
+                                        </div>
+                                    )}
+                                </article>
+                            );
+                        })}
+                    </div>
+                    <div className='bg-sheet border border-line rounded-xl px-4 py-3'>
+                        {pagination}
+                    </div>
+                </div>
+            )}
+
             <ProductEditModal
-                isOpen={showModal}
-                onClose={handleModalClose}
+                isOpen={Boolean(editingProduct)}
+                onClose={() => setEditingProduct(null)}
                 product={editingProduct}
-                onSuccess={handleModalSuccess}
+                onSuccess={fetchProducts}
+            />
+
+            <ConfirmModal
+                isOpen={Boolean(confirm)}
+                onClose={() => setConfirm(null)}
+                onConfirm={() => confirm?.onConfirm()}
+                title={confirm?.title}
+                message={confirm?.message}
+                confirmText={confirm?.confirmText}
+                variant='danger'
+            />
+
+            <RejectDialog
+                open={Boolean(rejecting)}
+                onClose={() => setRejecting(null)}
+                title={
+                    rejecting?.length > 1
+                        ? `Reject ${formatNumber(rejecting.length)} listings?`
+                        : 'Reject this listing?'
+                }
+                description={
+                    rejecting?.length > 1
+                        ? 'Every seller gets the same reason, so keep it general.'
+                        : 'The seller sees your reason, so say what to fix.'
+                }
+                onSubmit={(reason) => reject(rejecting, reason)}
             />
         </div>
     );

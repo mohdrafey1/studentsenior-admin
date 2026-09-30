@@ -1,5 +1,28 @@
 import { useState, useEffect } from 'react';
-import { X, Plus } from 'lucide-react';
+import { ImageOff, Loader2, Plus, X } from 'lucide-react';
+import { Button, Dialog, Field, Input, Select, Switch, Textarea } from './ui';
+
+const CATEGORIES = [
+    'Books',
+    'Electronics',
+    'Stationery',
+    'Courses',
+    'Gadgets',
+    'Accessories',
+    'Software',
+    'Other',
+];
+
+const EMPTY = {
+    name: '',
+    description: '',
+    price: '',
+    image: '',
+    buyLink: '',
+    category: 'General',
+    tags: [],
+    isActive: true,
+};
 
 const AffiliateProductModal = ({
     isOpen,
@@ -8,28 +31,10 @@ const AffiliateProductModal = ({
     initialData = null,
     isLoading,
 }) => {
-    const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        price: '',
-        image: '',
-        buyLink: '',
-        category: 'General',
-        tags: [],
-        isActive: true,
-    });
+    const [formData, setFormData] = useState(EMPTY);
     const [tagInput, setTagInput] = useState('');
-
-    const CATEGORIES = [
-        'Books',
-        'Electronics',
-        'Stationery',
-        'Courses',
-        'Gadgets',
-        'Accessories',
-        'Software',
-        'Other',
-    ];
+    const [errors, setErrors] = useState({});
+    const [previewBroken, setPreviewBroken] = useState(false);
 
     useEffect(() => {
         if (initialData) {
@@ -47,21 +52,30 @@ const AffiliateProductModal = ({
                         : true,
             });
         } else {
-            setFormData({
-                name: '',
-                description: '',
-                price: '',
-                image: '',
-                buyLink: '',
-                category: 'General',
-                tags: [],
-                isActive: true,
-            });
+            setFormData(EMPTY);
         }
+        setErrors({});
+        setTagInput('');
+        setPreviewBroken(false);
     }, [initialData, isOpen]);
+
+    const setField = (name, value) => {
+        setFormData((prev) => ({ ...prev, [name]: value }));
+        if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        const next = {};
+        if (!formData.name.trim()) next.name = 'Enter the product name';
+        if (!formData.description.trim())
+            next.description = 'Add a short description';
+        if (formData.price === '' || Number(formData.price) < 0)
+            next.price = 'Enter a price of ₹0 or more';
+        if (!formData.image.trim()) next.image = 'Add an image link';
+        if (!formData.buyLink.trim()) next.buyLink = 'Add the buy link';
+        setErrors(next);
+        if (Object.keys(next).length) return;
         onSubmit(formData);
     };
 
@@ -85,263 +99,203 @@ const AffiliateProductModal = ({
 
     if (!isOpen) return null;
 
+    // Keep a category the list doesn't know (such as the default "General") selectable.
+    const categoryOptions = [
+        ...(CATEGORIES.includes(formData.category) || !formData.category
+            ? []
+            : [formData.category]),
+        ...CATEGORIES,
+    ].map((cat) => ({ value: cat, label: cat }));
+
     return (
-        <div className='fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto'>
-            <div className='bg-white dark:bg-gray-800 rounded-xl w-full max-w-2xl shadow-xl flex flex-col max-h-[90vh]'>
-                <div className='flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700'>
-                    <h2 className='text-xl font-bold text-gray-900 dark:text-white'>
-                        {initialData ? 'Edit Product' : 'Add New Product'}
-                    </h2>
-                    <button
-                        onClick={onClose}
-                        className='p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors'
-                    >
-                        <X size={20} className='text-gray-500' />
-                    </button>
-                </div>
-
-                <form
-                    onSubmit={handleSubmit}
-                    className='flex-1 overflow-y-auto p-6 space-y-6'
-                >
-                    <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                        {/* Name */}
-                        <div className='space-y-2 md:col-span-2'>
-                            <label className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                                Product Name
-                            </label>
-                            <input
-                                required
-                                type='text'
-                                value={formData.name}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        name: e.target.value,
-                                    })
-                                }
-                                className='w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
-                                placeholder='e.g., Engineering Physics Textbook'
-                            />
-                        </div>
-
-                        {/* Description */}
-                        <div className='space-y-2 md:col-span-2'>
-                            <label className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                                Description
-                            </label>
-                            <textarea
-                                required
-                                rows={3}
-                                value={formData.description}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        description: e.target.value,
-                                    })
-                                }
-                                className='w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none'
-                                placeholder='Product description...'
-                            />
-                        </div>
-
-                        {/* Price */}
-                        <div className='space-y-2'>
-                            <label className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                                Price (₹)
-                            </label>
-                            <div className='relative'>
-                                <span className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-500'>
-                                    ₹
-                                </span>
-                                <input
-                                    required
-                                    type='number'
-                                    min='0'
-                                    value={formData.price}
-                                    onChange={(e) =>
-                                        setFormData({
-                                            ...formData,
-                                            price: e.target.value,
-                                        })
-                                    }
-                                    className='w-full pl-8 pr-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
-                                    placeholder='0.00'
-                                />
-                            </div>
-                        </div>
-
-                        {/* Category */}
-                        <div className='space-y-2'>
-                            <label className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                                Category
-                            </label>
-                            <select
-                                value={formData.category}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        category: e.target.value,
-                                    })
-                                }
-                                className='w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
-                            >
-                                {CATEGORIES.map((cat) => (
-                                    <option key={cat} value={cat}>
-                                        {cat}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Image URL */}
-                        <div className='space-y-2 md:col-span-2'>
-                            <label className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                                Image URL
-                            </label>
-                            <div className='flex gap-2'>
-                                <input
-                                    required
-                                    type='url'
-                                    value={formData.image}
-                                    onChange={(e) =>
-                                        setFormData({
-                                            ...formData,
-                                            image: e.target.value,
-                                        })
-                                    }
-                                    className='flex-1 px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
-                                    placeholder='https://example.com/image.jpg'
-                                />
-                                {formData.image && (
-                                    <div className='w-12 h-12 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0'>
-                                        <img
-                                            src={formData.image}
-                                            alt='Preview'
-                                            className='w-full h-full object-cover'
-                                            onError={(e) =>
-                                                (e.target.style.display =
-                                                    'none')
-                                            }
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Affiliate Link */}
-                        <div className='space-y-2 md:col-span-2'>
-                            <label className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                                Affiliate / Buy Link
-                            </label>
-                            <input
-                                required
-                                type='url'
-                                value={formData.buyLink}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        buyLink: e.target.value,
-                                    })
-                                }
-                                className='w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
-                                placeholder='https://amazon.com/...'
-                            />
-                        </div>
-
-                        {/* Tags */}
-                        <div className='space-y-2 md:col-span-2'>
-                            <label className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                                Tags
-                            </label>
-                            <div className='flex gap-2 mb-2'>
-                                <input
-                                    type='text'
-                                    value={tagInput}
-                                    onChange={(e) =>
-                                        setTagInput(e.target.value)
-                                    }
-                                    onKeyDown={(e) =>
-                                        e.key === 'Enter' && handleAddTag(e)
-                                    }
-                                    className='flex-1 px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
-                                    placeholder='Add tags (press Enter)...'
-                                />
-                                <button
-                                    type='button'
-                                    onClick={handleAddTag}
-                                    className='px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'
-                                >
-                                    <Plus size={20} />
-                                </button>
-                            </div>
-                            <div className='flex flex-wrap gap-2'>
-                                {formData.tags.map((tag, index) => (
-                                    <span
-                                        key={index}
-                                        className='inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                    >
-                                        #{tag}
-                                        <button
-                                            type='button'
-                                            onClick={() => removeTag(tag)}
-                                            className='hover:text-blue-900 dark:hover:text-blue-100'
-                                        >
-                                            <X size={14} />
-                                        </button>
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Status Toggle */}
-                        <div className='flex items-center gap-3 md:col-span-2'>
-                            <label className='relative inline-flex items-center cursor-pointer'>
-                                <input
-                                    type='checkbox'
-                                    checked={formData.isActive}
-                                    onChange={(e) =>
-                                        setFormData({
-                                            ...formData,
-                                            isActive: e.target.checked,
-                                        })
-                                    }
-                                    className='sr-only peer'
-                                />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                            </label>
-                            <span className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                                Active (Visible to users)
-                            </span>
-                        </div>
-                    </div>
-                </form>
-
-                <div className='p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3'>
-                    <button
-                        type='button'
-                        onClick={onClose}
-                        className='px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
-                    >
+        <Dialog
+            open={isOpen}
+            onClose={onClose}
+            busy={isLoading}
+            size='lg'
+            title={initialData ? 'Edit product' : 'Add product'}
+            description={
+                initialData
+                    ? undefined
+                    : 'Students see it with a link to buy it elsewhere.'
+            }
+            footer={
+                <>
+                    <Button onClick={onClose} disabled={isLoading}>
                         Cancel
-                    </button>
-                    <button
-                        onClick={handleSubmit}
+                    </Button>
+                    <Button
+                        type='submit'
+                        form='affiliate-product-form'
+                        variant='primary'
                         disabled={isLoading}
-                        className='px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
+                        icon={isLoading ? Loader2 : undefined}
+                        className={isLoading ? '[&>svg]:animate-spin' : ''}
                     >
-                        {isLoading ? (
-                            <>
-                                <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' />
-                                Saving...
-                            </>
-                        ) : (
-                            <>Save Product</>
-                        )}
-                    </button>
+                        {isLoading
+                            ? 'Saving…'
+                            : initialData
+                              ? 'Save changes'
+                              : 'Add product'}
+                    </Button>
+                </>
+            }
+        >
+            <form
+                id='affiliate-product-form'
+                onSubmit={handleSubmit}
+                noValidate
+                className='flex flex-col gap-4'
+            >
+                <Field label='Product name' required error={errors.name}>
+                    <Input
+                        value={formData.name}
+                        onChange={(e) => setField('name', e.target.value)}
+                        placeholder='Engineering Physics textbook'
+                    />
+                </Field>
+
+                <Field label='Description' required error={errors.description}>
+                    <Textarea
+                        rows={3}
+                        value={formData.description}
+                        onChange={(e) =>
+                            setField('description', e.target.value)
+                        }
+                        placeholder='Why students would want it, in a line or two'
+                    />
+                </Field>
+
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                    <Field
+                        label='Price'
+                        required
+                        error={errors.price}
+                        hint='In rupees.'
+                    >
+                        <Input
+                            type='number'
+                            min='0'
+                            value={formData.price}
+                            onChange={(e) => setField('price', e.target.value)}
+                            placeholder='499'
+                            className='font-mono'
+                        />
+                    </Field>
+                    <Field label='Category'>
+                        <Select
+                            value={formData.category}
+                            onChange={(e) =>
+                                setField('category', e.target.value)
+                            }
+                            options={categoryOptions}
+                        />
+                    </Field>
                 </div>
-            </div>
-        </div>
+
+                <div className='flex items-start gap-3'>
+                    <Field
+                        label='Image link'
+                        required
+                        error={errors.image}
+                        className='flex-1 min-w-0'
+                    >
+                        <Input
+                            type='url'
+                            value={formData.image}
+                            onChange={(e) => {
+                                setField('image', e.target.value);
+                                setPreviewBroken(false);
+                            }}
+                            placeholder='https://example.com/image.jpg'
+                        />
+                    </Field>
+                    {formData.image && (
+                        <div className='mt-[25px] w-14 h-14 rounded-lg border border-line bg-sunken overflow-hidden shrink-0 flex items-center justify-center text-muted'>
+                            {previewBroken ? (
+                                <ImageOff
+                                    className='w-5 h-5'
+                                    aria-label='The image couldn’t be loaded'
+                                />
+                            ) : (
+                                <img
+                                    src={formData.image}
+                                    alt='Preview'
+                                    className='w-full h-full object-cover'
+                                    onError={() => setPreviewBroken(true)}
+                                />
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <Field label='Buy link' required error={errors.buyLink}>
+                    <Input
+                        type='url'
+                        value={formData.buyLink}
+                        onChange={(e) => setField('buyLink', e.target.value)}
+                        placeholder='https://amazon.in/…'
+                    />
+                </Field>
+
+                <div className='flex flex-col gap-1.5'>
+                    <div className='flex items-end gap-2'>
+                        <Field
+                            label='Tags'
+                            hint='Press Enter to add each one.'
+                            className='flex-1 min-w-0'
+                        >
+                            <Input
+                                value={tagInput}
+                                onChange={(e) => setTagInput(e.target.value)}
+                                onKeyDown={(e) =>
+                                    e.key === 'Enter' && handleAddTag(e)
+                                }
+                                placeholder='first-year'
+                            />
+                        </Field>
+                        <Button
+                            iconOnly
+                            icon={Plus}
+                            aria-label='Add tag'
+                            onClick={handleAddTag}
+                            className='mb-[26px]'
+                        />
+                    </div>
+                    {formData.tags.length > 0 && (
+                        <ul className='flex flex-wrap gap-1.5'>
+                            {formData.tags.map((tag, index) => (
+                                <li
+                                    key={index}
+                                    className='inline-flex items-center gap-1 h-7 pl-2.5 pr-1 rounded-full bg-ground text-[12.5px] text-ink-2'
+                                >
+                                    #{tag}
+                                    <button
+                                        type='button'
+                                        onClick={() => removeTag(tag)}
+                                        aria-label={`Remove tag ${tag}`}
+                                        className='w-5 h-5 rounded-full flex items-center justify-center text-muted hover:text-ink hover:bg-line-soft cursor-pointer'
+                                    >
+                                        <X
+                                            className='w-3 h-3'
+                                            aria-hidden='true'
+                                        />
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+
+                <Switch
+                    checked={formData.isActive}
+                    onChange={(value) => setField('isActive', value)}
+                    label='Show to students'
+                    description='Hidden products stay here, but students don’t see them.'
+                    className='p-3 rounded-lg border border-line'
+                />
+            </form>
+        </Dialog>
     );
 };
 

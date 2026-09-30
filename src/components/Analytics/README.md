@@ -1,62 +1,20 @@
-# Analytics Components
+# Analytics components
 
-This directory contains all the refactored components for the Analytics Dashboard.
+Pieces of the Analytics page (`src/pages/Analytics/Analytics.jsx`), in the
+Paper Ledger style: token colours only, so dark mode follows the page.
 
-## Components Structure
+- **AnalyticsHeader** – page title, time range, refresh and CSV export
+- **AnalyticsInsights** – one line of highlights worked out from the data
+- **OverviewStats** / **StatCard** – the headline strip and one of its cells
+- **SubmissionsChart** – new content per day (or month for long ranges)
+- **ContentDistribution** – content added in the range, by type
+- **TopPerformers** – most-viewed items
+- **RecentActivity** – latest uploads
+- **GrowthTrends** – last 7 days against the 7 before, by type
+- **EngagementMetrics** – all-time views by type
+- **ChatbotAnalytics** – the study assistant section
+- **ContentCard** – one row of a bar list (label, number, thin bar)
+- **ChartTooltip** – hover card for recharts charts
 
-### Main Components
-
-- **AnalyticsHeader** - Header section with time range filter, refresh, and export buttons
-- **OverviewStats** - Overview statistics cards (Total Content, Total Views, Engagement Rate)
-- **ContentDistribution** - Grid of content type cards with progress bars
-- **EngagementMetrics** - Engagement metrics with visual bars
-- **TopPerformers** - List of top performing content
-- **RecentActivity** - Recent activity feed
-- **GrowthTrends** - Growth trends with percentage changes
-- **AnalyticsInsights** - Insights card with platform recommendations
-- **ChatbotAnalytics** - Complete chatbot analytics section
-
-### Utility Components
-
-- **StatCard** - Reusable stat card component
-- **ContentCard** - Reusable content card with progress bar
-
-## Features
-
-✅ Fully responsive for mobile, tablet, and desktop
-✅ Dark mode support
-✅ Modular and reusable components
-✅ Easy to maintain and extend
-✅ Consistent design system
-
-## Mobile Responsiveness
-
-All components are designed with mobile-first approach:
-
-- Grid layouts adapt from 1 column on mobile to 2-4 columns on desktop
-- Text sizes scale appropriately
-- Buttons stack vertically on mobile
-- Padding and spacing adjusted for smaller screens
-- Touch-friendly targets (minimum 44x44px)
-
-## Usage
-
-```jsx
-import Analytics from './pages/Analytics/Analytics';
-
-// Or import individual components
-import {
-    AnalyticsHeader,
-    OverviewStats,
-    ContentDistribution,
-} from './components/Analytics';
-```
-
-## Styling
-
-All components use Tailwind CSS with:
-
-- Responsive utilities (sm:, md:, lg:, xl:)
-- Dark mode classes (dark:)
-- Hover and transition effects
-- Consistent color palette
+`analyticsData.js` holds the range options, the content-type key map and the
+shared chart styling (axis, grid, cursor and bar props).

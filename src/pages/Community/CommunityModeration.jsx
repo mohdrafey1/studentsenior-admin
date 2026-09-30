@@ -1,29 +1,77 @@
-import React, { useState, useEffect } from 'react';
-import Header from '../../components/Header';
-import api from '../../utils/api';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { MessagesSquare, Flag, Trash2, CheckCircle, Users } from 'lucide-react';
+import { Flag, MessagesSquare, Trash2, Users } from 'lucide-react';
+import api from '../../utils/api';
+import {
+    formatNumber,
+    formatShortDate,
+    formatShortDateTime,
+} from '../../utils/format';
+import { relativeTime } from '../../utils/relativeTime';
+import ConfirmModal from '../../components/ConfirmModal';
+import Pagination from '../../components/Pagination';
+import {
+    Alert,
+    Button,
+    EmptyState,
+    SkeletonRows,
+    PageHeader,
+    StatusBadge,
+    Table,
+    Tabs,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
 
-const formatDate = (d) =>
-    d
-        ? new Date(d).toLocaleString('en-IN', {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-          })
-        : '';
+const GROUPS_PER_PAGE = 20;
+
+// Report statuses from the API: open → reviewed (kept) or actioned (message deleted).
+const REPORT_STATUS = {
+    open: { tone: 'warn', label: 'Open' },
+    reviewed: { tone: 'outline', label: 'Kept' },
+    actioned: { tone: 'bad', label: 'Message deleted' },
+};
+
+const ReportStatus = ({ status }) => {
+    const meta = REPORT_STATUS[status] || REPORT_STATUS.open;
+    return <StatusBadge tone={meta.tone}>{meta.label}</StatusBadge>;
+};
+
+const Eyebrow = ({ children }) => <span className='eyebrow'>{children}</span>;
 
 const CommunityModeration = () => {
     const [tab, setTab] = useState('reports');
     const [groups, setGroups] = useState([]);
+    const [groupsTotal, setGroupsTotal] = useState(null);
+    const [groupsPage, setGroupsPage] = useState(1);
     const [reports, setReports] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [handled, setHandled] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [groupsLoading, setGroupsLoading] = useState(false);
+    const [errors, setErrors] = useState({});
+    const [busyId, setBusyId] = useState(null);
+    const [confirm, setConfirm] = useState(null);
 
-    const fetchGroups = async () => {
+    const fetchGroups = async (page = groupsPage) => {
+        setGroupsLoading(true);
         try {
-            const res = await api.get('/community-chat/groups');
-            if (res.data.success) setGroups(res.data.data.groups || []);
+            const res = await api.get('/community-chat/groups', {
+                params: { page, limit: GROUPS_PER_PAGE },
+            });
+            if (res.data.success) {
+                setGroups(res.data.data.groups || []);
+                setGroupsTotal(
+                    res.data.data.pagination?.totalItems ??
+                        (res.data.data.groups || []).length,
+                );
+            }
+            setErrors((prev) => ({ ...prev, groups: false }));
         } catch {
-            toast.error('Failed to load groups');
+            setErrors((prev) => ({ ...prev, groups: true }));
+        } finally {
+            setGroupsLoading(false);
         }
     };
 
@@ -31,192 +79,440 @@ const CommunityModeration = () => {
         try {
             const res = await api.get('/community-chat/reports?status=open');
             if (res.data.success) setReports(res.data.data.reports || []);
+            setErrors((prev) => ({ ...prev, reports: false }));
         } catch {
-            toast.error('Failed to load reports');
+            setErrors((prev) => ({ ...prev, reports: true }));
+        }
+    };
+
+    // Reviewed and actioned reports, for the "Recently handled" list.
+    const fetchHandled = async () => {
+        try {
+            const res = await api.get('/community-chat/reports?status=all');
+            if (res.data.success) {
+                setHandled(
+                    (res.data.data.reports || [])
+                        .filter((r) => r.status !== 'open')
+                        .sort(
+                            (a, b) =>
+                                new Date(b.updatedAt || b.createdAt) -
+                                new Date(a.updatedAt || a.createdAt),
+                        )
+                        .slice(0, 10),
+                );
+            }
+        } catch {
+            // Optional history; the open reports still work without it.
         }
     };
 
     useEffect(() => {
         setLoading(true);
-        Promise.all([fetchGroups(), fetchReports()]).finally(() =>
-            setLoading(false),
+        Promise.all([fetchGroups(1), fetchReports(), fetchHandled()]).finally(
+            () => setLoading(false),
         );
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const deleteGroup = async (groupId) => {
-        if (!window.confirm('Delete this group? Members lose access.')) return;
+    const deleteGroup = (group) =>
+        setConfirm({
+            title: `Delete ${group.name}?`,
+            message:
+                'Members lose access to the group and its messages straight away. This can’t be undone.',
+            confirmText: 'Delete group',
+            onConfirm: async () => {
+                try {
+                    await api.delete(`/community-chat/groups/${group._id}`);
+                    toast.success('Group deleted');
+                    setGroups((prev) =>
+                        prev.filter((g) => g._id !== group._id),
+                    );
+                    setGroupsTotal((n) => (n ? n - 1 : n));
+                } catch {
+                    toast.error('Couldn’t delete the group. Try again.');
+                }
+            },
+        });
+
+    const deleteMessage = (report) =>
+        setConfirm({
+            title: 'Delete this message?',
+            message:
+                'It disappears from the group for everyone, and every report about it is closed.',
+            confirmText: 'Delete message',
+            onConfirm: async () => {
+                setBusyId(report._id);
+                try {
+                    await api.delete(
+                        `/community-chat/messages/${report.message._id}`,
+                    );
+                    toast.success('Message deleted');
+                    await Promise.all([fetchReports(), fetchHandled()]);
+                } catch {
+                    toast.error('Couldn’t delete the message. Try again.');
+                } finally {
+                    setBusyId(null);
+                }
+            },
+        });
+
+    const resolveReport = async (report) => {
+        setBusyId(report._id);
         try {
-            await api.delete(`/community-chat/groups/${groupId}`);
-            toast.success('Group deleted');
-            setGroups((prev) => prev.filter((g) => g._id !== groupId));
+            await api.patch(`/community-chat/reports/${report._id}/resolve`);
+            toast.success('Report closed, message kept');
+            setReports((prev) => prev.filter((r) => r._id !== report._id));
+            fetchHandled();
         } catch {
-            toast.error('Failed to delete group');
+            toast.error('Couldn’t close the report. Try again.');
+        } finally {
+            setBusyId(null);
         }
     };
 
-    const deleteMessage = async (messageId) => {
-        try {
-            await api.delete(`/community-chat/messages/${messageId}`);
-            toast.success('Message deleted');
-            fetchReports();
-        } catch {
-            toast.error('Failed to delete message');
-        }
-    };
+    const tabs = [
+        {
+            value: 'reports',
+            label: 'Open reports',
+            count: loading ? undefined : reports.length,
+            attention: reports.length > 0,
+        },
+        {
+            value: 'groups',
+            label: 'Groups',
+            count: groupsTotal ?? undefined,
+        },
+    ];
 
-    const resolveReport = async (reportId) => {
-        try {
-            await api.patch(`/community-chat/reports/${reportId}/resolve`);
-            toast.success('Report resolved');
-            setReports((prev) => prev.filter((r) => r._id !== reportId));
-        } catch {
-            toast.error('Failed to resolve report');
-        }
+    const reportCard = (r) => {
+        const message = r.message;
+        const senderId = message?.sender?._id || message?.sender;
+        const busy = busyId === r._id;
+        return (
+            <article
+                key={r._id}
+                className='bg-sheet border border-line rounded-xl overflow-hidden'
+            >
+                <div className='flex flex-wrap items-center gap-3 px-5 py-3.5 border-b border-line-soft'>
+                    <span
+                        className='w-9 h-9 rounded-[10px] bg-ground text-ink-2 flex items-center justify-center shrink-0'
+                        aria-hidden='true'
+                    >
+                        <MessagesSquare className='w-4 h-4' />
+                    </span>
+                    <span className='flex-1 min-w-[160px] text-[14.5px] font-semibold text-ink'>
+                        {r.group?.name || 'Deleted group'}
+                    </span>
+                    <ReportStatus status={r.status} />
+                    <span className='text-[12.5px] text-muted'>
+                        Reported {relativeTime(r.createdAt)}
+                    </span>
+                </div>
+                <div className='grid grid-cols-1 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-6 p-5'>
+                    <div className='flex flex-col gap-2.5 min-w-0'>
+                        <Eyebrow>Flagged message</Eyebrow>
+                        <div className='flex gap-3 px-4 py-3.5 rounded-xl bg-sunken border border-line-soft'>
+                            <div className='flex flex-col gap-1 min-w-0'>
+                                <span className='text-[13px] text-muted'>
+                                    <span className='font-semibold text-ink'>
+                                        {message?.isAnonymous
+                                            ? 'Anonymous member'
+                                            : 'Member'}
+                                    </span>
+                                    {message?.createdAt &&
+                                        ` · ${formatShortDateTime(message.createdAt)}`}
+                                </span>
+                                <p className='text-sm leading-relaxed text-ink break-words'>
+                                    {message?.content ||
+                                        'This message is no longer available.'}
+                                </p>
+                            </div>
+                        </div>
+                        {message?.deleted && (
+                            <span className='text-[12.5px] text-muted'>
+                                The message was already deleted.
+                            </span>
+                        )}
+                        {senderId && !message?.isAnonymous && (
+                            <Link
+                                to={`/users/${senderId}`}
+                                className='self-start text-[12.5px] font-medium text-link hover:underline'
+                            >
+                                View sender
+                            </Link>
+                        )}
+                    </div>
+                    <div className='flex flex-col gap-2.5 min-w-0'>
+                        <Eyebrow>Reported by</Eyebrow>
+                        <div className='flex flex-col gap-1 text-[13.5px]'>
+                            {r.reporter?._id ? (
+                                <Link
+                                    to={`/users/${r.reporter._id}`}
+                                    className='self-start font-semibold text-ink hover:underline'
+                                >
+                                    @{r.reporter.username || 'student'}
+                                </Link>
+                            ) : (
+                                <span className='font-semibold text-ink'>
+                                    @{r.reporter?.username || 'unknown'}
+                                </span>
+                            )}
+                            <span className='text-ink-2 break-words'>
+                                “{r.reason}”
+                            </span>
+                        </div>
+                        <div className='flex flex-col gap-2 mt-auto pt-3'>
+                            {message && !message.deleted && (
+                                <Button
+                                    variant='danger-solid'
+                                    icon={Trash2}
+                                    disabled={busy}
+                                    onClick={() => deleteMessage(r)}
+                                >
+                                    Delete message
+                                </Button>
+                            )}
+                            <Button
+                                disabled={busy}
+                                onClick={() => resolveReport(r)}
+                            >
+                                {message && !message.deleted
+                                    ? 'Keep message'
+                                    : 'Close report'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </article>
+        );
     };
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <main className='pt-4 md:pt-6 pb-8 md:pb-12'>
-                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6'>
-                    <div className='flex items-center gap-3'>
-                        <MessagesSquare className='w-8 h-8 text-blue-600 dark:text-blue-400' />
-                        <h1 className='text-2xl md:text-3xl font-bold text-gray-900 dark:text-white'>
-                            Community Moderation
-                        </h1>
-                    </div>
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Community'
+                description='Group chats inside the app. Reports come from students who flag a message.'
+            />
 
-                    {/* Tabs */}
-                    <div className='flex gap-2'>
-                        <button
-                            onClick={() => setTab('reports')}
-                            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
-                                tab === 'reports'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                            }`}
-                        >
-                            <Flag className='w-4 h-4' /> Reports ({reports.length})
-                        </button>
-                        <button
-                            onClick={() => setTab('groups')}
-                            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
-                                tab === 'groups'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                            }`}
-                        >
-                            <Users className='w-4 h-4' /> Groups ({groups.length})
-                        </button>
-                    </div>
+            <Tabs
+                label='Community view'
+                className='mb-5'
+                value={tab}
+                onChange={setTab}
+                items={tabs}
+            />
 
-                    {loading && (
-                        <p className='text-gray-500 dark:text-gray-400'>
-                            Loading…
-                        </p>
+            {tab === 'reports' && (
+                <div className='flex flex-col gap-4'>
+                    {errors.reports && (
+                        <Alert
+                            tone='bad'
+                            action={
+                                <Button size='sm' onClick={fetchReports}>
+                                    Try again
+                                </Button>
+                            }
+                        >
+                            Couldn’t load reports. Check your connection and try
+                            again.
+                        </Alert>
+                    )}
+                    {loading ? (
+                        <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
+                            <SkeletonRows rows={4} />
+                        </div>
+                    ) : reports.length === 0 ? (
+                        !errors.reports && (
+                            <div className='bg-sheet border border-line rounded-xl'>
+                                <EmptyState
+                                    icon={Flag}
+                                    tone='done'
+                                    title='No open reports'
+                                    description='Messages students flag in group chats appear here.'
+                                />
+                            </div>
+                        )
+                    ) : (
+                        reports.map(reportCard)
                     )}
 
-                    {/* Reports tab */}
-                    {tab === 'reports' && (
-                        <div className='space-y-3'>
-                            {reports.length === 0 && !loading ? (
-                                <p className='text-gray-500 dark:text-gray-400'>
-                                    No open reports. 🎉
-                                </p>
-                            ) : (
-                                reports.map((r) => (
-                                    <div
-                                        key={r._id}
-                                        className='bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700'
-                                    >
-                                        <div className='flex items-start justify-between gap-4'>
-                                            <div className='min-w-0'>
-                                                <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                                    {r.group?.name || 'Group'} ·{' '}
-                                                    {formatDate(r.createdAt)}
-                                                </p>
-                                                <p className='mt-1 font-medium text-gray-900 dark:text-white break-words'>
-                                                    “{r.message?.content ||
-                                                        '(message unavailable)'}
-                                                    ”
-                                                </p>
-                                                <p className='mt-1 text-sm text-red-600 dark:text-red-400'>
-                                                    Reason: {r.reason}
-                                                </p>
-                                                {r.message?.deleted && (
-                                                    <span className='text-xs text-gray-400'>
-                                                        (message already deleted)
+                    {handled.length > 0 && (
+                        <section
+                            aria-labelledby='handled-title'
+                            className='flex flex-col gap-2.5 mt-2'
+                        >
+                            <h2
+                                id='handled-title'
+                                className='text-[14.5px] font-semibold text-ink-2'
+                            >
+                                Recently handled
+                            </h2>
+                            <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
+                                <Table minWidth={720}>
+                                    <thead>
+                                        <tr>
+                                            <Th>Group</Th>
+                                            <Th>Message · reason</Th>
+                                            <Th>Outcome</Th>
+                                            <Th>Handled</Th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {handled.map((r) => (
+                                            <Tr key={r._id}>
+                                                <Td className='font-medium whitespace-nowrap'>
+                                                    {r.group?.name ||
+                                                        'Deleted group'}
+                                                </Td>
+                                                <Td className='max-w-[420px]'>
+                                                    <span className='block truncate text-ink-2'>
+                                                        {r.message?.content
+                                                            ? `“${r.message.content}”`
+                                                            : 'Message unavailable'}{' '}
+                                                        · {r.reason}
                                                     </span>
-                                                )}
-                                            </div>
-                                            <div className='flex flex-col gap-2 shrink-0'>
-                                                {r.message &&
-                                                    !r.message.deleted && (
-                                                        <button
-                                                            onClick={() =>
-                                                                deleteMessage(
-                                                                    r.message._id,
-                                                                )
-                                                            }
-                                                            className='inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm'
-                                                        >
-                                                            <Trash2 className='w-4 h-4' />{' '}
-                                                            Delete msg
-                                                        </button>
+                                                </Td>
+                                                <Td>
+                                                    <ReportStatus
+                                                        status={r.status}
+                                                    />
+                                                </Td>
+                                                <Td className='whitespace-nowrap text-[13px] text-muted'>
+                                                    {formatShortDate(
+                                                        r.updatedAt ||
+                                                            r.createdAt,
                                                     )}
-                                                <button
-                                                    onClick={() =>
-                                                        resolveReport(r._id)
-                                                    }
-                                                    className='inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm'
-                                                >
-                                                    <CheckCircle className='w-4 h-4' />{' '}
-                                                    Resolve
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    )}
-
-                    {/* Groups tab */}
-                    {tab === 'groups' && (
-                        <div className='space-y-3'>
-                            {groups.length === 0 && !loading ? (
-                                <p className='text-gray-500 dark:text-gray-400'>
-                                    No groups yet.
-                                </p>
-                            ) : (
-                                groups.map((g) => (
-                                    <div
-                                        key={g._id}
-                                        className='bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 flex items-center justify-between gap-4'
-                                    >
-                                        <div className='min-w-0'>
-                                            <p className='font-semibold text-gray-900 dark:text-white truncate'>
-                                                {g.name}
-                                            </p>
-                                            <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                                {g.college?.name || '—'} ·{' '}
-                                                {g.memberCount} members · by{' '}
-                                                {g.creator?.username || '—'}
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={() => deleteGroup(g._id)}
-                                            className='inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm shrink-0'
-                                        >
-                                            <Trash2 className='w-4 h-4' /> Delete
-                                        </button>
-                                    </div>
-                                ))
-                            )}
-                        </div>
+                                                </Td>
+                                            </Tr>
+                                        ))}
+                                    </tbody>
+                                </Table>
+                            </div>
+                        </section>
                     )}
                 </div>
-            </main>
+            )}
+
+            {tab === 'groups' && (
+                <div className='flex flex-col gap-4'>
+                    {errors.groups && (
+                        <Alert
+                            tone='bad'
+                            action={
+                                <Button
+                                    size='sm'
+                                    onClick={() => fetchGroups(groupsPage)}
+                                >
+                                    Try again
+                                </Button>
+                            }
+                        >
+                            Couldn’t load groups. Check your connection and try
+                            again.
+                        </Alert>
+                    )}
+                    <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
+                        {loading || groupsLoading ? (
+                            <SkeletonRows rows={6} />
+                        ) : groups.length === 0 ? (
+                            <EmptyState
+                                icon={Users}
+                                title='No groups yet'
+                                description='Group chats students create in the app appear here.'
+                            />
+                        ) : (
+                            <Table minWidth={820}>
+                                <thead>
+                                    <tr>
+                                        <Th>Group</Th>
+                                        <Th>College</Th>
+                                        <Th align='right'>Members</Th>
+                                        <Th>Created by</Th>
+                                        <Th>Last message</Th>
+                                        <Th>
+                                            <span className='sr-only'>
+                                                Actions
+                                            </span>
+                                        </Th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {groups.map((g) => (
+                                        <Tr key={g._id}>
+                                            <Td className='font-medium max-w-[280px]'>
+                                                <span className='block truncate'>
+                                                    {g.name}
+                                                </span>
+                                            </Td>
+                                            <Td className='text-ink-2'>
+                                                {g.college?.name || '—'}
+                                            </Td>
+                                            <Td align='right' mono>
+                                                {formatNumber(g.memberCount)}
+                                            </Td>
+                                            <Td className='text-ink-2'>
+                                                {g.creator?._id ? (
+                                                    <Link
+                                                        to={`/users/${g.creator._id}`}
+                                                        className='hover:underline'
+                                                    >
+                                                        @
+                                                        {g.creator.username ||
+                                                            'student'}
+                                                    </Link>
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </Td>
+                                            <Td className='whitespace-nowrap text-[13px] text-ink-2'>
+                                                {g.lastMessageAt
+                                                    ? relativeTime(
+                                                          g.lastMessageAt,
+                                                      )
+                                                    : 'No messages yet'}
+                                            </Td>
+                                            <Td align='right'>
+                                                <Button
+                                                    variant='danger'
+                                                    size='sm'
+                                                    onClick={() =>
+                                                        deleteGroup(g)
+                                                    }
+                                                    aria-label={`Delete ${g.name}`}
+                                                >
+                                                    Delete
+                                                </Button>
+                                            </Td>
+                                        </Tr>
+                                    ))}
+                                </tbody>
+                            </Table>
+                        )}
+                        {groupsTotal > GROUPS_PER_PAGE && (
+                            <div className='px-4 py-3 border-t border-line-soft'>
+                                <Pagination
+                                    currentPage={groupsPage}
+                                    pageSize={GROUPS_PER_PAGE}
+                                    totalItems={groupsTotal}
+                                    onPageChange={(page) => {
+                                        setGroupsPage(page);
+                                        fetchGroups(page);
+                                    }}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            <ConfirmModal
+                isOpen={Boolean(confirm)}
+                onClose={() => setConfirm(null)}
+                onConfirm={() => confirm?.onConfirm()}
+                title={confirm?.title}
+                message={confirm?.message}
+                confirmText={confirm?.confirmText}
+                variant='danger'
+            />
         </div>
     );
 };
