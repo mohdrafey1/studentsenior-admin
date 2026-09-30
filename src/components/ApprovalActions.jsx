@@ -1,239 +1,270 @@
 import React, { useState } from 'react';
-import { CheckCircle, XCircle, Loader, AlertTriangle } from 'lucide-react';
-import api from '../utils/api';
+import { Check, Clock, Loader2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import api from '../utils/api';
 import ConfirmModal from './ConfirmModal';
+import RejectDialog from './RejectDialog';
+import ReasonPicker from './ReasonPicker';
+import { reasonError as checkReason } from './reviewReasons';
+import { Button, StatusBadge } from './ui';
 
+/**
+ * Approve or reject a student upload.
+ *
+ * variant='bar'   — amber band across the page, only while pending.
+ * variant='panel' — the "Review" card for the side column of review pages.
+ *                   Shows the decision controls while pending, and the
+ *                   current decision (with "Change decision") otherwise.
+ */
 const ApprovalActions = ({
     resourceType,
     currentStatus,
+    rejectionReason: currentReason,
     apiEndpoint,
     onStatusChange,
+    variant = 'bar',
+    approveNote,
 }) => {
     const [isProcessing, setIsProcessing] = useState(false);
-    const [showRejectModal, setShowRejectModal] = useState(false);
-    const [rejectionReason, setRejectionReason] = useState('');
-    const [rejectError, setRejectError] = useState('');
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [rejectOpen, setRejectOpen] = useState(false);
 
-    // Confirmation modal state
-    const [confirmModal, setConfirmModal] = useState({
-        isOpen: false,
-        title: '',
-        message: '',
-        onConfirm: null,
-        variant: 'success',
-    });
+    // Panel state
+    const [decision, setDecision] = useState('approve');
+    const [reason, setReason] = useState('');
+    const [reasonError, setReasonError] = useState('');
+    const [reopened, setReopened] = useState(false);
 
-    const showConfirm = (config) => {
-        return new Promise((resolve) => {
-            setConfirmModal({
-                isOpen: true,
-                title: config.title || 'Confirm Action',
-                message: config.message,
-                variant: config.variant || 'success',
-                onConfirm: () => {
-                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-                    resolve(true);
-                },
-            });
-        });
-    };
+    // Pages pass names like 'PYQ', 'note' or 'Opportunity'. Mid-sentence we
+    // lower-case them (keeping acronyms); toasts start with a capital.
+    const noun =
+        resourceType === resourceType.toUpperCase()
+            ? resourceType
+            : resourceType.toLowerCase();
+    const label = noun.charAt(0).toUpperCase() + noun.slice(1);
 
-    const handleCloseConfirm = () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-    };
-
-    const handleApprove = async () => {
-        const confirmed = await showConfirm({
-            title: 'Approve Resource',
-            message: `Are you sure you want to approve this ${resourceType}? It will become visible to all users.`,
-            variant: 'success',
-        });
-
-        if (!confirmed) return;
-
+    const setStatus = async (submissionStatus, rejectionReason = '') => {
         setIsProcessing(true);
         try {
-            const updateData = {
-                submissionStatus: 'approved',
-                rejectionReason: '', // Clear any previous rejection reason
-            };
-
-            await api.put(apiEndpoint, updateData);
-            toast.success(`${resourceType} approved successfully!`);
-            onStatusChange && onStatusChange('approved');
+            await api.put(apiEndpoint, { submissionStatus, rejectionReason });
+            toast.success(
+                submissionStatus === 'approved'
+                    ? `${label} approved`
+                    : `${label} rejected`,
+            );
+            setReopened(false);
+            setReason('');
+            onStatusChange && onStatusChange(submissionStatus);
+            return true;
         } catch (error) {
-            console.error('Error approving resource:', error);
             toast.error(
                 error.response?.data?.message ||
-                    `Failed to approve ${resourceType}`,
+                    `Couldn’t update the ${noun}. Try again.`,
             );
+            return false;
         } finally {
             setIsProcessing(false);
         }
     };
 
-    const handleRejectClick = () => {
-        setShowRejectModal(true);
-        setRejectionReason('');
-        setRejectError('');
-    };
+    const status = currentStatus || 'pending';
 
-    const handleRejectSubmit = async () => {
-        if (!rejectionReason.trim()) {
-            setRejectError('Rejection reason is required');
-            return;
-        }
+    if (variant === 'panel') {
+        const deciding = status === 'pending' || reopened;
+        const submit = () => {
+            if (decision === 'reject') {
+                const problem = checkReason(reason);
+                if (problem) {
+                    setReasonError(problem);
+                    return;
+                }
+                setStatus('rejected', reason.trim());
+            } else {
+                setStatus('approved');
+            }
+        };
 
-        setIsProcessing(true);
-        try {
-            const updateData = {
-                submissionStatus: 'rejected',
-                rejectionReason: rejectionReason.trim(),
-            };
+        const choice = (value, label, Icon, on) => (
+            <button
+                type='button'
+                role='radio'
+                aria-checked={decision === value}
+                onClick={() => {
+                    setDecision(value);
+                    setReasonError('');
+                }}
+                disabled={isProcessing}
+                className={`flex items-center justify-center gap-2 h-10 rounded-[9px] border text-[13.5px] font-medium cursor-pointer transition-colors ${
+                    decision === value
+                        ? on
+                        : 'border-line-strong bg-sheet text-ink-2 hover:text-ink'
+                }`}
+            >
+                <Icon className='w-4 h-4' aria-hidden='true' />
+                {label}
+            </button>
+        );
 
-            await api.put(apiEndpoint, updateData);
-            toast.success(`${resourceType} rejected successfully!`);
-            setShowRejectModal(false);
-            onStatusChange && onStatusChange('rejected');
-        } catch (error) {
-            console.error('Error rejecting resource:', error);
-            toast.error(
-                error.response?.data?.message ||
-                    `Failed to reject ${resourceType}`,
-            );
-        } finally {
-            setIsProcessing(false);
-        }
-    };
+        return (
+            <section
+                aria-labelledby='review-title'
+                className='bg-sheet border border-line rounded-xl p-5 flex flex-col gap-3.5'
+            >
+                <div className='flex items-center gap-2'>
+                    <h2
+                        id='review-title'
+                        className='flex-1 text-[15px] font-semibold text-ink'
+                    >
+                        Review
+                    </h2>
+                    <StatusBadge status={status} />
+                </div>
 
-    // Only show for pending resources
-    if (currentStatus !== 'pending') {
-        return null;
+                {!deciding ? (
+                    <>
+                        {status === 'rejected' && currentReason && (
+                            <p className='px-3 py-2.5 rounded-lg bg-bad-soft text-[13px] leading-relaxed text-bad-ink'>
+                                {currentReason}
+                            </p>
+                        )}
+                        <p className='text-[13px] text-ink-2'>
+                            {status === 'approved'
+                                ? `Students can see this ${noun}.`
+                                : `Students can’t see this ${noun}.`}
+                        </p>
+                        <Button
+                            onClick={() => {
+                                setDecision(
+                                    status === 'approved'
+                                        ? 'reject'
+                                        : 'approve',
+                                );
+                                setReopened(true);
+                            }}
+                        >
+                            Change decision
+                        </Button>
+                    </>
+                ) : (
+                    <>
+                        <div
+                            role='radiogroup'
+                            aria-label='Decision'
+                            className='grid grid-cols-2 gap-2'
+                        >
+                            {choice(
+                                'approve',
+                                'Approve',
+                                Check,
+                                'border-ok bg-ok-soft text-ok-ink',
+                            )}
+                            {choice(
+                                'reject',
+                                'Reject',
+                                X,
+                                'border-bad bg-bad-soft text-bad-ink',
+                            )}
+                        </div>
+                        {decision === 'reject' ? (
+                            <ReasonPicker
+                                value={reason}
+                                onChange={(text) => {
+                                    setReason(text);
+                                    setReasonError('');
+                                }}
+                                error={reasonError}
+                                disabled={isProcessing}
+                            />
+                        ) : (
+                            <p className='text-[13px] leading-relaxed text-ink-2'>
+                                {approveNote ||
+                                    `Approving makes this ${noun} visible to every student.`}
+                            </p>
+                        )}
+                        <Button
+                            variant='dark'
+                            size='lg'
+                            onClick={submit}
+                            disabled={isProcessing}
+                            icon={isProcessing ? Loader2 : undefined}
+                            className={
+                                isProcessing ? '[&>svg]:animate-spin' : ''
+                            }
+                        >
+                            {isProcessing
+                                ? 'Saving…'
+                                : decision === 'reject'
+                                  ? 'Reject with reason'
+                                  : `Approve ${noun}`}
+                        </Button>
+                        {reopened && (
+                            <Button
+                                variant='ghost'
+                                size='sm'
+                                onClick={() => setReopened(false)}
+                            >
+                                Keep current decision
+                            </Button>
+                        )}
+                    </>
+                )}
+            </section>
+        );
     }
+
+    // Bar: only while pending.
+    if (status !== 'pending') return null;
 
     return (
         <>
-            <div className='py-4 max-w-xs mx-auto border-t border-gray-100 dark:border-gray-700'>
-                <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-3'>
-                    Quick Actions
-                </dt>
-                <dd className='flex gap-2'>
-                    <button
-                        onClick={handleApprove}
+            <div className='flex flex-wrap items-center gap-3 px-4 py-3 mb-5 rounded-xl bg-warn-soft text-warn-ink'>
+                <Clock className='w-4 h-4 shrink-0' aria-hidden='true' />
+                <p className='flex-1 min-w-[200px] text-[13.5px]'>
+                    <span className='font-semibold'>Waiting for review.</span>{' '}
+                    Approving makes this {noun} visible to all students.
+                </p>
+                <div className='flex items-center gap-2'>
+                    <Button
+                        variant='danger'
+                        icon={X}
+                        onClick={() => setRejectOpen(true)}
                         disabled={isProcessing}
-                        className='flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed'
                     >
-                        {isProcessing ? (
-                            <Loader className='h-4 w-4 animate-spin' />
-                        ) : (
-                            <CheckCircle className='h-4 w-4' />
-                        )}
-                        Approve
-                    </button>
-                    <button
-                        onClick={handleRejectClick}
-                        disabled={isProcessing}
-                        className='flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed'
-                    >
-                        <XCircle className='h-4 w-4' />
                         Reject
-                    </button>
-                </dd>
+                    </Button>
+                    <Button
+                        variant='primary'
+                        icon={isProcessing ? Loader2 : Check}
+                        onClick={() => setConfirmOpen(true)}
+                        disabled={isProcessing}
+                        className={isProcessing ? '[&>svg]:animate-spin' : ''}
+                    >
+                        Approve
+                    </Button>
+                </div>
             </div>
 
-            {/* Confirm Modal */}
             <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={handleCloseConfirm}
-                onConfirm={confirmModal.onConfirm}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                variant={confirmModal.variant}
+                isOpen={confirmOpen}
+                onClose={() => setConfirmOpen(false)}
+                onConfirm={() => {
+                    setConfirmOpen(false);
+                    setStatus('approved');
+                }}
+                title={`Approve this ${noun}?`}
+                message='It will become visible to all students.'
+                variant='success'
+                confirmText='Approve'
             />
 
-            {/* Rejection Reason Modal */}
-            {showRejectModal && (
-                <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
-                    <div className='flex items-center justify-center min-h-screen p-4'>
-                        <div
-                            className='fixed inset-0'
-                            onClick={() =>
-                                !isProcessing && setShowRejectModal(false)
-                            }
-                        ></div>
-
-                        <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md'>
-                            {/* Header */}
-                            <div className='p-4 border-b border-gray-200 dark:border-gray-700'>
-                                <h3 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                    Reject {resourceType}
-                                </h3>
-                                <p className='text-sm text-gray-500 dark:text-gray-400 mt-1'>
-                                    Please provide a reason for rejection
-                                </p>
-                            </div>
-
-                            {/* Body */}
-                            <div className='p-4'>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                                    Rejection Reason{' '}
-                                    <span className='text-red-500'>*</span>
-                                </label>
-                                <textarea
-                                    value={rejectionReason}
-                                    onChange={(e) => {
-                                        setRejectionReason(e.target.value);
-                                        setRejectError('');
-                                    }}
-                                    rows={4}
-                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 dark:text-white resize-none ${
-                                        rejectError
-                                            ? 'border-red-300'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    placeholder='Enter the reason for rejecting this submission...'
-                                    disabled={isProcessing}
-                                />
-                                {rejectError && (
-                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                        <AlertTriangle className='h-3 w-3' />
-                                        {rejectError}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Footer */}
-                            <div className='flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700'>
-                                <button
-                                    onClick={() => setShowRejectModal(false)}
-                                    disabled={isProcessing}
-                                    className='px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg disabled:opacity-50'
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleRejectSubmit}
-                                    disabled={isProcessing}
-                                    className='px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50 flex items-center gap-2'
-                                >
-                                    {isProcessing ? (
-                                        <>
-                                            <Loader className='h-4 w-4 animate-spin' />
-                                            Rejecting...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <XCircle className='h-4 w-4' />
-                                            Reject
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <RejectDialog
+                open={rejectOpen}
+                onClose={() => setRejectOpen(false)}
+                title={`Reject this ${noun}?`}
+                onSubmit={async (text) => {
+                    if (await setStatus('rejected', text)) setRejectOpen(false);
+                }}
+            />
         </>
     );
 };

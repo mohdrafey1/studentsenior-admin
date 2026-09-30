@@ -1,28 +1,51 @@
-import { BarChart3 } from 'lucide-react';
+import { CONTENT_TYPES, percentChange } from './analyticsData';
 
-function AnalyticsInsights() {
-    return (
-        <div className='mt-6 md:mt-8 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl p-4 md:p-6 border border-blue-200 dark:border-blue-800'>
-            <div className='flex flex-col sm:flex-row items-start space-y-3 sm:space-y-0 sm:space-x-4'>
-                <div className='flex-shrink-0'>
-                    <BarChart3 className='w-6 h-6 md:w-8 md:h-8 text-blue-600 dark:text-blue-400' />
-                </div>
-                <div className='flex-1'>
-                    <h3 className='text-base md:text-lg font-semibold text-gray-900 dark:text-white mb-2'>
-                        Analytics Insights
-                    </h3>
-                    <p className='text-gray-600 dark:text-gray-400 text-xs md:text-sm leading-relaxed'>
-                        Your platform is showing strong growth across all
-                        content categories. PYQs and Opportunities are the most
-                        engaged content types. Consider promoting more
-                        interactive features to boost community participation.
-                        The engagement rate has increased by 32% in the last
-                        month, indicating healthy platform activity.
-                    </p>
-                </div>
-            </div>
-        </div>
-    );
+/**
+ * One line of highlights worked out from the numbers on the page: which type
+ * draws the most views, and which grew most this week. Renders nothing when
+ * there isn't enough data to say anything true.
+ */
+function AnalyticsInsights({ engagement, percentageChanges }) {
+    const sentences = [];
+
+    if (engagement) {
+        const views = CONTENT_TYPES.filter((t) => engagement[t.series]).map(
+            (t) => ({
+                label: t.label,
+                value: engagement[t.series].totalViews || 0,
+            }),
+        );
+        const total = views.reduce((sum, v) => sum + v.value, 0);
+        const top = [...views].sort((a, b) => b.value - a.value)[0];
+        if (top && total > 0) {
+            sentences.push(
+                `${top.label} draw ${Math.round((top.value / total) * 100)}% of all views.`,
+            );
+        }
+    }
+
+    if (percentageChanges) {
+        const risers = CONTENT_TYPES.map((t) => ({
+            label: t.label,
+            change: percentageChanges[t.change],
+        }))
+            .filter((t) => t.change?.previous > 0)
+            .map((t) => ({
+                label: t.label,
+                pct: percentChange(t.change.current, t.change.previous),
+            }))
+            .filter((t) => t.pct > 0)
+            .sort((a, b) => b.pct - a.pct);
+        if (risers[0]) {
+            sentences.push(
+                `${risers[0].label} grew most this week, up ${risers[0].pct}% on the week before.`,
+            );
+        }
+    }
+
+    if (sentences.length === 0) return null;
+
+    return <p className='text-[13px] text-muted'>{sentences.join(' ')}</p>;
 }
 
 export default AnalyticsInsights;

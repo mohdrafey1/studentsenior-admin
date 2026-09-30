@@ -1,18 +1,38 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
-import api from '../../utils/api';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { GraduationCap, Calendar, X } from 'lucide-react';
+import {
+    GitBranch,
+    GraduationCap,
+    Loader2,
+    Pencil,
+    Plus,
+    Trash2,
+} from 'lucide-react';
+import api from '../../utils/api';
+import { formatDate, formatNumber } from '../../utils/format';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
-import { Link } from 'react-router-dom';
 import Loader from '../../components/Common/Loader';
-import BackButton from '../../components/Common/BackButton';
 import FilterBar from '../../components/Common/FilterBar';
 import { filterByTime } from '../../components/Common/timeFilterUtils';
+import {
+    Alert,
+    Button,
+    Dialog,
+    EmptyState,
+    Field,
+    Input,
+    PageHeader,
+    Table,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+import { SORT_OPTIONS, hasTimeFilter, sortCatalog } from './catalogUtils';
+
+const branchesPath = (course) =>
+    `/reports/branches?search=&page=1&pageSize=12&course=${course._id}`;
 
 const Courses = () => {
     const [courses, setCourses] = useState([]);
@@ -33,8 +53,8 @@ const Courses = () => {
         courseName: '',
         courseCode: '',
     });
+    const [formErrors, setFormErrors] = useState({});
     const [submitting, setSubmitting] = useState(false);
-    const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -43,6 +63,7 @@ const Courses = () => {
         isOpen: false,
         title: '',
         message: '',
+        confirmText: 'Delete',
         onConfirm: null,
         variant: 'danger',
     });
@@ -51,8 +72,9 @@ const Courses = () => {
         return new Promise((resolve) => {
             setConfirmModal({
                 isOpen: true,
-                title: config.title || 'Confirm Action',
+                title: config.title,
                 message: config.message,
+                confirmText: config.confirmText || 'Delete',
                 variant: config.variant || 'danger',
                 onConfirm: () => resolve(true),
             });
@@ -70,8 +92,9 @@ const Courses = () => {
             setCourses(res.data.data || []);
         } catch (e) {
             console.error(e);
-            setError('Failed to load courses');
-            toast.error('Failed to load courses');
+            setError(
+                'Couldn’t load courses. Check your connection and try again.',
+            );
         } finally {
             setLoading(false);
         }
@@ -129,20 +152,13 @@ const Courses = () => {
         navigate,
     ]);
 
-    // Responsive view auto-switch
-    useEffect(() => {
-        const handleResize = () =>
-            setViewMode(window.innerWidth >= 1024 ? 'table' : 'grid');
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!formData.courseName.trim() || !formData.courseCode.trim()) {
-            toast.error('Please fill in all fields');
-            return;
-        }
+        const errors = {};
+        if (!formData.courseName.trim()) errors.courseName = 'Enter a name';
+        if (!formData.courseCode.trim()) errors.courseCode = 'Enter a code';
+        setFormErrors(errors);
+        if (Object.keys(errors).length) return;
 
         setSubmitting(true);
         try {
@@ -151,7 +167,7 @@ const Courses = () => {
                     `/resource/courses/${editingCourse._id}`,
                     formData,
                 );
-                toast.success('Course updated successfully');
+                toast.success('Course saved');
                 setCourses(
                     courses.map((c) =>
                         c._id === editingCourse._id ? { ...c, ...formData } : c,
@@ -159,16 +175,26 @@ const Courses = () => {
                 );
             } else {
                 await api.post('/resource/courses', formData);
-                toast.success('Course created successfully');
+                toast.success('Course added');
                 fetchCourses(); // Refresh to get updated data
             }
             handleCloseModal();
         } catch (e) {
             console.error(e);
-            toast.error(e.response?.data?.message || 'Operation failed');
+            toast.error(
+                e.response?.data?.message ||
+                    'Couldn’t save the course. Try again.',
+            );
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const handleAdd = () => {
+        setEditingCourse(null);
+        setFormData({ courseName: '', courseCode: '' });
+        setFormErrors({});
+        setShowModal(true);
     };
 
     const handleEdit = (course) => {
@@ -177,24 +203,28 @@ const Courses = () => {
             courseName: course.courseName,
             courseCode: course.courseCode,
         });
+        setFormErrors({});
         setShowModal(true);
     };
 
     const handleDelete = async (course) => {
+        const branchCount = course.totalBranch || 0;
         const ok = await showConfirm({
-            title: 'Delete Course',
-            message: `Are you sure you want to delete "${course.courseName}"? This action cannot be undone.`,
-            variant: 'danger',
+            title: `Delete ${course.courseName}?`,
+            message: branchCount
+                ? `Its ${formatNumber(branchCount)} branch${branchCount === 1 ? '' : 'es'} and every subject in them are deleted too. Students lose access straight away. This can’t be undone.`
+                : 'Students lose access straight away. This can’t be undone.',
+            confirmText: 'Delete course',
         });
         if (!ok) return;
 
         try {
             await api.delete(`/resource/courses/${course._id}`);
             setCourses(courses.filter((c) => c._id !== course._id));
-            toast.success('Course deleted successfully');
+            toast.success('Course deleted');
         } catch (e) {
             console.error(e);
-            toast.error('Failed to delete course');
+            toast.error('Couldn’t delete the course. Try again.');
         }
     };
 
@@ -202,11 +232,12 @@ const Courses = () => {
         setShowModal(false);
         setEditingCourse(null);
         setFormData({ courseName: '', courseCode: '' });
+        setFormErrors({});
     };
 
     const filteredAndSorted = useMemo(() => {
         const q = search.trim().toLowerCase();
-        let list = courses
+        const list = courses
             .filter((c) => {
                 return (
                     !q ||
@@ -215,369 +246,341 @@ const Courses = () => {
                 );
             })
             // Apply time filter
-            .filter((c) => filterByTime(c, timeFilter))
-            .sort((a, b) => {
-                let aVal = 0;
-                let bVal = 0;
-                if (sortBy === 'createdAt') {
-                    aVal = new Date(a.createdAt || 0).getTime();
-                    bVal = new Date(b.createdAt || 0).getTime();
-                } else {
-                    aVal = (a.courseName || '').toLowerCase();
-                    bVal = (b.courseName || '').toLowerCase();
-                    const cmp = aVal.localeCompare(bVal);
-                    return sortOrder === 'asc' ? cmp : -cmp;
-                }
-                return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-            });
-        return list;
+            .filter((c) => filterByTime(c, timeFilter));
+        return sortCatalog(list, sortBy, sortOrder, 'courseName');
     }, [courses, search, timeFilter, sortBy, sortOrder]);
 
     const totalItems = filteredAndSorted.length;
     const start = (page - 1) * pageSize;
     const current = filteredAndSorted.slice(start, start + pageSize);
+    const filtersActive = Boolean(search || hasTimeFilter(timeFilter));
+
+    const clearFilters = () => {
+        setSearch('');
+        setTimeFilter('');
+        setPage(1);
+    };
 
     if (loading) {
         return <Loader />;
     }
 
+    const rowActions = (course) => (
+        <>
+            <Button size='sm' icon={GitBranch} to={branchesPath(course)}>
+                Branches
+            </Button>
+            <Button
+                variant='ghost'
+                size='sm'
+                iconOnly
+                icon={Pencil}
+                aria-label={`Edit ${course.courseName}`}
+                onClick={() => handleEdit(course)}
+            />
+            <Button
+                variant='ghost'
+                size='sm'
+                iconOnly
+                icon={Trash2}
+                aria-label={`Delete ${course.courseName}`}
+                className='text-bad-ink hover:text-bad-ink'
+                onClick={() => handleDelete(course)}
+            />
+        </>
+    );
+
+    const empty = (
+        <EmptyState
+            icon={GraduationCap}
+            title={courses.length === 0 ? 'No courses yet' : 'No courses match'}
+            description={
+                courses.length === 0
+                    ? 'Courses you add appear here, with their branches.'
+                    : 'Try another search or clear the filters.'
+            }
+            action={
+                filtersActive ? (
+                    <Button onClick={clearFilters}>Clear filters</Button>
+                ) : courses.length === 0 ? (
+                    <Button variant='primary' icon={Plus} onClick={handleAdd}>
+                        Add course
+                    </Button>
+                ) : undefined
+            }
+        />
+    );
+
+    const pagination = (
+        <Pagination
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+            }}
+        />
+    );
+
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
-            <main
-                className={`py-4 ${mainContentMargin} transition-all duration-300`}
-            >
-                <div className='max-w-7xl mx-auto px-4 sm:px-6'>
-                    {/* Header */}
-                    <BackButton title='Courses' TitleIcon={GraduationCap} />
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Courses'
+                description='The courses that every branch, subject, PYQ and note belongs to.'
+                actions={
+                    <Button variant='primary' icon={Plus} onClick={handleAdd}>
+                        Add course
+                    </Button>
+                }
+            />
 
-                    {/* Compact Filters */}
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
-                        <FilterBar
-                            search={search}
-                            onSearch={setSearch}
-                            searchPlaceholder='Search by course name or code...'
-                            timeFilter={{
-                                value: timeFilter,
-                                onChange: (v) => {
-                                    setTimeFilter(v);
-                                    setPage(1);
-                                },
-                            }}
-                            sortBy={{
-                                value: sortBy,
-                                onChange: setSortBy,
-                                options: [
-                                    {
-                                        value: 'createdAt',
-                                        label: 'Sort by Date',
-                                    },
-                                    {
-                                        value: 'name',
-                                        label: 'Sort by Name',
-                                    },
-                                ],
-                            }}
-                            sortOrder={{
-                                value: sortOrder,
-                                onToggle: () =>
-                                    setSortOrder(
-                                        sortOrder === 'asc' ? 'desc' : 'asc',
-                                    ),
-                            }}
-                            viewMode={{
-                                value: viewMode,
-                                onChange: setViewMode,
-                            }}
-                            onClear={() => {
-                                setSearch('');
-                                setTimeFilter('');
-                                setPage(1);
-                            }}
-                            showClear={!!(search || timeFilter)}
-                        />
-                    </div>
+            <FilterBar
+                className='mb-4'
+                search={search}
+                onSearch={(v) => {
+                    setSearch(v);
+                    setPage(1);
+                }}
+                searchPlaceholder='Search by course name or code'
+                timeFilter={{
+                    value: timeFilter,
+                    onChange: (v) => {
+                        setTimeFilter(v);
+                        setPage(1);
+                    },
+                }}
+                sortBy={{
+                    value: sortBy,
+                    onChange: setSortBy,
+                    options: SORT_OPTIONS,
+                }}
+                sortOrder={{
+                    value: sortOrder,
+                    onToggle: () =>
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                }}
+                viewMode={{
+                    value: viewMode,
+                    onChange: setViewMode,
+                }}
+                onClear={clearFilters}
+                showClear={filtersActive}
+            />
 
-                    {error && (
-                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 px-3 py-2 rounded mb-3'>
-                            {error}
-                        </div>
-                    )}
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button size='sm' onClick={fetchCourses}>
+                            Try again
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
 
-                    {/* Grid/Table Views */}
-                    {current.length > 0 ? (
-                        <>
-                            {/* Grid View */}
-                            {viewMode === 'grid' && (
-                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mb-3'>
-                                    {current.map((course) => (
-                                        <div
-                                            key={course._id}
-                                            className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 hover:border-gray-300 dark:hover:border-gray-600 transition-colors'
-                                        >
-                                            <div className='text-sm font-semibold text-gray-900 dark:text-white mb-1'>
-                                                {course.courseName}
-                                            </div>
-                                            <div className='text-xs text-gray-500 dark:text-gray-400 mb-2'>
-                                                Code: {course.courseCode}
-                                            </div>
-                                            <div className='text-xs text-gray-700 dark:text-gray-300 mb-3'>
-                                                Total Branches:{' '}
-                                                <Link
-                                                    to={`/reports/branches?search=&page=1&pageSize=12&course=${course._id}`}
-                                                >
-                                                    {course.totalBranch || 0}
-                                                </Link>
-                                            </div>
-                                            <div className='flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-4'>
-                                                <Calendar className='w-4 h-4' />
-                                                {course.createdAt
-                                                    ? new Date(
-                                                          course.createdAt,
-                                                      ).toLocaleDateString()
-                                                    : 'N/A'}
-                                            </div>
-                                            <div className='flex gap-2 justify-end'>
-                                                <button
-                                                    onClick={() =>
-                                                        handleEdit(course)
-                                                    }
-                                                    className='inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700'
-                                                >
-                                                    Edit
-                                                </button>
-                                                <button
-                                                    onClick={() =>
-                                                        handleDelete(course)
-                                                    }
-                                                    className='inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700'
-                                                >
-                                                    Delete
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Table View */}
-                            {viewMode === 'table' && (
-                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                    <div className='overflow-x-auto'>
-                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                            <thead className='bg-gray-50 dark:bg-gray-900'>
-                                                <tr>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Course Name
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Course Code
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Total Branches
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Created
-                                                    </th>
-                                                    <th className='px-3 py-2'></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                                {current.map((course) => (
-                                                    <tr
-                                                        key={course._id}
-                                                        className='hover:bg-gray-50 dark:hover:bg-gray-700'
-                                                    >
-                                                        <td className='px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white'>
-                                                            {course.courseName}
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-900 dark:text-white'>
-                                                            {course.courseCode}
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-900 dark:text-white'>
-                                                            <Link
-                                                                to={`/reports/branches?search=&page=1&pageSize=12&course=${course._id}`}
-                                                                className='text-blue-500'
-                                                            >
-                                                                {course.totalBranch ||
-                                                                    0}
-                                                            </Link>
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white'>
-                                                            <div className='flex flex-col'>
-                                                                <span className='text-xs text-gray-500 dark:text-gray-400'>
-                                                                    {course.createdAt
-                                                                        ? new Date(
-                                                                              course.createdAt,
-                                                                          ).toLocaleDateString()
-                                                                        : 'N/A'}
-                                                                </span>
-                                                                <span className='text-xs font-medium'>
-                                                                    {course.clickCounts ||
-                                                                        0}{' '}
-                                                                    views
-                                                                </span>
-                                                            </div>
-                                                        </td>
-
-                                                        <td className='px-3 py-2 whitespace-nowrap text-sm text-right'>
-                                                            <div className='inline-flex gap-2'>
-                                                                <button
-                                                                    onClick={() =>
-                                                                        handleEdit(
-                                                                            course,
-                                                                        )
-                                                                    }
-                                                                    className='px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700'
-                                                                >
-                                                                    Edit
-                                                                </button>
-                                                                <button
-                                                                    onClick={() =>
-                                                                        handleDelete(
-                                                                            course,
-                                                                        )
-                                                                    }
-                                                                    className='px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700'
-                                                                >
-                                                                    Delete
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Pagination */}
-                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 px-3 py-2'>
-                                <Pagination
-                                    currentPage={page}
-                                    pageSize={pageSize}
-                                    totalItems={totalItems}
-                                    onPageChange={setPage}
-                                    onPageSizeChange={(s) => {
-                                        setPageSize(s);
-                                        setPage(1);
-                                    }}
-                                />
-                            </div>
-                        </>
+            {viewMode === 'table' ? (
+                <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
+                    {current.length === 0 ? (
+                        empty
                     ) : (
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-center p-12'>
-                            <GraduationCap className='w-16 h-16 mx-auto text-gray-400 mb-4' />
-                            <h3 className='text-xl font-medium text-gray-900 dark:text-white mb-2'>
-                                No Courses Found
-                            </h3>
-                            <p className='text-gray-600 dark:text-gray-400'>
-                                No courses match your current search.
-                            </p>
+                        <Table minWidth={820}>
+                            <thead>
+                                <tr>
+                                    <Th>Course</Th>
+                                    <Th>Code</Th>
+                                    <Th align='right'>Branches</Th>
+                                    <Th align='right'>Views</Th>
+                                    <Th>Added</Th>
+                                    <Th>
+                                        <span className='sr-only'>Actions</span>
+                                    </Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {current.map((course) => (
+                                    <Tr key={course._id}>
+                                        <Td className='font-medium max-w-[320px] truncate'>
+                                            {course.courseName}
+                                        </Td>
+                                        <Td
+                                            mono
+                                            className='text-ink-2 whitespace-nowrap'
+                                        >
+                                            {course.courseCode}
+                                        </Td>
+                                        <Td align='right' mono>
+                                            <Link
+                                                to={branchesPath(course)}
+                                                className='text-link hover:underline'
+                                                aria-label={`${formatNumber(course.totalBranch)} branches in ${course.courseName}`}
+                                            >
+                                                {formatNumber(
+                                                    course.totalBranch,
+                                                )}
+                                            </Link>
+                                        </Td>
+                                        <Td
+                                            align='right'
+                                            mono
+                                            className='text-ink-2'
+                                        >
+                                            {formatNumber(course.clickCounts)}
+                                        </Td>
+                                        <Td className='text-ink-2 whitespace-nowrap'>
+                                            {formatDate(course.createdAt)}
+                                        </Td>
+                                        <Td align='right'>
+                                            <div className='flex justify-end items-center gap-1'>
+                                                {rowActions(course)}
+                                            </div>
+                                        </Td>
+                                    </Tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                    {totalItems > 0 && (
+                        <div className='px-4 py-3 border-t border-line-soft'>
+                            {pagination}
                         </div>
                     )}
                 </div>
-            </main>
-
-            {/* Course Modal */}
-            {showModal && (
-                <div className='fixed inset-0 z-50 overflow-y-auto'>
-                    <div className='flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0'>
-                        <div
-                            className='fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75'
-                            onClick={handleCloseModal}
-                        ></div>
-                        <span
-                            className='hidden sm:inline-block sm:align-middle sm:h-screen'
-                            aria-hidden='true'
-                        >
-                            &#8203;
-                        </span>
-                        <div className='inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10'>
-                            <form onSubmit={handleSubmit}>
-                                <div className='bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4'>
-                                    <div className='flex items-center justify-between mb-4'>
-                                        <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
-                                            {editingCourse
-                                                ? 'Edit Course'
-                                                : 'Add New Course'}
-                                        </h3>
-                                        <button
-                                            type='button'
-                                            onClick={handleCloseModal}
-                                            className='text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                                        >
-                                            <X className='w-5 h-5' />
-                                        </button>
-                                    </div>
-                                    <div className='space-y-4'>
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                                Course Name
-                                            </label>
-                                            <input
-                                                type='text'
-                                                value={formData.courseName}
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        courseName:
-                                                            e.target.value,
-                                                    })
-                                                }
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                                placeholder='Enter course name'
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                                Course Code
-                                            </label>
-                                            <input
-                                                type='text'
-                                                value={formData.courseCode}
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        courseCode:
-                                                            e.target.value,
-                                                    })
-                                                }
-                                                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                                placeholder='Enter course code'
-                                                required
-                                            />
-                                        </div>
+            ) : current.length === 0 ? (
+                <div className='bg-sheet border border-line rounded-xl'>
+                    {empty}
+                </div>
+            ) : (
+                <div className='flex flex-col gap-4'>
+                    <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
+                        {current.map((course) => (
+                            <article
+                                key={course._id}
+                                className='flex flex-col gap-3 p-4 bg-sheet border border-line rounded-xl'
+                            >
+                                <div className='flex items-start gap-2'>
+                                    <div className='flex-1 min-w-0 flex flex-col gap-1'>
+                                        <span className='font-medium text-ink truncate'>
+                                            {course.courseName}
+                                        </span>
+                                        <code className='self-start font-mono text-[12px] px-1.5 py-px rounded bg-ground text-ink-2'>
+                                            {course.courseCode}
+                                        </code>
                                     </div>
                                 </div>
-                                <div className='bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse'>
-                                    <button
-                                        type='submit'
-                                        disabled={submitting}
-                                        className='w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-emerald-600 text-base font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50'
+                                <div className='flex flex-wrap gap-x-3 gap-y-1 text-[13px] text-ink-2'>
+                                    <Link
+                                        to={branchesPath(course)}
+                                        className='text-link hover:underline'
                                     >
-                                        {submitting
-                                            ? 'Saving...'
-                                            : editingCourse
-                                              ? 'Update'
-                                              : 'Create'}
-                                    </button>
-                                    <button
-                                        type='button'
-                                        onClick={handleCloseModal}
-                                        className='mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm'
-                                    >
-                                        Cancel
-                                    </button>
+                                        {formatNumber(course.totalBranch)}{' '}
+                                        {course.totalBranch === 1
+                                            ? 'branch'
+                                            : 'branches'}
+                                    </Link>
+                                    <span>
+                                        {formatNumber(course.clickCounts)} views
+                                    </span>
+                                    <span>
+                                        Added {formatDate(course.createdAt)}
+                                    </span>
                                 </div>
-                            </form>
-                        </div>
+                                <div className='flex items-center justify-end gap-1 pt-3 border-t border-line-soft'>
+                                    {rowActions(course)}
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                    <div className='bg-sheet border border-line rounded-xl px-4 py-3'>
+                        {pagination}
                     </div>
                 </div>
             )}
+
+            {/* Course dialog */}
+            <Dialog
+                open={showModal}
+                onClose={handleCloseModal}
+                busy={submitting}
+                size='sm'
+                title={editingCourse ? 'Edit course' : 'Add course'}
+                description={
+                    editingCourse
+                        ? undefined
+                        : 'Branches and subjects are added to a course afterwards.'
+                }
+                footer={
+                    <>
+                        <Button
+                            onClick={handleCloseModal}
+                            disabled={submitting}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type='submit'
+                            form='course-form'
+                            variant='primary'
+                            disabled={submitting}
+                            icon={submitting ? Loader2 : undefined}
+                            className={submitting ? '[&>svg]:animate-spin' : ''}
+                        >
+                            {submitting
+                                ? 'Saving…'
+                                : editingCourse
+                                  ? 'Save changes'
+                                  : 'Add course'}
+                        </Button>
+                    </>
+                }
+            >
+                <form
+                    id='course-form'
+                    onSubmit={handleSubmit}
+                    noValidate
+                    className='flex flex-col gap-4'
+                >
+                    <Field
+                        label='Course name'
+                        required
+                        error={formErrors.courseName}
+                    >
+                        <Input
+                            value={formData.courseName}
+                            onChange={(e) =>
+                                setFormData({
+                                    ...formData,
+                                    courseName: e.target.value,
+                                })
+                            }
+                            placeholder='B.Tech'
+                            autoFocus
+                        />
+                    </Field>
+                    <Field
+                        label='Course code'
+                        required
+                        error={formErrors.courseCode}
+                        hint='Short and unique, like BTECH or MCA.'
+                    >
+                        <Input
+                            value={formData.courseCode}
+                            onChange={(e) =>
+                                setFormData({
+                                    ...formData,
+                                    courseCode: e.target.value,
+                                })
+                            }
+                            placeholder='BTECH'
+                            className='font-mono text-[13px]'
+                        />
+                    </Field>
+                </form>
+            </Dialog>
 
             {/* Confirmation Modal */}
             <ConfirmModal
@@ -586,6 +589,7 @@ const Courses = () => {
                 onConfirm={confirmModal.onConfirm}
                 title={confirmModal.title}
                 message={confirmModal.message}
+                confirmText={confirmModal.confirmText}
                 variant={confirmModal.variant}
             />
         </div>

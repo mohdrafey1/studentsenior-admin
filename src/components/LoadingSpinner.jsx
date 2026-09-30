@@ -1,12 +1,12 @@
-import React from 'react';
-
+/** Full-screen loading state, used before the console layout has mounted. */
 const LoadingSpinner = () => {
     return (
-        <div className='flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900'>
-            <div className='relative w-16 h-16'>
-                <div className='absolute top-0 left-0 w-full h-full border-4 border-gray-200 dark:border-gray-700 rounded-full'></div>
-                <div className='absolute top-0 left-0 w-full h-full border-4 border-blue-500 rounded-full animate-spin border-t-transparent'></div>
-            </div>
+        <div
+            role='status'
+            aria-label='Loading'
+            className='flex items-center justify-center min-h-screen bg-ground'
+        >
+            <span className='w-9 h-9 rounded-full border-[3px] border-line-strong border-t-brand animate-spin' />
         </div>
     );
 };

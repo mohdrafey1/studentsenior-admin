@@ -1,18 +1,54 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
-import api from '../../utils/api';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CreditCard } from 'lucide-react';
+import { ChevronRight, CreditCard, Download } from 'lucide-react';
+import api from '../../utils/api';
+import { downloadCsv } from '../../utils/csv';
+import { formatDateTime, formatNumber } from '../../utils/format';
 import Pagination from '../../components/Pagination';
-import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
 import FilterBar from '../../components/Common/FilterBar';
+import { getTimeFilterLabel } from '../../components/Common/timeFilterUtils';
 import {
-    getTimeFilterLabel,
-} from '../../components/Common/timeFilterUtils';
+    Alert,
+    Button,
+    EmptyState,
+    PageHeader,
+    Stat,
+    StatusBadge,
+    Table,
+    Tabs,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+import {
+    EXPORT_LIMIT,
+    fetchAllPages,
+    formatMoney,
+    userName,
+} from './financeFormat';
+import { DateCell, RupeeValue, UserCell } from './financeParts';
+
+const STATUS_TABS = [
+    ['', 'All'],
+    ['captured', 'Captured'],
+    ['pending', 'Pending'],
+    ['initiated', 'Initiated'],
+    ['authorized', 'Authorized'],
+    ['failed', 'Failed'],
+    ['refunded', 'Refunded'],
+];
+
+const ORDER_TYPE_OPTIONS = [
+    { value: '', label: 'Any type' },
+    { value: 'pyq_purchase', label: 'PYQ purchase' },
+    { value: 'note_purchase', label: 'Note purchase' },
+    { value: 'add_points', label: 'Wallet top-up' },
+];
+
+const reference = (payment) =>
+    payment.gatewayOrderId || payment.merchantOrderId || payment._id;
 
 const Payments = () => {
     const [payments, setPayments] = useState([]);
@@ -21,6 +57,8 @@ const Payments = () => {
     const [hasLoaded, setHasLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [refresh, setRefresh] = useState(0);
+    const [exporting, setExporting] = useState(false);
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
     const [orderType, setOrderType] = useState('');
@@ -33,9 +71,18 @@ const Payments = () => {
     const [viewMode, setViewMode] = useState(() => {
         return window.innerWidth >= 1024 ? 'table' : 'grid';
     });
-    const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
     const location = useLocation();
+
+    const listParams = () => ({
+        search,
+        status: filterStatus,
+        orderType,
+        timeFilter,
+        sortBy,
+        sortOrder,
+        timezoneOffset: new Date().getTimezoneOffset(),
+    });
 
     useEffect(() => {
         const controller = new AbortController();
@@ -44,26 +91,49 @@ const Payments = () => {
             setError(null);
             try {
                 const response = await api.get('/payment', {
-                    params: { page, pageSize, search, status: filterStatus, orderType, timeFilter, sortBy, sortOrder, timezoneOffset: new Date().getTimezoneOffset() },
+                    params: { page, pageSize, ...listParams() },
                     signal: controller.signal,
                 });
                 const result = response.data?.data;
-                if (!Array.isArray(result?.items) || !result.pagination) throw new Error('Invalid list response');
+                if (!Array.isArray(result?.items) || !result.pagination)
+                    throw new Error('Invalid list response');
                 setPayments(result.items);
                 setTotalItems(result.pagination.total);
                 setTotals(result.totals);
-                if (result.pagination.totalPages > 0 && page > result.pagination.totalPages) setPage(result.pagination.totalPages);
+                if (
+                    result.pagination.totalPages > 0 &&
+                    page > result.pagination.totalPages
+                )
+                    setPage(result.pagination.totalPages);
             } catch (failure) {
                 if (controller.signal.aborted) return;
-                const message = failure.response?.data?.message || 'Could not load records. Please retry.';
-                setError(message);
-                toast.error(message);
+                setError(
+                    failure.response?.data?.message ||
+                        'Couldn’t load payments. Check your connection and try again.',
+                );
             } finally {
-                if (!controller.signal.aborted) { setLoading(false); setHasLoaded(true); }
+                if (!controller.signal.aborted) {
+                    setLoading(false);
+                    setHasLoaded(true);
+                }
             }
         }, 250);
-        return () => { clearTimeout(timer); controller.abort(); };
-    }, [page, pageSize, search, filterStatus, orderType, timeFilter, sortBy, sortOrder]);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        page,
+        pageSize,
+        search,
+        filterStatus,
+        orderType,
+        timeFilter,
+        sortBy,
+        sortOrder,
+        refresh,
+    ]);
 
     // Read URL params on mount
     useEffect(() => {
@@ -120,36 +190,60 @@ const Payments = () => {
         navigate,
     ]);
 
-    // Responsive view mode - always auto-switch based on screen size
-    useEffect(() => {
-        const handleResize = () => {
-            const newMode = window.innerWidth >= 1024 ? 'table' : 'grid';
-            setViewMode(newMode);
-        };
-
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    const currentPayments = payments;
-    const totalAmount = totals.rupees;
-
-    const handlePageChange = (newPage) => {
-        setPage(newPage);
+    const hasFilters = Boolean(
+        search || orderType || (timeFilter && timeFilter !== 'all'),
+    );
+    const clearFilters = () => {
+        setSearch('');
+        setOrderType('');
+        setTimeFilter('');
+        setPage(1);
     };
 
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'captured':
-                return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-            case 'pending':
-                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-            case 'failed':
-                return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-            case 'refunded':
-                return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-            default:
-                return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+    const exportCsv = async () => {
+        setExporting(true);
+        try {
+            const { rows, total } = await fetchAllPages(
+                '/payment',
+                listParams(),
+            );
+            downloadCsv(
+                'payments',
+                [
+                    {
+                        label: 'Date',
+                        value: (p) => formatDateTime(p.createdAt),
+                    },
+                    { label: 'Username', value: (p) => p.user?.username },
+                    { label: 'Email', value: (p) => p.user?.email },
+                    { label: 'Amount', value: (p) => p.amount },
+                    { label: 'Currency', value: (p) => p.currency || 'INR' },
+                    { label: 'Status', value: (p) => p.status },
+                    { label: 'Provider', value: (p) => p.provider },
+                    {
+                        label: 'Gateway order ID',
+                        value: (p) => p.gatewayOrderId,
+                    },
+                    {
+                        label: 'Merchant order ID',
+                        value: (p) => p.merchantOrderId,
+                    },
+                    { label: 'Payment record ID', value: (p) => p._id },
+                ],
+                rows,
+            );
+            toast.success(
+                total > EXPORT_LIMIT
+                    ? `Exported the first ${formatNumber(EXPORT_LIMIT)} of ${formatNumber(total)} payments`
+                    : `Exported ${formatNumber(rows.length)} payments`,
+            );
+        } catch (failure) {
+            toast.error(
+                failure.response?.data?.message ||
+                    'Couldn’t export payments. Try again.',
+            );
+        } finally {
+            setExporting(false);
         }
     };
 
@@ -157,290 +251,301 @@ const Payments = () => {
         return <Loader />;
     }
 
+    const openPayment = (payment) =>
+        navigate(`/reports/payments/${payment._id}`);
+    const timeLabel = getTimeFilterLabel(timeFilter).toLowerCase();
+    const statusLabel =
+        STATUS_TABS.find(([v]) => v === filterStatus)?.[1] || 'All';
+
+    const pagination = (
+        <Pagination
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+            }}
+        />
+    );
+
+    const empty = (
+        <EmptyState
+            icon={CreditCard}
+            title={
+                hasFilters || filterStatus
+                    ? 'No payments match'
+                    : 'No payments yet'
+            }
+            description={
+                hasFilters || filterStatus
+                    ? 'Try another search, status or date range.'
+                    : 'Razorpay payments for PYQs, notes and wallet top-ups appear here.'
+            }
+            action={
+                hasFilters ? (
+                    <Button onClick={clearFilters}>Clear filters</Button>
+                ) : undefined
+            }
+        />
+    );
+
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Payments'
+                description='Razorpay payments for PYQs, notes and wallet top-ups.'
+                actions={
+                    <Button
+                        icon={Download}
+                        onClick={exportCsv}
+                        disabled={!totalItems || exporting}
+                    >
+                        {exporting ? 'Exporting…' : 'Export CSV'}
+                    </Button>
+                }
+            />
 
-            <main
-                className={`py-4 ${mainContentMargin} transition-all duration-300`}
-            >
-                <div className='max-w-7xl mx-auto px-4 sm:px-6'>
-                    {/* Compact Header */}
-                    <BackButton title='Payments' TitleIcon={CreditCard} />
+            <div className='grid grid-cols-2 gap-3 sm:gap-4 mb-6'>
+                <Stat
+                    label={
+                        filterStatus === 'captured'
+                            ? 'Captured'
+                            : 'Total amount'
+                    }
+                    value={<RupeeValue amount={totals?.rupees} />}
+                    note={`${statusLabel === 'All' ? 'All statuses' : statusLabel} · ${timeLabel}`}
+                />
+                <Stat
+                    label='Payments'
+                    value={formatNumber(totalItems)}
+                    note={
+                        orderType
+                            ? ORDER_TYPE_OPTIONS.find(
+                                  (o) => o.value === orderType,
+                              )?.label
+                            : 'PYQs, notes and top-ups'
+                    }
+                />
+            </div>
 
-                    {/* Compact Filters */}
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
-                        {/* Total Amount - Compact */}
-                        <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
-                            <span className='text-gray-600 dark:text-gray-400'>
-                                Total ({getTimeFilterLabel(timeFilter)}):
-                            </span>
-                            <span className='font-semibold text-gray-900 dark:text-white'>
-                                ₹{totalAmount.toLocaleString()}
-                            </span>
-                        </div>
+            <Tabs
+                label='Payment status'
+                className='mb-4'
+                value={filterStatus}
+                onChange={(value) => {
+                    setFilterStatus(value);
+                    setPage(1);
+                }}
+                items={STATUS_TABS.map(([value, label]) => ({
+                    value,
+                    label,
+                }))}
+            />
 
-                        <FilterBar
-                            search={search}
-                            onSearch={(value) => { setSearch(value); setPage(1); }}
-                            filters={[
-                                {
-                                    label: 'Order Type', value: orderType,
-                                    onChange: (value) => { setOrderType(value); setPage(1); },
-                                    options: [{ value: '', label: 'All Types' },
-                                        { value: 'pyq_purchase', label: 'PYQ Purchase' },
-                                        { value: 'note_purchase', label: 'Note Purchase' },
-                                        { value: 'add_points', label: 'Wallet Top-up' }],
-                                },
-                                {
-                                    label: 'Status',
-                                    value: filterStatus,
-                                    onChange: setFilterStatus,
-                                    options: [
-                                        { value: '', label: 'All Statuses' },
-                                        {
-                                            value: 'captured',
-                                            label: 'Captured',
-                                        },
-                                        { value: 'pending', label: 'Pending' },
-                                        { value: 'initiated', label: 'Initiated' },
-                                        { value: 'authorized', label: 'Authorized' },
-                                        { value: 'failed', label: 'Failed' },
-                                        {
-                                            value: 'refunded',
-                                            label: 'Refunded',
-                                        },
-                                    ],
-                                },
-                            ]}
-                            timeFilter={{
-                                value: timeFilter,
-                                onChange: (v) => {
-                                    setTimeFilter(v);
-                                    setPage(1);
-                                },
-                            }}
-                            sortBy={{
-                                value: sortBy,
-                                onChange: setSortBy,
-                                options: [
-                                    {
-                                        value: 'createdAt',
-                                        label: 'Sort by Date',
-                                    },
-                                    {
-                                        value: 'amount',
-                                        label: 'Sort by Amount',
-                                    },
-                                ],
-                            }}
-                            sortOrder={{
-                                value: sortOrder,
-                                onToggle: () =>
-                                    setSortOrder(
-                                        sortOrder === 'asc' ? 'desc' : 'asc',
-                                    ),
-                            }}
-                            viewMode={{
-                                value: viewMode,
-                                onChange: setViewMode,
-                            }}
-                            onClear={() => {
-                                setSearch('');
-                                setFilterStatus('');
-                                setOrderType('');
-                                setTimeFilter('');
-                                setPage(1);
-                            }}
-                            showClear={!!(search || filterStatus || orderType || timeFilter)}
-                        />
-                    </div>
+            <FilterBar
+                className='mb-4'
+                search={search}
+                onSearch={(value) => {
+                    setSearch(value);
+                    setPage(1);
+                }}
+                searchPlaceholder='Search by username, email or order ID'
+                filters={[
+                    {
+                        label: 'Order type',
+                        value: orderType,
+                        onChange: (value) => {
+                            setOrderType(value);
+                            setPage(1);
+                        },
+                        options: ORDER_TYPE_OPTIONS,
+                    },
+                ]}
+                timeFilter={{
+                    value: timeFilter,
+                    onChange: (v) => {
+                        setTimeFilter(v);
+                        setPage(1);
+                    },
+                }}
+                sortBy={{
+                    value: sortBy,
+                    onChange: setSortBy,
+                    options: [
+                        { value: 'createdAt', label: 'Sort by date' },
+                        { value: 'amount', label: 'Sort by amount' },
+                    ],
+                }}
+                sortOrder={{
+                    value: sortOrder,
+                    onToggle: () =>
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                }}
+                viewMode={{
+                    value: viewMode,
+                    onChange: setViewMode,
+                }}
+                onClear={clearFilters}
+                showClear={hasFilters}
+            />
 
-                    {loading && <p role='status' className='text-sm text-gray-500 mb-2'>Updating records…</p>}
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button
+                            size='sm'
+                            onClick={() => setRefresh((v) => v + 1)}
+                        >
+                            Try again
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
 
-                    {/* Error Message */}
-                    {error && (
-                        <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded text-sm mb-3'>
-                            {error}
-                        </div>
-                    )}
+            <p role='status' className='sr-only'>
+                {loading ? 'Updating payments…' : ''}
+            </p>
 
-                    {/* Payments Display */}
-                    {currentPayments.length > 0 ? (
-                        <>
-                            {/* Compact Grid View */}
-                            {viewMode === 'grid' && (
-                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mb-3'>
-                                    {currentPayments.map((payment) => (
-                                        <div
-                                            key={payment._id}
-                                            className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 hover:border-gray-300 dark:hover:border-gray-600 transition-colors cursor-pointer'
-                                            onClick={() =>
-                                                navigate(
-                                                    `/reports/payments/${payment._id}`,
-                                                )
-                                            }
-                                        >
-                                            {/* Status and Provider */}
-                                            <div className='flex justify-between items-start mb-2'>
-                                                <span
-                                                    className={`px-1.5 py-0.5 text-xs rounded ${getStatusColor(payment.status)}`}
-                                                >
-                                                    {payment.status}
-                                                </span>
-                                                <span className='text-xs text-gray-500 dark:text-gray-400'>
-                                                    {payment.provider || 'N/A'}
-                                                </span>
-                                            </div>
-
-                                            {/* User Info */}
-                                            <div className='mb-2'>
-                                                <div className='text-sm font-medium text-gray-900 dark:text-white truncate'>
-                                                    {payment.user?.username ||
-                                                        'N/A'}
-                                                </div>
-                                                <div className='text-xs text-gray-500 dark:text-gray-400 truncate'>
-                                                    {payment.user?.email ||
-                                                        'N/A'}
-                                                </div>
-                                            </div>
-
-                                            {/* Amount */}
-                                            <div className='text-lg font-semibold text-gray-900 dark:text-white mb-1'>
-                                                {payment.currency || 'INR'}{' '}
-                                                {payment.amount || 0}
-                                            </div>
-
-                                            {/* Date */}
-                                            <div className='text-xs text-gray-500 dark:text-gray-400'>
-                                                {payment.createdAt
-                                                    ? new Date(
-                                                          payment.createdAt,
-                                                      ).toLocaleDateString()
-                                                    : 'N/A'}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Compact Table View */}
-                            {viewMode === 'table' && (
-                                <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden mb-3'>
-                                    <div className='overflow-x-auto'>
-                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                            <thead className='bg-gray-50 dark:bg-gray-900'>
-                                                <tr>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        User
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Provider
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Amount
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Status
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Date
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                                {currentPayments.map(
-                                                    (payment) => (
-                                                        <tr
-                                                            key={payment._id}
-                                                            onClick={() =>
-                                                                navigate(
-                                                                    `/reports/payments/${payment._id}`,
-                                                                )
-                                                            }
-                                                            className='hover:bg-gray-50 dark:hover:bg-gray-900'
-                                                        >
-                                                            <td className='px-3 py-2 whitespace-nowrap'>
-                                                                <div className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                                    {payment
-                                                                        .user
-                                                                        ?.username ||
-                                                                        'N/A'}
-                                                                </div>
-                                                                <div className='text-xs text-gray-500 dark:text-gray-400'>
-                                                                    {payment
-                                                                        .user
-                                                                        ?.email ||
-                                                                        'N/A'}
-                                                                </div>
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap'>
-                                                                <span className='text-xs text-gray-600 dark:text-gray-400'>
-                                                                    {payment.provider ||
-                                                                        'N/A'}
-                                                                </span>
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white'>
-                                                                {payment.currency ||
-                                                                    'INR'}{' '}
-                                                                {payment.amount ||
-                                                                    0}
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap'>
-                                                                <span
-                                                                    className={`px-1.5 py-0.5 text-xs rounded ${getStatusColor(payment.status)}`}
-                                                                >
-                                                                    {
-                                                                        payment.status
-                                                                    }
-                                                                </span>
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400'>
-                                                                {payment.createdAt
-                                                                    ? new Date(
-                                                                          payment.createdAt,
-                                                                      ).toLocaleDateString()
-                                                                    : 'N/A'}
-                                                            </td>
-                                                        </tr>
-                                                    ),
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Compact Pagination */}
-                            {totalItems > 0 && (
-                                <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 px-3 py-2'>
-                                    <Pagination
-                                        currentPage={page}
-                                        pageSize={pageSize}
-                                        totalItems={totalItems}
-                                        onPageChange={handlePageChange}
-                                        onPageSizeChange={(size) => {
-                                            setPageSize(size);
-                                            setPage(1);
-                                        }}
-                                    />
-                                </div>
-                            )}
-                        </>
+            {viewMode === 'table' ? (
+                <div
+                    aria-busy={loading}
+                    className={`bg-sheet border border-line rounded-xl overflow-hidden transition-opacity ${loading ? 'opacity-60' : ''}`}
+                >
+                    {payments.length === 0 ? (
+                        empty
                     ) : (
-                        <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-center py-12'>
-                            <CreditCard className='w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3' />
-                            <h3 className='text-sm font-medium text-gray-900 dark:text-white mb-1'>
-                                No Payments Found
-                            </h3>
-                            <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                No payments match your current filters.
-                            </p>
+                        <Table minWidth={860}>
+                            <thead>
+                                <tr>
+                                    <Th>User</Th>
+                                    <Th>Reference</Th>
+                                    <Th align='right'>Amount</Th>
+                                    <Th>Status</Th>
+                                    <Th>Date</Th>
+                                    <Th className='w-10'>
+                                        <span className='sr-only'>Open</span>
+                                    </Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {payments.map((payment) => (
+                                    <Tr
+                                        key={payment._id}
+                                        onClick={() => openPayment(payment)}
+                                    >
+                                        <Td className='max-w-[280px]'>
+                                            <UserCell user={payment.user} />
+                                        </Td>
+                                        <Td className='max-w-[260px]'>
+                                            <div className='flex flex-col gap-0.5 min-w-0'>
+                                                <Link
+                                                    to={`/reports/payments/${payment._id}`}
+                                                    onClick={(e) =>
+                                                        e.stopPropagation()
+                                                    }
+                                                    aria-label={`Open payment ${reference(payment)}`}
+                                                    className='font-mono text-xs text-ink-2 hover:underline truncate'
+                                                >
+                                                    {reference(payment)}
+                                                </Link>
+                                                <span className='text-xs text-muted'>
+                                                    {payment.provider ||
+                                                        'Unknown provider'}
+                                                </span>
+                                            </div>
+                                        </Td>
+                                        <Td
+                                            align='right'
+                                            mono
+                                            className='font-medium whitespace-nowrap'
+                                        >
+                                            {formatMoney(
+                                                payment.amount,
+                                                payment.currency,
+                                            )}
+                                        </Td>
+                                        <Td>
+                                            <StatusBadge
+                                                status={payment.status}
+                                            />
+                                        </Td>
+                                        <Td>
+                                            <DateCell
+                                                value={payment.createdAt}
+                                            />
+                                        </Td>
+                                        <Td align='right'>
+                                            <ChevronRight
+                                                className='w-4 h-4 text-muted inline'
+                                                aria-hidden='true'
+                                            />
+                                        </Td>
+                                    </Tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                    {totalItems > 0 && (
+                        <div className='px-4 py-3 border-t border-line-soft'>
+                            {pagination}
                         </div>
                     )}
                 </div>
-            </main>
+            ) : payments.length === 0 ? (
+                <div className='bg-sheet border border-line rounded-xl'>
+                    {empty}
+                </div>
+            ) : (
+                <div
+                    aria-busy={loading}
+                    className={`flex flex-col gap-4 transition-opacity ${loading ? 'opacity-60' : ''}`}
+                >
+                    <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
+                        {payments.map((payment) => (
+                            <article
+                                key={payment._id}
+                                onClick={() => openPayment(payment)}
+                                className='flex flex-col gap-3 p-4 bg-sheet border border-line rounded-xl hover:border-line-strong cursor-pointer transition-colors'
+                            >
+                                <div className='flex items-start gap-2'>
+                                    <div className='flex-1 min-w-0'>
+                                        <UserCell user={payment.user} />
+                                    </div>
+                                    <StatusBadge status={payment.status} />
+                                </div>
+                                <Link
+                                    to={`/reports/payments/${payment._id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    aria-label={`Open payment of ${formatMoney(payment.amount, payment.currency)} by ${userName(payment.user)}`}
+                                    className='font-mono text-lg font-medium text-ink hover:underline self-start'
+                                >
+                                    {formatMoney(
+                                        payment.amount,
+                                        payment.currency,
+                                    )}
+                                </Link>
+                                <div className='flex items-center gap-2 pt-3 border-t border-line-soft text-xs text-muted min-w-0'>
+                                    <span className='font-mono truncate flex-1'>
+                                        {reference(payment)}
+                                    </span>
+                                    <span className='whitespace-nowrap'>
+                                        {formatDateTime(payment.createdAt)}
+                                    </span>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                    <div className='bg-sheet border border-line rounded-xl px-4 py-3'>
+                        {pagination}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

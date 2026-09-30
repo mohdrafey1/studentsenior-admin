@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader, AlertTriangle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
+import { Button, Checkbox, Dialog, Field, Input, Select, Textarea } from './ui';
 
 const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,30 +44,31 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
         const newErrors = {};
 
         if (!formData.name?.trim()) {
-            newErrors.name = 'Name is required';
+            newErrors.name = 'Enter a name';
         } else if (formData.name.trim().length < 2) {
-            newErrors.name = 'Name must be at least 2 characters';
+            newErrors.name = 'Use at least 2 characters';
         } else if (formData.name.trim().length > 200) {
-            newErrors.name = 'Name cannot exceed 200 characters';
+            newErrors.name = 'Keep the name under 200 characters';
         }
 
         if (!formData.description?.trim()) {
-            newErrors.description = 'Description is required';
+            newErrors.description = 'Enter a description';
         } else if (formData.description.trim().length > 1000) {
-            newErrors.description = 'Description cannot exceed 1000 characters';
+            newErrors.description =
+                'Keep the description under 1,000 characters';
         }
 
         if (formData.price < 0) {
-            newErrors.price = 'Price cannot be negative';
+            newErrors.price = 'Price can’t be negative';
         } else if (formData.price > 100000) {
-            newErrors.price = 'Price cannot exceed ₹1,00,000';
+            newErrors.price = 'Price can’t be more than ₹1,00,000';
         }
 
         if (formData.slug && formData.slug.trim()) {
             const slugPattern = /^[a-z0-9-]+$/;
             if (!slugPattern.test(formData.slug.trim())) {
                 newErrors.slug =
-                    'Slug can only contain lowercase letters, numbers, and hyphens';
+                    'Use only lowercase letters, numbers and hyphens';
             }
         }
 
@@ -74,7 +76,7 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
             try {
                 new URL(formData.image);
             } catch {
-                newErrors.image = 'Please provide a valid image URL';
+                newErrors.image = 'Enter a full image link, starting https://';
             }
         }
 
@@ -82,7 +84,7 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
             formData.submissionStatus === 'rejected' &&
             !formData.rejectionReason?.trim()
         ) {
-            newErrors.rejectionReason = 'Rejection reason is required';
+            newErrors.rejectionReason = 'Add a reason for the seller';
         }
 
         setErrors(newErrors);
@@ -131,7 +133,7 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
         e.preventDefault();
 
         if (!validateForm()) {
-            toast.error('Please fix the validation errors');
+            toast.error('Check the highlighted fields');
             return;
         }
 
@@ -153,271 +155,153 @@ const ProductEditModal = ({ isOpen, onClose, product, onSuccess }) => {
             };
 
             await api.put(`/store/edit/${product._id}`, updateData);
-            toast.success('Product updated successfully!');
+            toast.success('Listing saved');
             onClose();
             onSuccess && onSuccess();
         } catch (error) {
             console.error(error);
             toast.error(
-                error.response?.data?.message || 'Failed to update product',
+                error.response?.data?.message ||
+                    'Couldn’t save the listing. Try again.',
             );
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    if (!isOpen) return null;
-
     return (
-        <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
-            <div className='flex items-center justify-center min-h-screen p-4'>
-                <div className='fixed inset-0' onClick={onClose}></div>
+        <Dialog
+            open={isOpen}
+            onClose={onClose}
+            busy={isSubmitting}
+            title='Edit listing'
+            description={
+                product?.owner?.username
+                    ? `Listed by @${product.owner.username}`
+                    : undefined
+            }
+            footer={
+                <>
+                    <Button onClick={onClose} disabled={isSubmitting}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type='submit'
+                        form='product-edit-form'
+                        variant='primary'
+                        disabled={isSubmitting}
+                        icon={isSubmitting ? Loader2 : undefined}
+                        className={isSubmitting ? '[&>svg]:animate-spin' : ''}
+                    >
+                        {isSubmitting ? 'Saving…' : 'Save changes'}
+                    </Button>
+                </>
+            }
+        >
+            <form
+                id='product-edit-form'
+                onSubmit={handleSubmit}
+                noValidate
+                className='flex flex-col gap-4'
+            >
+                <Field label='Status' required>
+                    <Select
+                        name='submissionStatus'
+                        value={formData.submissionStatus}
+                        onChange={handleInputChange}
+                        options={[
+                            { value: 'pending', label: 'Pending' },
+                            { value: 'approved', label: 'Approved' },
+                            { value: 'rejected', label: 'Rejected' },
+                        ]}
+                    />
+                </Field>
 
-                <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
-                    {/* Header */}
-                    <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
-                        <div>
-                            <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                Edit Product
-                            </h2>
-                            <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                {product?.owner?.username || 'Store'}
-                            </p>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className='p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded'
-                            disabled={isSubmitting}
-                        >
-                            <X className='h-5 w-5' />
-                        </button>
-                    </div>
+                {formData.submissionStatus === 'rejected' && (
+                    <Field
+                        label='Reason for the seller'
+                        required
+                        error={errors.rejectionReason}
+                    >
+                        <Textarea
+                            name='rejectionReason'
+                            value={formData.rejectionReason}
+                            onChange={handleInputChange}
+                            rows={3}
+                            placeholder='What should the seller fix?'
+                        />
+                    </Field>
+                )}
 
-                    <form onSubmit={handleSubmit}>
-                        <div className='p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto'>
-                            {/* Status */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Status{' '}
-                                    <span className='text-red-500'>*</span>
-                                </label>
-                                <select
-                                    name='submissionStatus'
-                                    value={formData.submissionStatus}
-                                    onChange={handleInputChange}
-                                    className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                >
-                                    <option value='pending'>Pending</option>
-                                    <option value='approved'>Approved</option>
-                                    <option value='rejected'>Rejected</option>
-                                </select>
-                            </div>
+                <Field label='Name' required error={errors.name}>
+                    <Input
+                        name='name'
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        placeholder='Casio fx-82MS scientific calculator'
+                    />
+                </Field>
 
-                            {/* Rejection Reason */}
-                            {formData.submissionStatus === 'rejected' && (
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Rejection Reason{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <textarea
-                                        name='rejectionReason'
-                                        value={formData.rejectionReason}
-                                        onChange={handleInputChange}
-                                        rows={2}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 dark:text-white resize-none ${
-                                            errors.rejectionReason
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                        placeholder='Enter rejection reason...'
-                                    />
-                                    {errors.rejectionReason && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.rejectionReason}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
+                <Field label='Description' required error={errors.description}>
+                    <Textarea
+                        name='description'
+                        value={formData.description}
+                        onChange={handleInputChange}
+                        rows={4}
+                        placeholder='Condition, what’s included and where to pick it up'
+                    />
+                </Field>
 
-                            {/* Name */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Product Name{' '}
-                                    <span className='text-red-500'>*</span>
-                                </label>
-                                <input
-                                    type='text'
-                                    name='name'
-                                    value={formData.name}
-                                    onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                        errors.name
-                                            ? 'border-red-300'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    placeholder='Enter product name...'
-                                />
-                                {errors.name && (
-                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                        <AlertTriangle className='h-3 w-3' />
-                                        {errors.name}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Description */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Description{' '}
-                                    <span className='text-red-500'>*</span>
-                                </label>
-                                <textarea
-                                    name='description'
-                                    value={formData.description}
-                                    onChange={handleInputChange}
-                                    rows={3}
-                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none ${
-                                        errors.description
-                                            ? 'border-red-300'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    placeholder='Enter product description...'
-                                />
-                                {errors.description && (
-                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                        <AlertTriangle className='h-3 w-3' />
-                                        {errors.description}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Price and Slug */}
-                            <div className='grid grid-cols-2 gap-4'>
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Price (₹){' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <input
-                                        type='number'
-                                        name='price'
-                                        value={formData.price}
-                                        onChange={handleInputChange}
-                                        min='0'
-                                        max='100000'
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                            errors.price
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                        placeholder='0'
-                                    />
-                                    {errors.price && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.price}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        URL Slug
-                                    </label>
-                                    <input
-                                        type='text'
-                                        name='slug'
-                                        value={formData.slug}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                            errors.slug
-                                                ? 'border-red-300'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                        placeholder='product-slug'
-                                    />
-                                    {errors.slug && (
-                                        <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                            <AlertTriangle className='h-3 w-3' />
-                                            {errors.slug}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Image URL */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Image URL
-                                </label>
-                                <input
-                                    type='url'
-                                    name='image'
-                                    value={formData.image}
-                                    onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white ${
-                                        errors.image
-                                            ? 'border-red-300'
-                                            : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    placeholder='https://example.com/image.jpg'
-                                />
-                                {errors.image && (
-                                    <p className='text-xs text-red-600 mt-1 flex items-center gap-1'>
-                                        <AlertTriangle className='h-3 w-3' />
-                                        {errors.image}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Available Checkbox */}
-                            <div>
-                                <label className='flex items-center gap-2'>
-                                    <input
-                                        type='checkbox'
-                                        name='available'
-                                        checked={formData.available}
-                                        onChange={handleInputChange}
-                                        className='w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
-                                    />
-                                    <span className='text-sm text-gray-700 dark:text-gray-300'>
-                                        Available for Purchase
-                                    </span>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className='flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700'>
-                            <button
-                                type='button'
-                                onClick={onClose}
-                                disabled={isSubmitting}
-                                className='px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg disabled:opacity-50'
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type='submit'
-                                disabled={isSubmitting}
-                                className='px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 flex items-center gap-2'
-                            >
-                                {isSubmitting ? (
-                                    <>
-                                        <Loader className='h-4 w-4 animate-spin' />
-                                        Updating...
-                                    </>
-                                ) : (
-                                    'Update Product'
-                                )}
-                            </button>
-                        </div>
-                    </form>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                    <Field
+                        label='Price in rupees'
+                        required
+                        error={errors.price}
+                        hint='In rupees, not points.'
+                    >
+                        <Input
+                            type='number'
+                            name='price'
+                            value={formData.price}
+                            onChange={handleInputChange}
+                            min='0'
+                            max='100000'
+                            placeholder='0'
+                            className='font-mono'
+                        />
+                    </Field>
+                    <Field label='Slug' error={errors.slug}>
+                        <Input
+                            name='slug'
+                            value={formData.slug}
+                            onChange={handleInputChange}
+                            placeholder='casio-fx-82ms-calculator'
+                            className='font-mono text-[13px]'
+                        />
+                    </Field>
                 </div>
-            </div>
-        </div>
+
+                <Field label='Photo link' error={errors.image}>
+                    <Input
+                        type='url'
+                        name='image'
+                        value={formData.image}
+                        onChange={handleInputChange}
+                        placeholder='https://…/photo.jpg'
+                        className='font-mono text-[13px]'
+                    />
+                </Field>
+
+                <Checkbox
+                    name='available'
+                    checked={formData.available}
+                    onChange={handleInputChange}
+                    label='Available'
+                    description='Turn off when it has been sold.'
+                    bordered
+                />
+            </form>
+        </Dialog>
     );
 };
 

@@ -1,18 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useId, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import {
-    X,
-    Save,
-    Loader2,
-    Calendar,
-    User,
-    Flag,
-    Type,
-    AlertCircle,
-} from 'lucide-react';
+    Button,
+    Field,
+    Input,
+    Select,
+    Sheet,
+    Textarea,
+} from '../../components/ui';
 
-const PRIORITY_OPTIONS = ['Low', 'Medium', 'High'];
-const STATUS_OPTIONS = ['Open', 'In Progress', 'Completed'];
+const PRIORITY_OPTIONS = [
+    { value: 'Low', dot: 'bg-neutral' },
+    { value: 'Medium', dot: 'bg-warn' },
+    { value: 'High', dot: 'bg-bad' },
+];
+const STATUS_OPTIONS = [
+    { value: 'Open', label: 'Open' },
+    { value: 'In Progress', label: 'In progress' },
+    { value: 'Completed', label: 'Completed' },
+];
 
+const EMPTY_FORM = {
+    title: '',
+    description: '',
+    priority: 'Medium',
+    dueDate: '',
+    assignedTo: '',
+    status: 'Open',
+};
+
+/** Side sheet for creating or editing a task. */
 const TaskForm = ({
     isOpen,
     onClose,
@@ -21,14 +39,9 @@ const TaskForm = ({
     loading = false,
     users = [],
 }) => {
-    const [formData, setFormData] = useState({
-        title: '',
-        description: '',
-        priority: 'Medium',
-        dueDate: '',
-        assignedTo: '',
-        status: 'Open',
-    });
+    const { user: currentUser } = useAuth();
+    const priorityLabelId = useId();
+    const [formData, setFormData] = useState(EMPTY_FORM);
     const [errors, setErrors] = useState({});
 
     useEffect(() => {
@@ -44,301 +57,186 @@ const TaskForm = ({
                 status: task.status || 'Open',
             });
         } else {
-            setFormData({
-                title: '',
-                description: '',
-                priority: 'Medium',
-                dueDate: '',
-                assignedTo: '',
-                status: 'Open',
-            });
+            setFormData(EMPTY_FORM);
         }
         setErrors({});
     }, [task, isOpen]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-
-        if (errors[name]) {
-            setErrors((prev) => ({ ...prev, [name]: '' }));
-        }
-    };
-
-    const validateForm = () => {
-        const newErrors = {};
-
-        if (!formData.title.trim()) {
-            newErrors.title = 'Title is required';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        setFormData((prev) => ({ ...prev, [name]: value }));
+        if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (validateForm()) {
-            onSave(formData);
+        if (!formData.title.trim()) {
+            setErrors({ title: 'Give the task a title.' });
+            return;
         }
+        // An empty assignee must go as null: the API can't store '' as a person.
+        onSave({ ...formData, assignedTo: formData.assignedTo || null });
     };
 
-    if (!isOpen) return null;
+    const assigneeOptions = users.map((u) => ({
+        value: u._id,
+        label:
+            u._id === currentUser?.id
+                ? `${u.name} (me)`
+                : `${u.name}${u.email ? ` · ${u.email}` : ''}`,
+    }));
+    // Keep a current assignee who is no longer in the team list selectable.
+    if (
+        formData.assignedTo &&
+        !users.some((u) => u._id === formData.assignedTo)
+    ) {
+        assigneeOptions.push({
+            value: formData.assignedTo,
+            label: task?.assignedTo?.name || 'Current assignee',
+        });
+    }
 
     return (
-        <div className='fixed inset-0 z-[9999] overflow-y-auto'>
-            <div className='flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0'>
-                {/* Background overlay */}
-                <div
-                    className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
-                    onClick={onClose}
-                ></div>
-
-                {/* Modal centering span */}
-                <span
-                    className='hidden sm:inline-block sm:align-middle sm:h-screen'
-                    aria-hidden='true'
-                >
-                    &#8203;
-                </span>
-
-                {/* Modal */}
-                <div className='relative inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full'>
-                    {/* Header */}
-                    <div className='bg-white dark:bg-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-700'>
-                        <div className='flex items-center justify-between'>
-                            <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
-                                {task ? 'Edit Task' : 'Create New Task'}
-                            </h3>
-                            <button
-                                onClick={onClose}
-                                className='text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                                disabled={loading}
-                            >
-                                <X className='h-6 w-6' />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Form */}
-                    <form
-                        onSubmit={handleSubmit}
-                        className='bg-white dark:bg-gray-800 px-6 py-4'
+        <Sheet
+            open={isOpen}
+            onClose={onClose}
+            busy={loading}
+            width='max-w-[460px]'
+            title={task ? 'Edit task' : 'New task'}
+            footer={
+                <>
+                    <Button onClick={onClose} disabled={loading}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type='submit'
+                        form='task-form'
+                        variant='primary'
+                        disabled={loading}
+                        icon={loading ? Loader2 : undefined}
+                        className={loading ? '[&>svg]:animate-spin' : ''}
                     >
-                        <div className='space-y-4'>
-                            {/* Title */}
-                            <div>
-                                <label
-                                    htmlFor='title'
-                                    className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
-                                >
-                                    Task Title *
-                                </label>
-                                <div className='relative'>
-                                    <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
-                                        <Type className='h-5 w-5 text-gray-400' />
-                                    </div>
-                                    <input
-                                        type='text'
-                                        id='title'
-                                        name='title'
-                                        value={formData.title}
-                                        onChange={handleChange}
-                                        className={`w-full pl-10 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white ${
-                                            errors.title
-                                                ? 'border-red-300 dark:border-red-600'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                        placeholder='Enter task title'
-                                        disabled={loading}
-                                    />
-                                </div>
-                                {errors.title && (
-                                    <p className='mt-1 text-sm text-red-600'>
-                                        {errors.title}
-                                    </p>
-                                )}
-                            </div>
+                        {loading
+                            ? 'Saving…'
+                            : task
+                              ? 'Save changes'
+                              : 'Create task'}
+                    </Button>
+                </>
+            }
+        >
+            <form
+                id='task-form'
+                onSubmit={handleSubmit}
+                noValidate
+                className='flex flex-col gap-[18px]'
+            >
+                <Field label='Title' required error={errors.title}>
+                    <Input
+                        name='title'
+                        value={formData.title}
+                        onChange={handleChange}
+                        placeholder='e.g. Add Sem 5 syllabus for BBD University'
+                        disabled={loading}
+                        className='h-10'
+                    />
+                </Field>
 
-                            {/* Description */}
-                            <div>
-                                <label
-                                    htmlFor='description'
-                                    className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
-                                >
-                                    Description
-                                </label>
-                                <textarea
-                                    id='description'
-                                    name='description'
-                                    rows={3}
-                                    value={formData.description}
+                <Field label='Description'>
+                    <Textarea
+                        name='description'
+                        rows={4}
+                        value={formData.description}
+                        onChange={handleChange}
+                        placeholder='What needs doing, and where to find what’s needed'
+                        disabled={loading}
+                    />
+                </Field>
+
+                <div className='flex flex-col gap-1.5'>
+                    <span
+                        id={priorityLabelId}
+                        className='text-[13px] font-medium text-ink'
+                    >
+                        Priority
+                    </span>
+                    <div
+                        role='radiogroup'
+                        aria-labelledby={priorityLabelId}
+                        className='grid grid-cols-3 p-[3px] rounded-[10px] bg-ground'
+                    >
+                        {PRIORITY_OPTIONS.map((option) => (
+                            <label key={option.value} className='relative'>
+                                <input
+                                    type='radio'
+                                    name='priority'
+                                    value={option.value}
+                                    checked={formData.priority === option.value}
                                     onChange={handleChange}
-                                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white resize-none'
-                                    placeholder='Enter task details'
                                     disabled={loading}
+                                    className='peer sr-only'
                                 />
-                            </div>
-
-                            <div className='grid grid-cols-2 gap-4'>
-                                {/* Priority */}
-                                <div>
-                                    <label
-                                        htmlFor='priority'
-                                        className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
-                                    >
-                                        Priority
-                                    </label>
-                                    <div className='relative'>
-                                        <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
-                                            <Flag className='h-5 w-5 text-gray-400' />
-                                        </div>
-                                        <select
-                                            id='priority'
-                                            name='priority'
-                                            value={formData.priority}
-                                            onChange={handleChange}
-                                            className='w-full pl-10 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white appearance-none'
-                                            disabled={loading}
-                                        >
-                                            {PRIORITY_OPTIONS.map((option) => (
-                                                <option
-                                                    key={option}
-                                                    value={option}
-                                                >
-                                                    {option}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                {/* Status */}
-                                <div>
-                                    <label
-                                        htmlFor='status'
-                                        className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
-                                    >
-                                        Status
-                                    </label>
-                                    <div className='relative'>
-                                        <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
-                                            <AlertCircle className='h-5 w-5 text-gray-400' />
-                                        </div>
-                                        <select
-                                            id='status'
-                                            name='status'
-                                            value={formData.status}
-                                            onChange={handleChange}
-                                            className='w-full pl-10 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white appearance-none'
-                                            disabled={loading}
-                                        >
-                                            {STATUS_OPTIONS.map((option) => (
-                                                <option
-                                                    key={option}
-                                                    value={option}
-                                                >
-                                                    {option}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Due Date - Full Width */}
-                            <div>
-                                <label
-                                    htmlFor='dueDate'
-                                    className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
-                                >
-                                    Due Date
-                                </label>
-                                <div className='relative'>
-                                    <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
-                                        <Calendar className='h-5 w-5 text-gray-400' />
-                                    </div>
-                                    <input
-                                        type='date'
-                                        id='dueDate'
-                                        name='dueDate'
-                                        value={formData.dueDate}
-                                        onChange={handleChange}
-                                        className='w-full pl-10 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white'
-                                        disabled={loading}
+                                <span className='flex items-center justify-center gap-1.5 h-[34px] rounded-lg text-[13px] text-ink-2 cursor-pointer transition-colors hover:text-ink peer-checked:bg-sheet peer-checked:text-ink peer-checked:font-medium peer-checked:shadow-[0_1px_2px_rgba(28,27,24,0.08)] peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40'>
+                                    <span
+                                        className={`w-[7px] h-[7px] rounded-full ${option.dot}`}
+                                        aria-hidden='true'
                                     />
-                                </div>
-                            </div>
-
-                            {/* Assignee */}
-                            <div>
-                                <label
-                                    htmlFor='assignedTo'
-                                    className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
-                                >
-                                    Assign To
-                                </label>
-                                <div className='relative'>
-                                    <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
-                                        <User className='h-5 w-5 text-gray-400' />
-                                    </div>
-                                    <select
-                                        id='assignedTo'
-                                        name='assignedTo'
-                                        value={formData.assignedTo}
-                                        onChange={handleChange}
-                                        className='w-full pl-10 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white appearance-none'
-                                        disabled={loading}
-                                    >
-                                        <option value=''>
-                                            Unassigned (Open Task)
-                                        </option>
-                                        {users.map((user) => (
-                                            <option
-                                                key={user._id}
-                                                value={user._id}
-                                            >
-                                                {user.name} ({user.email})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
-                                    Leave empty to create an open task that can
-                                    be picked up by anyone.
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Buttons */}
-                        <div className='mt-6 flex justify-end space-x-3'>
-                            <button
-                                type='button'
-                                onClick={onClose}
-                                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors'
-                                disabled={loading}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type='submit'
-                                className='inline-flex items-center px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-                                disabled={loading}
-                            >
-                                {loading && (
-                                    <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                                )}
-                                <Save className='h-4 w-4 mr-2' />
-                                {task ? 'Update Task' : 'Create Task'}
-                            </button>
-                        </div>
-                    </form>
+                                    {option.value}
+                                </span>
+                            </label>
+                        ))}
+                    </div>
                 </div>
-            </div>
-        </div>
+
+                <div
+                    className={`grid gap-3 ${task ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}
+                >
+                    {/* The API sets a new task's status from its assignee, so
+                        status is only editable once the task exists. */}
+                    {task && (
+                        <Field label='Status'>
+                            <Select
+                                name='status'
+                                value={formData.status}
+                                onChange={handleChange}
+                                disabled={loading}
+                                options={STATUS_OPTIONS}
+                                className='h-10'
+                            />
+                        </Field>
+                    )}
+                    <Field label='Due date'>
+                        <Input
+                            type='date'
+                            name='dueDate'
+                            value={formData.dueDate}
+                            onChange={handleChange}
+                            disabled={loading}
+                            className='h-10'
+                        />
+                    </Field>
+                </div>
+
+                <Field
+                    label='Assign to'
+                    hint={
+                        task
+                            ? 'Unassigned tasks appear under “Open to pick up”.'
+                            : 'Unassigned tasks start as Open and appear under “Open to pick up”. Assigned ones start In progress.'
+                    }
+                >
+                    <Select
+                        name='assignedTo'
+                        value={formData.assignedTo || ''}
+                        onChange={handleChange}
+                        disabled={loading}
+                        placeholder='Nobody yet, anyone can pick it up'
+                        options={assigneeOptions}
+                        className='h-10'
+                    />
+                </Field>
+            </form>
+        </Sheet>
     );
 };
 

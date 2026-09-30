@@ -1,40 +1,91 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import Header from '../../components/Header';
-import api from '../../utils/api';
+import React, { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-    CheckSquare,
+    ChevronDown,
+    ChevronUp,
+    ClipboardList,
+    Minus,
+    Pencil,
     Plus,
-    User,
-    Calendar,
     Trash2,
-    Edit2,
-    Hand,
 } from 'lucide-react';
-import TaskForm from './TaskForm';
+import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import Loader from '../../components/Common/Loader';
+import ConfirmModal from '../../components/ConfirmModal';
+import {
+    Alert,
+    Avatar,
+    Button,
+    EmptyState,
+    PageHeader,
+    Tabs,
+} from '../../components/ui';
+import TaskForm from './TaskForm';
+import { TASK_COLUMNS, TASK_TABS, dueInfo, tasksForTab } from './tasksHelpers';
+
+const PRIORITY = {
+    High: { icon: ChevronUp, classes: 'bg-bad-soft text-bad-ink' },
+    Medium: { icon: Minus, classes: 'bg-warn-soft text-warn-ink' },
+    Low: { icon: ChevronDown, classes: 'bg-neutral-soft text-neutral-ink' },
+};
+
+const PriorityChip = ({ priority }) => {
+    const meta = PRIORITY[priority] || PRIORITY.Medium;
+    const Icon = meta.icon;
+    return (
+        <span
+            className={`inline-flex items-center gap-1 h-[22px] pl-1.5 pr-2 rounded-md text-xs font-medium ${meta.classes}`}
+        >
+            <Icon className='w-3.5 h-3.5' aria-hidden='true' />
+            {priority || 'Medium'}
+            <span className='sr-only'> priority</span>
+        </span>
+    );
+};
+
+const EMPTY_COPY = {
+    'my-tasks': {
+        title: 'Nothing assigned to you',
+        description:
+            'Tasks assigned to you appear here. Pick one up from “Open to pick up” or create one.',
+    },
+    'open-tasks': {
+        title: 'No open tasks',
+        description: 'Unassigned tasks that anyone can pick up appear here.',
+    },
+    'all-tasks': {
+        title: 'No tasks yet',
+        description: 'Create a task to track work for the admin team.',
+    },
+};
 
 const Tasks = () => {
     const { user: currentUser } = useAuth();
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [users, setUsers] = useState([]);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingTask, setEditingTask] = useState(null);
-    const [activeTab, setActiveTab] = useState('my-tasks'); // 'my-tasks', 'open-tasks', 'all-tasks'
+    const [activeTab, setActiveTab] = useState('my-tasks');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [pickingId, setPickingId] = useState(null);
+    const [deleting, setDeleting] = useState(null);
 
     const fetchTasks = async () => {
         try {
             setLoading(true);
+            setError(null);
             const response = await api.get('/tasks');
             if (response.data.success) {
                 setTasks(response.data.data);
             }
-        } catch (error) {
-            console.error('Error fetching tasks:', error);
-            toast.error('Failed to fetch tasks');
+        } catch (e) {
+            console.error('Error fetching tasks:', e);
+            setError(
+                'Couldn’t load tasks. Check your connection and try again.',
+            );
         } finally {
             setLoading(false);
         }
@@ -46,8 +97,8 @@ const Tasks = () => {
             if (response.data.success) {
                 setUsers(response.data.data);
             }
-        } catch (error) {
-            console.error('Error fetching users:', error);
+        } catch (e) {
+            console.error('Error fetching users:', e);
         }
     };
 
@@ -56,25 +107,24 @@ const Tasks = () => {
         fetchUsers();
     }, []);
 
-    const filteredTasks = useMemo(() => {
-        if (!currentUser) return [];
-        switch (activeTab) {
-            case 'my-tasks':
-                return tasks.filter(
-                    (task) =>
-                        task.assignedTo?._id === currentUser.id ||
-                        task.assignedTo === currentUser.id,
-                );
-            case 'open-tasks':
-                return tasks.filter(
-                    (task) => !task.assignedTo && task.status === 'Open',
-                );
-            case 'all-tasks':
-                return tasks;
-            default:
-                return tasks;
-        }
-    }, [tasks, activeTab, currentUser]);
+    const counts = useMemo(
+        () =>
+            Object.fromEntries(
+                TASK_TABS.map((t) => [
+                    t.value,
+                    currentUser
+                        ? tasksForTab(tasks, t.value, currentUser.id).length
+                        : 0,
+                ]),
+            ),
+        [tasks, currentUser],
+    );
+
+    const filteredTasks = useMemo(
+        () =>
+            currentUser ? tasksForTab(tasks, activeTab, currentUser.id) : [],
+        [tasks, activeTab, currentUser],
+    );
 
     const handleCreateClick = () => {
         setEditingTask(null);
@@ -86,33 +136,35 @@ const Tasks = () => {
         setIsFormOpen(true);
     };
 
-    const handleDeleteClick = async (taskId) => {
-        if (window.confirm('Are you sure you want to delete this task?')) {
-            try {
-                const response = await api.delete(`/tasks/${taskId}`);
-                if (response.data.success) {
-                    toast.success('Task deleted successfully');
-                    fetchTasks();
-                }
-            } catch (error) {
-                console.error('Error deleting task:', error);
-                toast.error('Failed to delete task');
+    const handleDelete = async (task) => {
+        try {
+            const response = await api.delete(`/tasks/${task._id}`);
+            if (response.data.success) {
+                toast.success('Task deleted');
+                fetchTasks();
             }
+        } catch (e) {
+            console.error('Error deleting task:', e);
+            toast.error('Couldn’t delete the task. Try again.');
         }
     };
 
     const handlePickUpClick = async (taskId) => {
+        setPickingId(taskId);
         try {
             const response = await api.put(`/tasks/${taskId}/pick`);
             if (response.data.success) {
-                toast.success('Task picked up successfully');
+                toast.success('Task picked up');
                 fetchTasks();
             }
-        } catch (error) {
-            console.error('Error picking up task:', error);
+        } catch (e) {
+            console.error('Error picking up task:', e);
             toast.error(
-                error.response?.data?.message || 'Failed to pick up task',
+                e.response?.data?.message ||
+                    'Couldn’t pick up the task. Try again.',
             );
+        } finally {
+            setPickingId(null);
         }
     };
 
@@ -127,240 +179,226 @@ const Tasks = () => {
             }
 
             if (response.data.success) {
-                toast.success(
-                    `Task ${editingTask ? 'updated' : 'created'} successfully`,
-                );
+                toast.success(editingTask ? 'Task saved' : 'Task created');
                 setIsFormOpen(false);
                 fetchTasks();
             }
-        } catch (error) {
-            console.error('Error saving task:', error);
-            toast.error(error.response?.data?.message || 'Failed to save task');
+        } catch (e) {
+            console.error('Error saving task:', e);
+            toast.error(
+                e.response?.data?.message ||
+                    'Couldn’t save the task. Try again.',
+            );
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    if (loading && !tasks.length) return <Loader />;
+    if (loading && !tasks.length && !error) return <Loader />;
 
-    return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-
-            <main className={`pt-6 pb-12  transition-all duration-300`}>
-                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-                    <div className='flex justify-between items-center mb-6'>
-                        <div>
-                            <h1 className='text-2xl font-semibold text-gray-900 dark:text-white flex items-center gap-2'>
-                                <CheckSquare className='w-8 h-8 text-blue-600' />
-                                Task Management
-                            </h1>
-                            <p className='mt-1 text-sm text-gray-500 dark:text-gray-400'>
-                                Manage assignments and track work progress.
-                            </p>
-                        </div>
-                        <button
-                            onClick={handleCreateClick}
-                            className='inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-                        >
-                            <Plus className='w-4 h-4 mr-2' />
-                            Create Task
-                        </button>
-                    </div>
-
-                    {/* Tabs */}
-                    <div className='border-b border-gray-200 dark:border-gray-700 mb-6'>
-                        <nav className='-mb-px flex space-x-8'>
-                            {['My Tasks', 'Open Tasks', 'All Tasks'].map(
-                                (tab) => {
-                                    const tabKey = tab
-                                        .toLowerCase()
-                                        .replace(' ', '-');
-                                    const isActive = activeTab === tabKey;
-                                    return (
-                                        <button
-                                            key={tab}
-                                            onClick={() => setActiveTab(tabKey)}
-                                            className={`${
-                                                isActive
-                                                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
-                                        >
-                                            {tab}
-                                        </button>
-                                    );
-                                },
-                            )}
-                        </nav>
-                    </div>
-
-                    {/* Task List */}
-                    {filteredTasks.length === 0 ? (
-                        <div className='text-center py-12 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700'>
-                            <CheckSquare className='mx-auto h-12 w-12 text-gray-400' />
-                            <h3 className='mt-2 text-sm font-medium text-gray-900 dark:text-white'>
-                                No tasks found
-                            </h3>
-                            <p className='mt-1 text-sm text-gray-500 dark:text-gray-400'>
-                                {activeTab === 'my-tasks'
-                                    ? "You don't have any assigned tasks."
-                                    : 'No tasks available in this category.'}
-                            </p>
-                        </div>
+    const taskCard = (task) => {
+        const due = dueInfo(task);
+        const completed = task.status === 'Completed';
+        const canPick = !task.assignedTo && task.status === 'Open';
+        return (
+            <article
+                key={task._id}
+                className={`flex flex-col gap-2.5 p-3.5 rounded-[10px] bg-sheet border border-line ${
+                    completed ? 'opacity-75' : ''
+                }`}
+            >
+                <div className='flex items-center gap-2'>
+                    <PriorityChip priority={task.priority} />
+                    <span className='flex-1' />
+                    <span
+                        className={`text-xs ${
+                            due.urgent
+                                ? 'font-semibold text-bad-ink'
+                                : 'text-muted'
+                        }`}
+                    >
+                        {due.text}
+                    </span>
+                </div>
+                <h3
+                    className={`text-sm font-medium leading-snug text-ink break-words ${
+                        completed ? 'line-through' : ''
+                    }`}
+                >
+                    {task.title}
+                </h3>
+                {task.description && (
+                    <p className='text-[12.5px] leading-normal text-muted line-clamp-3 break-words'>
+                        {task.description}
+                    </p>
+                )}
+                <div className='flex items-center gap-2 pt-1'>
+                    {task.assignedTo ? (
+                        <>
+                            <Avatar
+                                name={task.assignedTo.name}
+                                size='sm'
+                                className='!w-6 !h-6 !text-[10px]'
+                            />
+                            <span className='flex-1 min-w-0 truncate text-[12.5px] text-ink-2'>
+                                {task.assignedTo.name || 'Assigned'}
+                            </span>
+                        </>
                     ) : (
-                        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-                            {filteredTasks.map((task) => (
-                                <div
-                                    key={task._id}
-                                    className={`group bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden relative ${
-                                        task.priority === 'High'
-                                            ? 'border-l-4 border-l-red-500'
-                                            : task.priority === 'Medium'
-                                              ? 'border-l-4 border-l-yellow-500'
-                                              : 'border-l-4 border-l-green-500'
-                                    }`}
-                                >
-                                    <div className='p-6 flex-grow'>
-                                        <div className='flex justify-between items-start mb-4'>
-                                            <div className='flex items-center gap-2'>
-                                                <span
-                                                    className={`px-2.5 py-1 rounded-full text-xs font-semibold tracking-wide uppercase ${
-                                                        task.status ===
-                                                        'Completed'
-                                                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                                            : task.status ===
-                                                                'In Progress'
-                                                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-                                                              : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                                                    }`}
-                                                >
-                                                    {task.status || 'Open'}
-                                                </span>
-                                            </div>
-                                            {task.priority && (
-                                                <span
-                                                    className={`text-xs font-bold uppercase tracking-wider ${
-                                                        task.priority === 'High'
-                                                            ? 'text-red-600 dark:text-red-400'
-                                                            : task.priority ===
-                                                                'Medium'
-                                                              ? 'text-yellow-600 dark:text-yellow-400'
-                                                              : 'text-green-600 dark:text-green-400'
-                                                    }`}
-                                                >
-                                                    {task.priority}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <h3 className='text-xl font-bold text-gray-900 dark:text-white mb-3 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors'>
-                                            {task.title}
-                                        </h3>
-
-                                        <p className='text-sm text-gray-600 dark:text-gray-300 mb-6 line-clamp-3 leading-relaxed'>
-                                            {task.description ||
-                                                'No description provided.'}
-                                        </p>
-
-                                        <div className='flex items-center text-xs text-gray-500 dark:text-gray-400 mt-auto'>
-                                            <Calendar className='w-4 h-4 mr-1.5' />
-                                            <span className='font-medium'>
-                                                Due:{' '}
-                                                {task.dueDate
-                                                    ? new Date(
-                                                          task.dueDate,
-                                                      ).toLocaleDateString(
-                                                          undefined,
-                                                          {
-                                                              year: 'numeric',
-                                                              month: 'short',
-                                                              day: 'numeric',
-                                                          },
-                                                      )
-                                                    : 'No due date'}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div className='bg-gray-50 dark:bg-gray-700/30 px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center'>
-                                        <div className='flex items-center'>
-                                            {task.assignedTo ? (
-                                                <div
-                                                    className='flex items-center group/user'
-                                                    title={task.assignedTo.name}
-                                                >
-                                                    <div className='h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 flex items-center justify-center text-xs font-bold ring-2 ring-white dark:ring-gray-800'>
-                                                        {task.assignedTo.name?.charAt(
-                                                            0,
-                                                        ) || 'U'}
-                                                    </div>
-                                                    <span className='ml-2 text-sm font-medium text-gray-700 dark:text-gray-200 truncate max-w-[100px] group-hover/user:text-blue-600 transition-colors'>
-                                                        {task.assignedTo.name}
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                <div className='flex items-center text-gray-400 italic text-sm'>
-                                                    <div className='h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center'>
-                                                        <User className='w-4 h-4' />
-                                                    </div>
-                                                    <span className='ml-2'>
-                                                        Unassigned
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className='flex space-x-1'>
-                                            {!task.assignedTo &&
-                                                activeTab === 'open-tasks' && (
-                                                    <button
-                                                        onClick={() =>
-                                                            handlePickUpClick(
-                                                                task._id,
-                                                            )
-                                                        }
-                                                        className='p-2 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 rounded-lg transition-all duration-200'
-                                                        title='Pick Up Task'
-                                                    >
-                                                        <Hand className='w-5 h-5' />
-                                                    </button>
-                                                )}
-                                            <button
-                                                onClick={() =>
-                                                    handleEditClick(task)
-                                                }
-                                                className='p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg transition-all duration-200'
-                                                title='Edit Task'
-                                            >
-                                                <Edit2 className='w-5 h-5' />
-                                            </button>
-                                            <button
-                                                onClick={() =>
-                                                    handleDeleteClick(task._id)
-                                                }
-                                                className='p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-all duration-200'
-                                                title='Delete Task'
-                                            >
-                                                <Trash2 className='w-5 h-5' />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                        <span className='flex-1 text-[12.5px] text-muted'>
+                            Unassigned
+                        </span>
                     )}
-
-                    <TaskForm
-                        isOpen={isFormOpen}
-                        onClose={() => setIsFormOpen(false)}
-                        task={editingTask}
-                        onSave={handleSaveTask}
-                        loading={isSubmitting}
-                        users={users}
+                    {canPick && (
+                        <Button
+                            size='sm'
+                            className='!h-7'
+                            disabled={pickingId === task._id}
+                            onClick={() => handlePickUpClick(task._id)}
+                        >
+                            {pickingId === task._id ? 'Picking up…' : 'Pick up'}
+                        </Button>
+                    )}
+                    <Button
+                        variant='ghost'
+                        size='sm'
+                        iconOnly
+                        icon={Pencil}
+                        aria-label={`Edit ${task.title}`}
+                        className='!w-7 !h-7'
+                        onClick={() => handleEditClick(task)}
+                    />
+                    <Button
+                        variant='ghost'
+                        size='sm'
+                        iconOnly
+                        icon={Trash2}
+                        aria-label={`Delete ${task.title}`}
+                        className='!w-7 !h-7 text-bad-ink hover:text-bad-ink'
+                        onClick={() => setDeleting(task)}
                     />
                 </div>
-            </main>
+            </article>
+        );
+    };
+
+    return (
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Tasks'
+                description='Work for the admin team. Unassigned tasks can be picked up by anyone.'
+                actions={
+                    <Button
+                        variant='primary'
+                        icon={Plus}
+                        onClick={handleCreateClick}
+                    >
+                        New task
+                    </Button>
+                }
+            />
+
+            <Tabs
+                label='Whose tasks'
+                className='mb-5'
+                value={activeTab}
+                onChange={setActiveTab}
+                items={TASK_TABS.map((t) => ({
+                    ...t,
+                    count: counts[t.value],
+                }))}
+            />
+
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button size='sm' onClick={fetchTasks}>
+                            Try again
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
+
+            {filteredTasks.length === 0 ? (
+                !error && (
+                    <div className='bg-sheet border border-line rounded-xl'>
+                        <EmptyState
+                            icon={ClipboardList}
+                            title={EMPTY_COPY[activeTab].title}
+                            description={EMPTY_COPY[activeTab].description}
+                            action={
+                                <Button icon={Plus} onClick={handleCreateClick}>
+                                    New task
+                                </Button>
+                            }
+                        />
+                    </div>
+                )
+            ) : (
+                <div className='grid grid-cols-1 lg:grid-cols-3 gap-4 items-start'>
+                    {TASK_COLUMNS.map((column) => {
+                        const cards = filteredTasks.filter(
+                            (task) => (task.status || 'Open') === column.status,
+                        );
+                        const headingId = `tasks-${column.status
+                            .replace(' ', '-')
+                            .toLowerCase()}`;
+                        return (
+                            <section
+                                key={column.status}
+                                aria-labelledby={headingId}
+                                className='flex flex-col gap-2.5 p-3 rounded-[14px] bg-sunken border border-line-soft lg:min-h-[480px]'
+                            >
+                                <div className='flex items-center gap-2 px-1 pt-0.5 pb-1'>
+                                    <span
+                                        className={`w-2 h-2 rounded-full ${column.dot}`}
+                                        aria-hidden='true'
+                                    />
+                                    <h2
+                                        id={headingId}
+                                        className='flex-1 text-sm font-semibold text-ink'
+                                    >
+                                        {column.title}
+                                    </h2>
+                                    <span className='font-mono text-xs text-muted'>
+                                        {cards.length}
+                                    </span>
+                                </div>
+                                {cards.length ? (
+                                    cards.map(taskCard)
+                                ) : (
+                                    <p className='px-3 py-6 text-center text-[13px] text-muted'>
+                                        Nothing here
+                                    </p>
+                                )}
+                            </section>
+                        );
+                    })}
+                </div>
+            )}
+
+            <TaskForm
+                isOpen={isFormOpen}
+                onClose={() => setIsFormOpen(false)}
+                task={editingTask}
+                onSave={handleSaveTask}
+                loading={isSubmitting}
+                users={users}
+            />
+
+            <ConfirmModal
+                isOpen={Boolean(deleting)}
+                onClose={() => setDeleting(null)}
+                onConfirm={() => handleDelete(deleting)}
+                title='Delete this task?'
+                message={`“${deleting?.title || ''}” is removed for the whole team. This can’t be undone.`}
+                confirmText='Delete task'
+                variant='danger'
+            />
         </div>
     );
 };

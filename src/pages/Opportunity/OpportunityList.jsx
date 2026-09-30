@@ -1,781 +1,764 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
-import api from '../../utils/api';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
     Briefcase,
-    Edit2,
-    Trash2,
-    Eye,
-    Calendar,
-    User,
-    Mail,
-    Phone,
-    CheckCircle,
-    XCircle,
-    Clock,
+    Check,
+    Download,
     ExternalLink,
+    Pencil,
+    Trash2,
+    X,
 } from 'lucide-react';
+import api from '../../utils/api';
+import { useColleges } from '../../context/CollegeContext';
+import { useSelection } from '../../hooks/useSelection';
+import { downloadCsv } from '../../utils/csv';
+import {
+    formatDateTime,
+    formatNumber,
+    formatShortDateTime,
+} from '../../utils/format';
+import FilterBar from '../../components/Common/FilterBar';
+import { filterByTime } from '../../components/Common/timeFilterUtils';
+import Loader from '../../components/Common/Loader';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
+import RejectDialog from '../../components/RejectDialog';
 import OpportunityEditModal from '../../components/OpportunityEditModal';
-import FilterBar from '../../components/Common/FilterBar';
-import BackButton from '../../components/Common/BackButton';
-import Loader from '../../components/Common/Loader';
 import {
-    filterByTime,
-    getTimeFilterLabel,
-} from '../../components/Common/timeFilterUtils';
+    Alert,
+    BulkBar,
+    BulkButton,
+    Button,
+    EmptyState,
+    PageHeader,
+    SelectCell,
+    StatusBadge,
+    Table,
+    Tabs,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+
+const STATUS_TABS = [
+    ['', 'All'],
+    ['pending', 'Pending'],
+    ['approved', 'Approved'],
+    ['rejected', 'Rejected'],
+];
+
+const EMPTY_FILTERS = {
+    submissionStatus: '',
+    via: '',
+    deleted: '',
+};
+
+// The model stores `clickCount`; older records may still use `clickCounts`.
+const viewsOf = (o) => o.clickCount ?? o.clickCounts ?? 0;
+
+// Ways a student can apply, in the order they show in the table.
+const channelsOf = (o) =>
+    [
+        o.link && { key: 'link', label: 'Form' },
+        o.email && { key: 'email', label: 'Email' },
+        o.whatsapp && { key: 'whatsapp', label: 'WhatsApp' },
+    ].filter(Boolean);
 
 const OpportunityList = () => {
     const location = useLocation();
-    const { collegeslug } = useParams();
     const navigate = useNavigate();
+    const { collegeslug } = useParams();
+    const { currentCollege } = useColleges();
 
-    // Read URL params
+    // Filters live in the URL so a filtered list can be shared or reloaded.
     const params = new URLSearchParams(location.search);
-    const initialSearch = params.get('search') || '';
-    const initialTimeFilter = params.get('time') || '';
-    const initialPage = parseInt(params.get('page')) || 1;
-    const initialSubmissionStatus = params.get('submissionStatus') || '';
-    const initialDeleted = params.get('deleted') || '';
-
     const [opportunities, setOpportunities] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [search, setSearch] = useState(initialSearch);
-    const [page, setPage] = useState(initialPage);
+    const [search, setSearch] = useState(params.get('search') || '');
+    const [page, setPage] = useState(parseInt(params.get('page')) || 1);
     const [pageSize, setPageSize] = useState(12);
-    const [timeFilter, setTimeFilter] = useState(initialTimeFilter);
-    const [showModal, setShowModal] = useState(false);
-    const [editingOpportunity, setEditingOpportunity] = useState(null);
-    const { mainContentMargin } = useSidebarLayout();
-
-    // View mode - responsive default (small screens = grid, large screens = table)
-    const [viewMode, setViewMode] = useState(() => {
-        return window.innerWidth >= 1024 ? 'table' : 'grid';
-    });
-
-    // Filters state
-    const [filters, setFilters] = useState({
-        submissionStatus: initialSubmissionStatus,
-        deleted: initialDeleted,
-    });
+    const [timeFilter, setTimeFilter] = useState(params.get('time') || 'all');
+    const [filters, setFilters] = useState(() =>
+        Object.fromEntries(
+            Object.keys(EMPTY_FILTERS).map((key) => [
+                key,
+                params.get(key) || '',
+            ]),
+        ),
+    );
     const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState('desc');
+    const [viewMode, setViewMode] = useState(() =>
+        window.innerWidth >= 1024 ? 'table' : 'grid',
+    );
 
-    // Confirmation modal state
-    const [confirmModal, setConfirmModal] = useState({
-        isOpen: false,
-        title: '',
-        message: '',
-        onConfirm: null,
-        variant: 'danger',
-    });
+    const [editing, setEditing] = useState(null);
+    const [confirm, setConfirm] = useState(null);
+    const [rejecting, setRejecting] = useState(null); // array of ids
+    const [bulkBusy, setBulkBusy] = useState(false);
 
-    const showConfirm = (config) => {
-        return new Promise((resolve) => {
-            setConfirmModal({
-                isOpen: true,
-                title: config.title || 'Confirm Action',
-                message: config.message,
-                variant: config.variant || 'danger',
-                onConfirm: () => {
-                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-                    resolve(true);
-                },
-            });
-        });
-    };
-
-    const handleCloseConfirm = () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+    const fetchOpportunities = async () => {
+        try {
+            setError(null);
+            const response = await api.get(`/opportunity/all/${collegeslug}`);
+            setOpportunities(response.data.data || []);
+        } catch {
+            setError(
+                'Couldn’t load opportunities. Check your connection and try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
         fetchOpportunities();
     }, [collegeslug]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Persist filters in URL
     useEffect(() => {
-        const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (timeFilter) params.set('time', timeFilter);
-        if (filters.submissionStatus)
-            params.set('submissionStatus', filters.submissionStatus);
-        if (filters.deleted) params.set('deleted', filters.deleted);
-        if (page > 1) params.set('page', page.toString());
-        navigate({ search: params.toString() }, { replace: true });
+        const next = new URLSearchParams();
+        if (search) next.set('search', search);
+        if (timeFilter && timeFilter !== 'all') next.set('time', timeFilter);
+        Object.entries(filters).forEach(
+            ([key, value]) => value && next.set(key, value),
+        );
+        if (page > 1) next.set('page', String(page));
+        navigate({ search: next.toString() }, { replace: true });
     }, [search, timeFilter, filters, page, navigate]);
 
-    // Responsive view mode - always auto-switch based on screen size
-    useEffect(() => {
-        const handleResize = () => {
-            const newMode = window.innerWidth >= 1024 ? 'table' : 'grid';
-            setViewMode(newMode);
-        };
-
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    const fetchOpportunities = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get(`/opportunity/all/${collegeslug}`);
-            setOpportunities(response.data.data || []);
-            setError(null);
-        } catch (error) {
-            console.error('Error fetching opportunities:', error);
-            setError('Failed to fetch opportunities');
-            toast.error('Failed to fetch opportunities');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleEdit = (opportunity) => {
-        setEditingOpportunity(opportunity);
-        setShowModal(true);
-    };
-
-    const handleDelete = async (opportunity) => {
-        const confirmed = await showConfirm({
-            title: 'Delete Opportunity',
-            message: `Are you sure you want to delete "${opportunity.name}"? This action cannot be undone.`,
-            variant: 'danger',
-        });
-
-        if (confirmed) {
-            try {
-                await api.delete(`/opportunity/delete/${opportunity._id}`);
-                toast.success('Opportunity deleted successfully');
-                fetchOpportunities();
-            } catch (error) {
-                console.error('Error deleting opportunity:', error);
-                toast.error('Failed to delete opportunity');
-            }
-        }
-    };
-
-    const handleView = (opportunity) => {
-        navigate(`/${collegeslug}/opportunities/${opportunity._id}`);
-    };
-
-    const handleModalClose = () => {
-        setShowModal(false);
-        setEditingOpportunity(null);
-    };
-
-    const handleModalSuccess = () => {
-        fetchOpportunities();
-        handleModalClose();
-    };
-
-    // Get unique values for filters
-    const uniqueStatuses = ['pending', 'approved', 'rejected'];
-
-    const getStatusColor = (status) => {
-        const colors = {
-            approved:
-                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-            pending:
-                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-            rejected:
-                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-        };
-        return colors[status] || colors.pending;
-    };
-
-    const getStatusIcon = (status) => {
-        const icons = {
-            approved: CheckCircle,
-            pending: Clock,
-            rejected: XCircle,
-        };
-        const Icon = icons[status] || Clock;
-        return <Icon className='h-4 w-4' />;
-    };
-
-    // Apply filters and sorting
-    const filtered = opportunities.filter((opp) => {
-        const q = search.trim().toLowerCase();
-        const matchesSearch =
-            !q ||
-            opp.title?.toLowerCase().includes(q) ||
-            opp.company?.toLowerCase().includes(q) ||
-            opp.description?.toLowerCase().includes(q) ||
-            opp.location?.toLowerCase().includes(q) ||
-            opp.submissionStatus?.toLowerCase().includes(q);
-
-        const matchesStatus =
-            !filters.submissionStatus ||
-            opp.submissionStatus === filters.submissionStatus;
-        const matchesDeleted =
-            filters.deleted === '' ||
-            (filters.deleted === 'true' ? opp.deleted : !opp.deleted);
-
-        // Time filter
-        const matchesTime = filterByTime(opp, timeFilter);
-
-        return matchesSearch && matchesStatus && matchesDeleted && matchesTime;
-    }); // Sort
-    const sorted = [...filtered].sort((a, b) => {
-        if (sortBy === 'createdAt') {
-            const dateA = new Date(a.createdAt);
-            const dateB = new Date(b.createdAt);
-            return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-        }
-        if (sortBy === 'clickCounts') {
-            const countA = a.clickCounts || 0;
-            const countB = b.clickCounts || 0;
-            return sortOrder === 'asc' ? countA - countB : countB - countA;
-        }
-        return 0;
-    });
-
-    const start = (page - 1) * pageSize;
-    const current = sorted.slice(start, start + pageSize);
-
-    const totalOpportunities = sorted.length;
-    const totalItems = sorted.length;
-    const totalPages = Math.ceil(totalItems / pageSize) || 1;
-
-    const resetFilters = () => {
-        setFilters({
-            submissionStatus: '',
-            deleted: '',
-        });
-        setSortBy('createdAt');
-        setSortOrder('desc');
-    };
-
-    const clearAllFilters = () => {
-        setSearch('');
-        setTimeFilter('');
-        resetFilters();
+    const setFilter = (key, value) => {
+        setFilters((prev) => ({ ...prev, [key]: value }));
         setPage(1);
     };
 
-    const activeFiltersCount = Object.values(filters).filter(Boolean).length;
-
-    if (loading) {
-        return <Loader />;
-    }
-
-    if (error) {
+    // Everything except the status tab, so tab counts reflect the other filters.
+    const matchesFilters = (o) => {
+        const q = search.trim().toLowerCase();
+        const matchesSearch =
+            !q ||
+            o.name?.toLowerCase().includes(q) ||
+            o.description?.toLowerCase().includes(q) ||
+            o.email?.toLowerCase().includes(q) ||
+            o.owner?.username?.toLowerCase().includes(q);
         return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div
-                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${mainContentMargin} transition-all duration-300`}
-                >
-                    <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-8 text-center'>
-                        <div className='text-red-600 dark:text-red-400 text-lg font-medium mb-2'>
-                            Error Loading Opportunities
-                        </div>
-                        <p className='text-red-500 dark:text-red-300 mb-4'>
-                            {error}
-                        </p>
-                        <button
-                            onClick={fetchOpportunities}
-                            className='bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors'
+            matchesSearch &&
+            (!filters.via || Boolean(o[filters.via])) &&
+            (filters.deleted === '' ||
+                (filters.deleted === 'true' ? o.deleted : !o.deleted)) &&
+            filterByTime(o, timeFilter)
+        );
+    };
+
+    const base = opportunities.filter(matchesFilters);
+    const counts = base.reduce(
+        (acc, o) => {
+            const status = o.submissionStatus || 'pending';
+            acc[status] = (acc[status] || 0) + 1;
+            return acc;
+        },
+        { '': base.length },
+    );
+    const filtered = base.filter(
+        (o) =>
+            !filters.submissionStatus ||
+            (o.submissionStatus || 'pending') === filters.submissionStatus,
+    );
+    const sorted = [...filtered].sort((a, b) => {
+        const diff =
+            sortBy === 'clickCounts'
+                ? viewsOf(a) - viewsOf(b)
+                : new Date(a.createdAt) - new Date(b.createdAt);
+        return sortOrder === 'desc' ? -diff : diff;
+    });
+    const current = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+    const selection = useSelection(
+        useMemo(() => current.map((o) => o._id), [current]),
+    );
+
+    const activeFilters = Object.entries(filters).filter(
+        ([key, value]) => key !== 'submissionStatus' && value,
+    ).length;
+    const clearAll = () => {
+        setSearch('');
+        setTimeFilter('all');
+        setFilters((prev) => ({
+            ...EMPTY_FILTERS,
+            submissionStatus: prev.submissionStatus,
+        }));
+        setSortBy('createdAt');
+        setSortOrder('desc');
+        setPage(1);
+    };
+
+    const updateLocal = (ids, patch) =>
+        setOpportunities((prev) =>
+            prev.map((o) => (ids.includes(o._id) ? { ...o, ...patch } : o)),
+        );
+
+    // Runs one request per opportunity and reports how many went through.
+    const runBulk = async (ids, request, verb) => {
+        setBulkBusy(true);
+        const results = await Promise.allSettled(ids.map(request));
+        setBulkBusy(false);
+        const done = ids.filter((_, i) => results[i].status === 'fulfilled');
+        const failed = ids.length - done.length;
+        if (done.length)
+            toast.success(
+                `${formatNumber(done.length)} ${done.length === 1 ? 'opportunity' : 'opportunities'} ${verb}`,
+            );
+        if (failed)
+            toast.error(
+                `${formatNumber(failed)} couldn’t be ${verb}. Try those again.`,
+            );
+        return done;
+    };
+
+    const approve = async (ids) => {
+        const done = await runBulk(
+            ids,
+            (id) =>
+                api.put(`/opportunity/edit/${id}`, {
+                    submissionStatus: 'approved',
+                    rejectionReason: '',
+                }),
+            'approved',
+        );
+        updateLocal(done, {
+            submissionStatus: 'approved',
+            rejectionReason: '',
+        });
+        selection.clear();
+    };
+
+    const reject = async (ids, reason) => {
+        const done = await runBulk(
+            ids,
+            (id) =>
+                api.put(`/opportunity/edit/${id}`, {
+                    submissionStatus: 'rejected',
+                    rejectionReason: reason,
+                }),
+            'rejected',
+        );
+        updateLocal(done, {
+            submissionStatus: 'rejected',
+            rejectionReason: reason,
+        });
+        selection.clear();
+        setRejecting(null);
+    };
+
+    const remove = (ids) =>
+        setConfirm({
+            title:
+                ids.length === 1
+                    ? 'Delete this opportunity?'
+                    : `Delete ${formatNumber(ids.length)} opportunities?`,
+            message:
+                'Students stop seeing it straight away and the poster can’t get it back. This can’t be undone.',
+            onConfirm: async () => {
+                const done = await runBulk(
+                    ids,
+                    (id) => api.delete(`/opportunity/delete/${id}`),
+                    'deleted',
+                );
+                setOpportunities((prev) =>
+                    prev.filter((o) => !done.includes(o._id)),
+                );
+                selection.clear();
+            },
+        });
+
+    const exportCsv = () =>
+        downloadCsv(
+            `opportunities-${collegeslug}`,
+            [
+                { label: 'Title', value: (o) => o.name },
+                { label: 'Description', value: (o) => o.description },
+                {
+                    label: 'Apply by',
+                    value: (o) =>
+                        channelsOf(o)
+                            .map((c) => c.label)
+                            .join(' / '),
+                },
+                { label: 'Email', value: (o) => o.email },
+                { label: 'Link', value: (o) => o.link },
+                {
+                    label: 'Status',
+                    value: (o) => o.submissionStatus || 'pending',
+                },
+                { label: 'Rejection reason', value: (o) => o.rejectionReason },
+                { label: 'Views', value: viewsOf },
+                { label: 'Posted by', value: (o) => o.owner?.username },
+                { label: 'Posted', value: (o) => formatDateTime(o.createdAt) },
+                { label: 'Deleted', value: (o) => (o.deleted ? 'yes' : 'no') },
+            ],
+            sorted,
+        );
+
+    if (loading) return <Loader />;
+
+    const selectedIds = [...selection.selected];
+    const detailPath = (o) => `/${collegeslug}/opportunities/${o._id}`;
+    const stop = (fn) => (event) => {
+        event.stopPropagation();
+        fn();
+    };
+
+    const rowActions = (o) =>
+        (o.submissionStatus || 'pending') === 'pending' ? (
+            <>
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={X}
+                    aria-label={`Reject ${o.name}`}
+                    className='text-bad-ink hover:text-bad-ink'
+                    onClick={stop(() => setRejecting([o._id]))}
+                />
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={Check}
+                    aria-label={`Approve ${o.name}`}
+                    className='text-ok-ink hover:text-ok-ink'
+                    onClick={stop(() => approve([o._id]))}
+                />
+            </>
+        ) : (
+            <>
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={Pencil}
+                    aria-label={`Edit ${o.name}`}
+                    onClick={stop(() => setEditing(o))}
+                />
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={Trash2}
+                    aria-label={`Delete ${o.name}`}
+                    className='text-bad-ink hover:text-bad-ink'
+                    onClick={stop(() => remove([o._id]))}
+                />
+            </>
+        );
+
+    // Chips for each way to apply; the form chip opens the link.
+    const channels = (o) => {
+        const list = channelsOf(o);
+        if (!list.length)
+            return <span className='text-[12.5px] text-muted'>Not given</span>;
+        return (
+            <div className='flex flex-wrap gap-1'>
+                {list.map((c) =>
+                    c.key === 'link' ? (
+                        <a
+                            key={c.key}
+                            href={o.link}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Open the application form for ${o.name} in a new tab`}
+                            className='inline-flex items-center gap-1 px-[7px] py-0.5 rounded-[5px] bg-ground text-xs text-ink-2 hover:text-link'
                         >
-                            Try Again
-                        </button>
-                    </div>
-                </div>
+                            {c.label}
+                            <ExternalLink
+                                className='w-3 h-3'
+                                aria-hidden='true'
+                            />
+                        </a>
+                    ) : (
+                        <span
+                            key={c.key}
+                            className='px-[7px] py-0.5 rounded-[5px] bg-ground text-xs text-ink-2'
+                        >
+                            {c.label}
+                        </span>
+                    ),
+                )}
             </div>
         );
-    }
+    };
+
+    const pagination = (
+        <Pagination
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={sorted.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+            }}
+        />
+    );
+
+    const reviewQueue =
+        filters.submissionStatus === 'pending' && !activeFilters && !search;
+    const empty = (
+        <EmptyState
+            icon={Briefcase}
+            tone={reviewQueue ? 'done' : 'neutral'}
+            title={
+                opportunities.length === 0
+                    ? 'No opportunities yet'
+                    : reviewQueue
+                      ? 'Nothing waiting for review'
+                      : 'No opportunities match'
+            }
+            description={
+                opportunities.length === 0 || reviewQueue
+                    ? 'New opportunities posted by students will appear here.'
+                    : 'Try another search or clear the filters.'
+            }
+            action={
+                activeFilters || search || timeFilter !== 'all' ? (
+                    <Button onClick={clearAll}>Clear filters</Button>
+                ) : undefined
+            }
+        />
+    );
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
-            <main className='pt-6 pb-12'>
-                <div
-                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
-                >
-                    {/* Header */}
-                    <BackButton
-                        title={`Opportunities for ${collegeslug}`}
-                        TitleIcon={Briefcase}
-                    />
-
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
-                        <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
-                            <span className='text-gray-600 dark:text-gray-400'>
-                                Total ({getTimeFilterLabel(timeFilter)}):
-                            </span>
-                            <span className='font-semibold text-gray-900 dark:text-white'>
-                                {totalOpportunities}
-                            </span>
-                        </div>
-                        {/* FilterBar */}
-                        <FilterBar
-                            search={search}
-                            onSearch={(v) => {
-                                setSearch(v);
-                                setPage(1);
-                            }}
-                            searchPlaceholder='Search opportunities...'
-                            filters={[
-                                {
-                                    label: 'Status',
-                                    value: filters.submissionStatus,
-                                    onChange: (v) =>
-                                        setFilters({
-                                            ...filters,
-                                            submissionStatus: v,
-                                        }),
-                                    options: [
-                                        { value: '', label: 'All Statuses' },
-                                        ...uniqueStatuses.map((s) => ({
-                                            value: s,
-                                            label:
-                                                s.charAt(0).toUpperCase() +
-                                                s.slice(1),
-                                        })),
-                                    ],
-                                },
-                                {
-                                    label: 'Deleted',
-                                    value: filters.deleted,
-                                    onChange: (v) =>
-                                        setFilters({ ...filters, deleted: v }),
-                                    options: [
-                                        { value: '', label: 'All (Deleted)' },
-                                        { value: 'true', label: 'Deleted' },
-                                        {
-                                            value: 'false',
-                                            label: 'Not Deleted',
-                                        },
-                                    ],
-                                },
-                            ]}
-                            timeFilter={{
-                                value: timeFilter,
-                                onChange: (v) => {
-                                    setTimeFilter(v);
-                                    setPage(1);
-                                },
-                            }}
-                            sortBy={{
-                                value: sortBy,
-                                onChange: setSortBy,
-                                options: [
-                                    {
-                                        value: 'createdAt',
-                                        label: 'Sort by Date',
-                                    },
-                                    {
-                                        value: 'clickCounts',
-                                        label: 'Sort by Views',
-                                    },
-                                ],
-                            }}
-                            sortOrder={{
-                                value: sortOrder,
-                                onToggle: () =>
-                                    setSortOrder(
-                                        sortOrder === 'asc' ? 'desc' : 'asc',
-                                    ),
-                            }}
-                            viewMode={{
-                                value: viewMode,
-                                onChange: setViewMode,
-                            }}
-                            onClear={clearAllFilters}
-                            showClear={
-                                !!(
-                                    search ||
-                                    timeFilter ||
-                                    activeFiltersCount > 0
-                                )
-                            }
-                        />
-                    </div>
-
-                    {error && (
-                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8'>
-                            {error}
-                        </div>
-                    )}
-
-                    {/* Empty State */}
-                    {current.length === 0 ? (
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center'>
-                            <Briefcase className='h-16 w-16 text-gray-400 mx-auto mb-4' />
-                            <h3 className='text-lg font-medium text-gray-900 dark:text-gray-100 mb-2'>
-                                No opportunities found
-                            </h3>
-                            <p className='text-gray-600 dark:text-gray-400'>
-                                {search || activeFiltersCount > 0
-                                    ? 'Try adjusting your search or filters'
-                                    : 'No opportunities have been submitted yet'}
-                            </p>
-                        </div>
-                    ) : (
-                        <>
-                            {/* Table View */}
-                            {viewMode === 'table' && (
-                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                    <div className='overflow-x-auto'>
-                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                            <thead className='bg-gray-50 dark:bg-gray-700'>
-                                                <tr>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Opportunity
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Contact
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Status
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Posted By
-                                                    </th>
-
-                                                    <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Actions
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                                {current.map((opportunity) => (
-                                                    <tr
-                                                        key={opportunity._id}
-                                                        className='hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors'
-                                                        onClick={() =>
-                                                            handleView(
-                                                                opportunity,
-                                                            )
-                                                        }
-                                                    >
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <div className='flex items-center'>
-                                                                <div className='flex-shrink-0 h-10 w-10'>
-                                                                    <div className='h-10 w-10 rounded-lg bg-gradient-to-r from-orange-400 to-red-400 flex items-center justify-center'>
-                                                                        <Briefcase className='h-6 w-6 text-white' />
-                                                                    </div>
-                                                                </div>
-                                                                <div className='ml-4'>
-                                                                    <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
-                                                                        {
-                                                                            opportunity.name
-                                                                        }
-                                                                    </div>
-                                                                    <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs'>
-                                                                        {opportunity.description ||
-                                                                            'No description'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <div className='space-y-1'>
-                                                                <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                                    <Mail className='h-4 w-4 text-blue-500 mr-2' />
-                                                                    <span className='truncate max-w-xs'>
-                                                                        {opportunity.email ||
-                                                                            'Not provided'}
-                                                                    </span>
-                                                                </div>
-                                                                {opportunity.whatsapp && (
-                                                                    <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                                        <Phone className='h-4 w-4 text-green-500 mr-2' />
-                                                                        {
-                                                                            opportunity.whatsapp
-                                                                        }
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <span
-                                                                className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                                                                    opportunity.submissionStatus,
-                                                                )}`}
-                                                            >
-                                                                {getStatusIcon(
-                                                                    opportunity.submissionStatus,
-                                                                )}
-                                                                <span className='capitalize'>
-                                                                    {
-                                                                        opportunity.submissionStatus
-                                                                    }
-                                                                </span>
-                                                            </span>
-                                                            {opportunity.clickCounts >
-                                                                0 && (
-                                                                <div className='flex items-center gap-1 text-gray-500 dark:text-gray-400'>
-                                                                    <Eye className='w-4 h-4' />
-                                                                    <span className='text-xs'>
-                                                                        {
-                                                                            opportunity.clickCounts
-                                                                        }
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                                <User className='h-4 w-4 text-gray-400 mr-2' />
-                                                                {opportunity
-                                                                    .owner
-                                                                    ?.username ||
-                                                                    'Unknown'}
-                                                            </div>
-                                                            <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                                <Calendar className='h-4 w-4 mr-2' />
-                                                                {new Date(
-                                                                    opportunity.createdAt,
-                                                                ).toLocaleDateString()}
-                                                            </div>
-                                                        </td>
-
-                                                        <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
-                                                            <div className='flex items-center justify-end space-x-2'>
-                                                                {opportunity.link && (
-                                                                    <button
-                                                                        onClick={(
-                                                                            e,
-                                                                        ) => {
-                                                                            e.stopPropagation();
-                                                                            window.open(
-                                                                                opportunity.link,
-                                                                                '_blank',
-                                                                            );
-                                                                        }}
-                                                                        className='text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors p-1 rounded'
-                                                                        title='Open External Link'
-                                                                    >
-                                                                        <ExternalLink className='h-4 w-4' />
-                                                                    </button>
-                                                                )}
-                                                                <button
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        handleEdit(
-                                                                            opportunity,
-                                                                        );
-                                                                    }}
-                                                                    className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
-                                                                    title='Edit Opportunity'
-                                                                >
-                                                                    <Edit2 className='h-4 w-4' />
-                                                                </button>
-                                                                <button
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        handleDelete(
-                                                                            opportunity,
-                                                                        );
-                                                                    }}
-                                                                    className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
-                                                                    title='Delete Opportunity'
-                                                                >
-                                                                    <Trash2 className='h-4 w-4' />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Grid View */}
-                            {viewMode === 'grid' && (
-                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-                                    {current.map((opportunity) => (
-                                        <div
-                                            key={opportunity._id}
-                                            className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow cursor-pointer overflow-hidden'
-                                            onClick={() =>
-                                                handleView(opportunity)
-                                            }
-                                        >
-                                            {/* Header with gradient */}
-                                            <div className='bg-gradient-to-r from-orange-500 to-red-500 p-4'>
-                                                <div className='flex items-start justify-between'>
-                                                    <div className='flex items-center gap-3'>
-                                                        <div className='p-2 bg-white/20 backdrop-blur-sm rounded-lg'>
-                                                            <Briefcase className='h-6 w-6 text-white' />
-                                                        </div>
-                                                        <div>
-                                                            <h3 className='text-white font-medium line-clamp-1'>
-                                                                {
-                                                                    opportunity.name
-                                                                }
-                                                            </h3>
-                                                            <div className='flex items-center gap-2 mt-1'>
-                                                                <span
-                                                                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                                                                        opportunity.submissionStatus,
-                                                                    )}`}
-                                                                >
-                                                                    {
-                                                                        opportunity.submissionStatus
-                                                                    }
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Content */}
-                                            <div className='p-4 space-y-3'>
-                                                {opportunity.description && (
-                                                    <p className='text-sm text-gray-600 dark:text-gray-400 line-clamp-2'>
-                                                        {
-                                                            opportunity.description
-                                                        }
-                                                    </p>
-                                                )}
-
-                                                <div className='space-y-2'>
-                                                    {opportunity.email && (
-                                                        <div className='flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
-                                                            <Mail className='h-4 w-4 text-blue-500' />
-                                                            <span className='truncate'>
-                                                                {
-                                                                    opportunity.email
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                    )}
-
-                                                    {opportunity.whatsapp && (
-                                                        <div className='flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
-                                                            <Phone className='h-4 w-4 text-green-500' />
-                                                            <span>
-                                                                {
-                                                                    opportunity.whatsapp
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                    )}
-
-                                                    <div className='flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
-                                                        <User className='h-4 w-4' />
-                                                        <span>
-                                                            {opportunity.owner
-                                                                ?.username ||
-                                                                'Unknown'}
-                                                        </span>
-                                                    </div>
-
-                                                    <div className='flex items-center justify-between text-xs text-gray-500 dark:text-gray-400'>
-                                                        <div className='flex items-center gap-1'>
-                                                            <Eye className='h-3 w-3' />
-                                                            {opportunity.clickCounts ||
-                                                                0}{' '}
-                                                            views
-                                                        </div>
-                                                        <div className='flex items-center gap-1'>
-                                                            <Calendar className='h-3 w-3' />
-                                                            {new Date(
-                                                                opportunity.createdAt,
-                                                            ).toLocaleDateString()}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Actions */}
-                                                <div className='flex items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700'>
-                                                    {opportunity.link && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                window.open(
-                                                                    opportunity.link,
-                                                                    '_blank',
-                                                                );
-                                                            }}
-                                                            className='flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors'
-                                                        >
-                                                            <ExternalLink className='h-4 w-4' />
-                                                            Visit
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleEdit(
-                                                                opportunity,
-                                                            );
-                                                        }}
-                                                        className='flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-lg transition-colors'
-                                                    >
-                                                        <Edit2 className='h-4 w-4' />
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDelete(
-                                                                opportunity,
-                                                            );
-                                                        }}
-                                                        className='flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors'
-                                                    >
-                                                        <Trash2 className='h-4 w-4' />
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Pagination */}
-                            {totalPages > 1 && (
-                                <div className='mt-6'>
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={totalPages}
-                                        onPageChange={setPage}
-                                        pageSize={pageSize}
-                                        onPageSizeChange={setPageSize}
-                                        totalItems={totalItems}
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-            </main>
-
-            {/* Modals */}
-            <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={handleCloseConfirm}
-                onConfirm={confirmModal.onConfirm}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                variant={confirmModal.variant}
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Opportunities'
+                description={`Internships, part-time work and team calls posted for ${currentCollege?.name || collegeslug} students.`}
+                actions={
+                    <Button
+                        icon={Download}
+                        onClick={exportCsv}
+                        disabled={!sorted.length}
+                    >
+                        Export CSV
+                    </Button>
+                }
             />
 
+            <Tabs
+                label='Review status'
+                className='mb-4'
+                value={filters.submissionStatus}
+                onChange={(value) => {
+                    setFilter('submissionStatus', value);
+                    selection.clear();
+                }}
+                items={STATUS_TABS.map(([value, label]) => ({
+                    value,
+                    label,
+                    count: counts[value] || 0,
+                    attention: value === 'pending' && counts.pending > 0,
+                }))}
+            />
+
+            <FilterBar
+                className='mb-4'
+                search={search}
+                onSearch={(value) => {
+                    setSearch(value);
+                    setPage(1);
+                }}
+                searchPlaceholder='Search by title, description, email or who posted it'
+                filters={[
+                    {
+                        label: 'Apply by',
+                        value: filters.via,
+                        onChange: (v) => setFilter('via', v),
+                        options: [
+                            { value: '', label: 'Any way to apply' },
+                            { value: 'link', label: 'Online form' },
+                            { value: 'email', label: 'Email' },
+                            { value: 'whatsapp', label: 'WhatsApp' },
+                        ],
+                    },
+                    {
+                        label: 'Deleted',
+                        value: filters.deleted,
+                        onChange: (v) => setFilter('deleted', v),
+                        options: [
+                            { value: '', label: 'Include deleted' },
+                            { value: 'false', label: 'Hide deleted' },
+                            { value: 'true', label: 'Only deleted' },
+                        ],
+                    },
+                ]}
+                timeFilter={{
+                    value: timeFilter,
+                    onChange: (v) => {
+                        setTimeFilter(v);
+                        setPage(1);
+                    },
+                }}
+                sortBy={{
+                    value: sortBy,
+                    onChange: setSortBy,
+                    options: [
+                        { value: 'createdAt', label: 'Newest first' },
+                        { value: 'clickCounts', label: 'Most viewed' },
+                    ],
+                }}
+                sortOrder={{
+                    value: sortOrder,
+                    onToggle: () =>
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                }}
+                viewMode={{ value: viewMode, onChange: setViewMode }}
+                onClear={clearAll}
+                showClear={Boolean(
+                    search || timeFilter !== 'all' || activeFilters,
+                )}
+            />
+
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button size='sm' onClick={fetchOpportunities}>
+                            Try again
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
+
+            {viewMode === 'table' ? (
+                <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
+                    <BulkBar count={selection.count} onClear={selection.clear}>
+                        <BulkButton
+                            primary
+                            icon={Check}
+                            disabled={bulkBusy}
+                            onClick={() => approve(selectedIds)}
+                        >
+                            Approve
+                        </BulkButton>
+                        <BulkButton
+                            icon={X}
+                            disabled={bulkBusy}
+                            onClick={() => setRejecting(selectedIds)}
+                        >
+                            Reject…
+                        </BulkButton>
+                        <BulkButton
+                            icon={Trash2}
+                            disabled={bulkBusy}
+                            onClick={() => remove(selectedIds)}
+                        >
+                            Delete
+                        </BulkButton>
+                    </BulkBar>
+                    {current.length === 0 ? (
+                        empty
+                    ) : (
+                        <Table minWidth={960}>
+                            <thead>
+                                <tr>
+                                    <SelectCell
+                                        header
+                                        label='Select all opportunities on this page'
+                                        checked={selection.allVisible}
+                                        indeterminate={selection.someVisible}
+                                        onChange={selection.toggleAllVisible}
+                                    />
+                                    <Th>Opportunity</Th>
+                                    <Th>Students apply by</Th>
+                                    <Th>Status</Th>
+                                    <Th>Posted</Th>
+                                    <Th>
+                                        <span className='sr-only'>Actions</span>
+                                    </Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {current.map((o) => (
+                                    <Tr
+                                        key={o._id}
+                                        selected={selection.isSelected(o._id)}
+                                        onClick={() => navigate(detailPath(o))}
+                                    >
+                                        <SelectCell
+                                            label={`Select ${o.name}`}
+                                            checked={selection.isSelected(
+                                                o._id,
+                                            )}
+                                            onChange={(on) =>
+                                                selection.toggle(o._id, on)
+                                            }
+                                        />
+                                        <Td className='max-w-[380px]'>
+                                            <div className='flex flex-col gap-0.5 min-w-0'>
+                                                <Link
+                                                    to={detailPath(o)}
+                                                    onClick={(e) =>
+                                                        e.stopPropagation()
+                                                    }
+                                                    className='font-medium text-ink hover:underline truncate'
+                                                >
+                                                    {o.name || 'Untitled'}
+                                                </Link>
+                                                <span className='text-[12.5px] text-muted truncate'>
+                                                    {o.description ||
+                                                        'No description'}
+                                                </span>
+                                            </div>
+                                        </Td>
+                                        <Td>{channels(o)}</Td>
+                                        <Td>
+                                            <div className='flex flex-col items-start gap-1'>
+                                                <div className='flex flex-wrap gap-1'>
+                                                    <StatusBadge
+                                                        status={
+                                                            o.submissionStatus
+                                                        }
+                                                    />
+                                                    {o.deleted && (
+                                                        <StatusBadge tone='outline'>
+                                                            Deleted
+                                                        </StatusBadge>
+                                                    )}
+                                                </div>
+                                                {viewsOf(o) > 0 && (
+                                                    <span className='text-xs text-muted'>
+                                                        {formatNumber(
+                                                            viewsOf(o),
+                                                        )}{' '}
+                                                        views
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </Td>
+                                        <Td>
+                                            <div className='flex flex-col gap-0.5'>
+                                                <span className='whitespace-nowrap'>
+                                                    {formatShortDateTime(
+                                                        o.createdAt,
+                                                    )}
+                                                </span>
+                                                <span className='text-[12.5px] text-muted'>
+                                                    {o.owner?.username
+                                                        ? `@${o.owner.username}`
+                                                        : 'Unknown poster'}
+                                                </span>
+                                            </div>
+                                        </Td>
+                                        <Td align='right'>
+                                            <div className='flex justify-end gap-1'>
+                                                {rowActions(o)}
+                                            </div>
+                                        </Td>
+                                    </Tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                    {sorted.length > 0 && (
+                        <div className='px-4 py-3 border-t border-line-soft'>
+                            {pagination}
+                        </div>
+                    )}
+                </div>
+            ) : current.length === 0 ? (
+                <div className='bg-sheet border border-line rounded-xl'>
+                    {empty}
+                </div>
+            ) : (
+                <div className='flex flex-col gap-4'>
+                    <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
+                        {current.map((o) => (
+                            <article
+                                key={o._id}
+                                onClick={() => navigate(detailPath(o))}
+                                className='flex flex-col gap-3 p-4 bg-sheet border border-line rounded-xl hover:border-line-strong cursor-pointer transition-colors'
+                            >
+                                <div className='flex items-start gap-2'>
+                                    <Link
+                                        to={detailPath(o)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className='flex-1 min-w-0 font-medium text-ink hover:underline line-clamp-2'
+                                    >
+                                        {o.name || 'Untitled'}
+                                    </Link>
+                                    <StatusBadge status={o.submissionStatus} />
+                                </div>
+                                {o.description && (
+                                    <p className='text-[13px] text-ink-2 line-clamp-2'>
+                                        {o.description}
+                                    </p>
+                                )}
+                                <div className='flex flex-wrap items-center gap-2'>
+                                    {channels(o)}
+                                    {o.deleted && (
+                                        <StatusBadge tone='outline'>
+                                            Deleted
+                                        </StatusBadge>
+                                    )}
+                                </div>
+                                <div className='flex items-center gap-2 pt-3 mt-auto border-t border-line-soft'>
+                                    <span className='flex-1 text-xs text-muted truncate'>
+                                        {formatShortDateTime(o.createdAt)}
+                                        {o.owner?.username &&
+                                            ` · @${o.owner.username}`}
+                                        {viewsOf(o) > 0 &&
+                                            ` · ${formatNumber(viewsOf(o))} views`}
+                                    </span>
+                                    {rowActions(o)}
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                    <div className='bg-sheet border border-line rounded-xl px-4 py-3'>
+                        {pagination}
+                    </div>
+                </div>
+            )}
+
             <OpportunityEditModal
-                isOpen={showModal}
-                onClose={handleModalClose}
-                opportunity={editingOpportunity}
-                onSuccess={handleModalSuccess}
+                isOpen={Boolean(editing)}
+                onClose={() => setEditing(null)}
+                opportunity={editing}
+                onSuccess={() => {
+                    fetchOpportunities();
+                    setEditing(null);
+                }}
+            />
+
+            <ConfirmModal
+                isOpen={Boolean(confirm)}
+                onClose={() => setConfirm(null)}
+                onConfirm={() => confirm?.onConfirm()}
+                title={confirm?.title}
+                message={confirm?.message}
+                confirmText='Delete'
+                variant='danger'
+            />
+
+            <RejectDialog
+                open={Boolean(rejecting)}
+                onClose={() => setRejecting(null)}
+                title={
+                    rejecting?.length > 1
+                        ? `Reject ${formatNumber(rejecting.length)} opportunities?`
+                        : 'Reject this opportunity?'
+                }
+                description={
+                    rejecting?.length > 1
+                        ? 'Every poster gets the same reason, so keep it general.'
+                        : 'The poster sees your reason, so say what to fix.'
+                }
+                onSubmit={(reason) => reject(rejecting, reason)}
             />
         </div>
     );

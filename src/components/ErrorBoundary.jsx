@@ -1,5 +1,6 @@
 import React from 'react';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
+import { Button, EmptyState } from './ui';
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -23,36 +24,33 @@ class ErrorBoundary extends React.Component {
     render() {
         if (this.state.hasError) {
             return (
-                <div className='min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4'>
-                    <div className='max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 text-center border border-gray-100 dark:border-gray-700'>
-                        <div className='inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 mb-6'>
-                            <AlertTriangle className='w-8 h-8 text-red-600 dark:text-red-400' />
-                        </div>
-
-                        <h2 className='text-2xl font-bold text-gray-900 dark:text-white mb-3'>
-                            Something went wrong
-                        </h2>
-
-                        <p className='text-gray-500 dark:text-gray-400 mb-8 leading-relaxed'>
-                            We encountered an unexpected error. Please try
-                            reloading the page to resolve the issue.
-                        </p>
-
-                        <div className='flex flex-col gap-3'>
-                            <button
-                                onClick={this.handleReload}
-                                className='inline-flex items-center justify-center gap-2 w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-[1.02]'
-                            >
-                                <RefreshCw className='w-4 h-4' />
-                                Reload Page
-                            </button>
-
-                            {import.meta.env.DEV && this.state.error && (
-                                <div className='mt-6 text-left p-4 bg-gray-100 dark:bg-gray-900 rounded-lg overflow-auto max-h-48 text-xs font-mono text-red-600 dark:text-red-400'>
-                                    {this.state.error.toString()}
+                <div className='min-h-screen flex items-center justify-center px-4 py-10 bg-ground text-ink'>
+                    <div className='w-full max-w-md bg-sheet border border-line rounded-xl'>
+                        <EmptyState
+                            icon={AlertCircle}
+                            tone='error'
+                            title='Something went wrong'
+                            description='This page hit an unexpected error. Reload to try again. If it keeps happening, tell the team what you were doing.'
+                            action={
+                                <div className='flex flex-wrap items-center justify-center gap-2'>
+                                    <Button
+                                        variant='dark'
+                                        icon={RefreshCw}
+                                        onClick={this.handleReload}
+                                    >
+                                        Reload page
+                                    </Button>
+                                    <Button href='/dashboard'>
+                                        Go to Home
+                                    </Button>
                                 </div>
-                            )}
-                        </div>
+                            }
+                        />
+                        {import.meta.env.DEV && this.state.error && (
+                            <pre className='mx-6 mb-6 -mt-4 p-3 max-h-48 overflow-auto rounded-lg bg-sunken border border-line-soft font-mono text-[11.5px] leading-relaxed text-bad-ink whitespace-pre-wrap break-words'>
+                                {this.state.error.toString()}
+                            </pre>
+                        )}
                     </div>
                 </div>
             );

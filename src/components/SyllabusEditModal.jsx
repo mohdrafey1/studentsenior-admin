@@ -1,231 +1,337 @@
-import React from 'react';
-import { X, Loader } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
+import api from '../utils/api';
+import { Button, Dialog, Field, Input, Select, Switch, Textarea } from './ui';
 
-const SyllabusEditModal = ({
-    showModal,
-    formData,
-    submitting,
-    onClose,
-    onSubmit,
-    onFormChange,
-}) => {
-    if (!showModal) return null;
+const YEARS = [1, 2, 3, 4, 5, 6].map((y) => ({
+    value: String(y),
+    label: `Year ${y}`,
+}));
+const SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8].map((s) => ({
+    value: String(s),
+    label: `Semester ${s}`,
+}));
+
+// Stable React keys for units that don't have an _id yet.
+const newKey = () => Math.random().toString(36).slice(2);
+
+const formFrom = (syllabus) => ({
+    year: syllabus?.year || 1,
+    semester: syllabus?.semester || 1,
+    description: syllabus?.description || '',
+    referenceBooks: syllabus?.referenceBooks || '',
+    isActive: syllabus?.isActive !== undefined ? syllabus.isActive : true,
+    units: (syllabus?.units || []).map((unit) => ({
+        ...unit,
+        _key: unit._id || newKey(),
+    })),
+});
+
+/**
+ * Edit a syllabus: year, semester, visibility, description, units and books.
+ * Saves with PUT /syllabus/edit/:id and calls onUpdate(savedFields, response).
+ */
+const SyllabusEditModal = ({ isOpen, onClose, syllabus, onUpdate }) => {
+    const [form, setForm] = useState(() => formFrom(syllabus));
+    const [errors, setErrors] = useState({});
+    const [submitting, setSubmitting] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setForm(formFrom(syllabus));
+            setErrors({});
+        }
+    }, [syllabus, isOpen]);
+
+    const set = (field, value) =>
+        setForm((prev) => ({ ...prev, [field]: value }));
+
+    const setUnit = (index, field, value) => {
+        setForm((prev) => ({
+            ...prev,
+            units: prev.units.map((unit, i) =>
+                i === index ? { ...unit, [field]: value } : unit,
+            ),
+        }));
+        if (errors.units?.[index]?.[field])
+            setErrors((prev) => ({
+                ...prev,
+                units: prev.units.map((unit, i) =>
+                    i === index ? { ...unit, [field]: '' } : unit,
+                ),
+            }));
+    };
+
+    const addUnit = () =>
+        setForm((prev) => ({
+            ...prev,
+            units: [
+                ...prev.units,
+                {
+                    unitNumber:
+                        Math.max(
+                            0,
+                            ...prev.units.map((u) => Number(u.unitNumber) || 0),
+                        ) + 1,
+                    title: '',
+                    content: '',
+                    _key: newKey(),
+                },
+            ],
+        }));
+
+    const removeUnit = (index) => {
+        setForm((prev) => ({
+            ...prev,
+            units: prev.units.filter((_, i) => i !== index),
+        }));
+        setErrors((prev) => ({
+            ...prev,
+            units: prev.units?.filter((_, i) => i !== index),
+        }));
+    };
+
+    const validate = () => {
+        const unitErrors = form.units.map((unit) => ({
+            unitNumber:
+                Number(unit.unitNumber) > 0 ? '' : 'Enter a unit number',
+            title: String(unit.title || '').trim() ? '' : 'Enter a title',
+            content: String(unit.content || '').trim()
+                ? ''
+                : 'List the topics this unit covers',
+        }));
+        const hasUnitErrors = unitErrors.some(
+            (u) => u.unitNumber || u.title || u.content,
+        );
+        setErrors({ units: unitErrors });
+        return !hasUnitErrors;
+    };
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        if (!validate()) {
+            toast.error('Check the highlighted units');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const updateData = {
+                year: Number(form.year),
+                semester: Number(form.semester),
+                units: form.units.map((unit) => {
+                    const clean = {
+                        ...unit,
+                        unitNumber: Number(unit.unitNumber),
+                        title: unit.title.trim(),
+                        content: unit.content.trim(),
+                    };
+                    delete clean._key;
+                    return clean;
+                }),
+                referenceBooks: form.referenceBooks,
+                description: form.description,
+                isActive: form.isActive,
+            };
+            const response = await api.put(
+                `/syllabus/edit/${syllabus._id}`,
+                updateData,
+            );
+            toast.success('Syllabus saved');
+            onUpdate?.(updateData, response.data?.data);
+            onClose();
+        } catch (err) {
+            toast.error(
+                err.response?.data?.message ||
+                    'Couldn’t save the syllabus. Try again.',
+            );
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const subject = syllabus?.subject;
 
     return (
-        <div className='fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto z-50'>
-            <div className='flex items-center justify-center min-h-screen p-4'>
-                <div className='fixed inset-0' onClick={onClose}></div>
-
-                <div className='relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl'>
-                    {/* Header */}
-                    <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
-                        <div>
-                            <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                Edit Syllabus
-                            </h2>
-                            <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                {formData.subjectCode} - {formData.subjectName}
-                            </p>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className='p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded'
-                            disabled={submitting}
-                        >
-                            <X className='h-5 w-5' />
-                        </button>
-                    </div>
-
-                    <form onSubmit={onSubmit}>
-                        <div className='p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto'>
-                            {/* Status */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Status
-                                </label>
-                                <select
-                                    value={formData.isActive}
-                                    onChange={(e) =>
-                                        onFormChange(
-                                            'isActive',
-                                            e.target.value === 'true',
-                                        )
-                                    }
-                                    className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                >
-                                    <option value='true'>Active</option>
-                                    <option value='false'>Inactive</option>
-                                </select>
-                            </div>
-
-                            {/* Subject Code (Read-only) */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Subject Code
-                                </label>
-                                <input
-                                    type='text'
-                                    value={formData.subjectCode}
-                                    readOnly
-                                    className='w-full px-3 py-2 border rounded-lg bg-gray-100 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                />
-                            </div>
-
-                            {/* Subject Name (Read-only) */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Subject Name
-                                </label>
-                                <input
-                                    type='text'
-                                    value={formData.subjectName}
-                                    readOnly
-                                    className='w-full px-3 py-2 border rounded-lg bg-gray-100 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                />
-                            </div>
-
-                            {/* Year and Semester */}
-                            <div className='grid grid-cols-2 gap-4'>
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Year
-                                    </label>
-                                    <select
-                                        value={formData.year}
-                                        onChange={(e) =>
-                                            onFormChange(
-                                                'year',
-                                                parseInt(e.target.value),
-                                            )
-                                        }
-                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                    >
-                                        {[1, 2, 3, 4, 5, 6].map((y) => (
-                                            <option key={y} value={y}>
-                                                Year {y}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                        Semester
-                                    </label>
-                                    <select
-                                        value={formData.semester}
-                                        onChange={(e) =>
-                                            onFormChange(
-                                                'semester',
-                                                parseInt(e.target.value),
-                                            )
-                                        }
-                                        className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white border-gray-300 dark:border-gray-600'
-                                    >
-                                        {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-                                            <option key={s} value={s}>
-                                                Semester {s}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Description */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Description
-                                </label>
-                                <textarea
-                                    value={formData.description}
-                                    onChange={(e) =>
-                                        onFormChange(
-                                            'description',
-                                            e.target.value,
-                                        )
-                                    }
-                                    className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none border-gray-300 dark:border-gray-600'
-                                    placeholder='Course description'
-                                    rows='3'
-                                />
-                            </div>
-
-                            {/* Units */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Course Units (JSON Format)
-                                </label>
-                                <textarea
-                                    value={
-                                        typeof formData.units === 'string'
-                                            ? formData.units
-                                            : JSON.stringify(
-                                                  formData.units,
-                                                  null,
-                                                  2,
-                                              )
-                                    }
-                                    onChange={(e) =>
-                                        onFormChange('units', e.target.value)
-                                    }
-                                    className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white font-mono text-sm resize-none border-gray-300 dark:border-gray-600'
-                                    placeholder='[{"unitNumber": 1, "title": "...", "content": "..."}]'
-                                    rows='8'
-                                />
-                                <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
-                                    Enter units as a JSON array. Each unit
-                                    should have: unitNumber, title, and content.
-                                </p>
-                            </div>
-
-                            {/* Reference Books */}
-                            <div>
-                                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                                    Reference Books
-                                </label>
-                                <textarea
-                                    value={formData.referenceBooks}
-                                    onChange={(e) =>
-                                        onFormChange(
-                                            'referenceBooks',
-                                            e.target.value,
-                                        )
-                                    }
-                                    className='w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none border-gray-300 dark:border-gray-600'
-                                    placeholder='Enter reference books (one per line)'
-                                    rows='3'
-                                />
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className='flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700'>
-                            <button
-                                type='button'
-                                onClick={onClose}
-                                disabled={submitting}
-                                className='px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg disabled:opacity-50'
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type='submit'
-                                disabled={submitting}
-                                className='px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 flex items-center gap-2'
-                            >
-                                {submitting ? (
-                                    <>
-                                        <Loader className='h-4 w-4 animate-spin' />
-                                        Updating...
-                                    </>
-                                ) : (
-                                    'Update Syllabus'
-                                )}
-                            </button>
-                        </div>
-                    </form>
+        <Dialog
+            open={isOpen}
+            onClose={onClose}
+            busy={submitting}
+            size='lg'
+            title='Edit syllabus'
+            description={[subject?.subjectCode, subject?.subjectName]
+                .filter(Boolean)
+                .join(' · ')}
+            footer={
+                <>
+                    <Button onClick={onClose} disabled={submitting}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type='submit'
+                        form='syllabus-edit-form'
+                        variant='primary'
+                        disabled={submitting}
+                        icon={submitting ? Loader2 : undefined}
+                        className={submitting ? '[&>svg]:animate-spin' : ''}
+                    >
+                        {submitting ? 'Saving…' : 'Save changes'}
+                    </Button>
+                </>
+            }
+        >
+            <form
+                id='syllabus-edit-form'
+                onSubmit={handleSubmit}
+                noValidate
+                className='flex flex-col gap-5'
+            >
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                    <Field label='Year' required>
+                        <Select
+                            value={String(form.year)}
+                            onChange={(e) =>
+                                set('year', Number(e.target.value))
+                            }
+                            options={YEARS}
+                        />
+                    </Field>
+                    <Field label='Semester' required>
+                        <Select
+                            value={String(form.semester)}
+                            onChange={(e) =>
+                                set('semester', Number(e.target.value))
+                            }
+                            options={SEMESTERS}
+                        />
+                    </Field>
                 </div>
-            </div>
-        </div>
+
+                <Switch
+                    checked={form.isActive}
+                    onChange={(on) => set('isActive', on)}
+                    label='Show to students'
+                    description='Turn off to hide this syllabus without deleting it.'
+                    className='p-3 rounded-lg border border-line'
+                />
+
+                <Field label='About this subject'>
+                    <Textarea
+                        value={form.description}
+                        onChange={(e) => set('description', e.target.value)}
+                        rows={3}
+                        placeholder='What the subject covers, in two or three sentences'
+                    />
+                </Field>
+
+                <fieldset className='flex flex-col gap-3'>
+                    <legend className='text-[13px] font-medium text-ink mb-3'>
+                        Units
+                    </legend>
+                    {form.units.length === 0 && (
+                        <p className='text-[13px] text-muted'>
+                            No units yet. Students see an empty syllabus until
+                            you add one.
+                        </p>
+                    )}
+                    {form.units.map((unit, index) => {
+                        const unitErrors = errors.units?.[index] || {};
+                        return (
+                            <div
+                                key={unit._key}
+                                className='flex flex-col gap-3 p-4 rounded-lg border border-line bg-sunken'
+                            >
+                                <div className='flex items-start gap-3'>
+                                    <Field
+                                        label='Unit'
+                                        required
+                                        error={unitErrors.unitNumber}
+                                        className='w-20 shrink-0'
+                                    >
+                                        <Input
+                                            type='number'
+                                            min='1'
+                                            value={unit.unitNumber}
+                                            onChange={(e) =>
+                                                setUnit(
+                                                    index,
+                                                    'unitNumber',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className='font-mono'
+                                        />
+                                    </Field>
+                                    <Field
+                                        label='Title'
+                                        required
+                                        error={unitErrors.title}
+                                        className='flex-1 min-w-0'
+                                    >
+                                        <Input
+                                            value={unit.title}
+                                            onChange={(e) =>
+                                                setUnit(
+                                                    index,
+                                                    'title',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder='Stacks and queues'
+                                        />
+                                    </Field>
+                                    <Button
+                                        variant='ghost'
+                                        size='sm'
+                                        iconOnly
+                                        icon={Trash2}
+                                        aria-label={`Remove unit ${unit.unitNumber || index + 1}`}
+                                        className='mt-[26px] text-bad-ink hover:text-bad-ink'
+                                        onClick={() => removeUnit(index)}
+                                    />
+                                </div>
+                                <Field
+                                    label='Topics'
+                                    required
+                                    error={unitErrors.content}
+                                >
+                                    <Textarea
+                                        value={unit.content}
+                                        onChange={(e) =>
+                                            setUnit(
+                                                index,
+                                                'content',
+                                                e.target.value,
+                                            )
+                                        }
+                                        rows={3}
+                                        placeholder='Stack as an abstract data type, prefix and postfix expressions, queues…'
+                                    />
+                                </Field>
+                            </div>
+                        );
+                    })}
+                    <Button
+                        icon={Plus}
+                        size='sm'
+                        className='self-start'
+                        onClick={addUnit}
+                    >
+                        Add unit
+                    </Button>
+                </fieldset>
+
+                <Field label='Reference books' hint='One book per line.'>
+                    <Textarea
+                        value={form.referenceBooks}
+                        onChange={(e) => set('referenceBooks', e.target.value)}
+                        rows={3}
+                        placeholder='Horowitz and Sahni — Fundamentals of Data Structures, Galgotia'
+                    />
+                </Field>
+            </form>
+        </Dialog>
     );
 };
 

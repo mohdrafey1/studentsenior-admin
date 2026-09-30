@@ -9,3 +9,5 @@ export { default as AnalyticsInsights } from './AnalyticsInsights';
 export { default as ChatbotAnalytics } from './ChatbotAnalytics';
 export { default as StatCard } from './StatCard';
 export { default as ContentCard } from './ContentCard';
+export { default as SubmissionsChart } from './SubmissionsChart';
+export { default as ChartTooltip } from './ChartTooltip';

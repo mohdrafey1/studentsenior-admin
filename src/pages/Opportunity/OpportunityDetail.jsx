@@ -1,432 +1,361 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import api from '../../utils/api';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
-    ArrowLeft,
-    Loader,
-    Edit2,
-    Trash2,
-    Mail,
-    Phone,
-    ExternalLink,
-    AlertTriangle,
     Briefcase,
-    Calendar,
-    User,
-    CheckCircle,
-    XCircle,
-    Clock,
+    ExternalLink,
+    Mail,
+    MessageSquare,
+    Pencil,
+    Trash2,
 } from 'lucide-react';
+import api from '../../utils/api';
+import { formatDateTime, formatNumber } from '../../utils/format';
+import { relativeTime } from '../../utils/relativeTime';
+import ApprovalActions from '../../components/ApprovalActions';
 import ConfirmModal from '../../components/ConfirmModal';
 import OpportunityEditModal from '../../components/OpportunityEditModal';
-import ApprovalActions from '../../components/ApprovalActions';
+import Loader from '../../components/Common/Loader';
+import {
+    Button,
+    EmptyState,
+    MetaList,
+    PageHeader,
+    Panel,
+    StatusBadge,
+} from '../../components/ui';
+
+// The model stores `clickCount`; older records may still use `clickCounts`.
+const viewsOf = (o) => o.clickCount ?? o.clickCounts ?? 0;
+
+const maskPhone = (phone = '') =>
+    phone.length > 4 ? `•••••• ${phone.slice(-4)}` : phone;
+
+const daysSince = (date) =>
+    Math.max(1, Math.ceil((Date.now() - new Date(date)) / 864e5));
 
 const OpportunityDetail = () => {
+    const { collegeslug, opportunityid } = useParams();
+    const navigate = useNavigate();
     const [opportunity, setOpportunity] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [showModal, setShowModal] = useState(false);
-    const [showRawData, setShowRawData] = useState(false);
-    const { collegeslug, opportunityid } = useParams();
-    const navigate = useNavigate();
+    const [notFound, setNotFound] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [showRaw, setShowRaw] = useState(false);
+    const [showPhone, setShowPhone] = useState(false);
 
-    // Confirmation modal state
-    const [confirmModal, setConfirmModal] = useState({
-        isOpen: false,
-        title: '',
-        message: '',
-        onConfirm: null,
-        variant: 'danger',
-    });
-
-    const showConfirm = (config) => {
-        return new Promise((resolve) => {
-            setConfirmModal({
-                isOpen: true,
-                title: config.title || 'Confirm Action',
-                message: config.message,
-                variant: config.variant || 'danger',
-                onConfirm: () => {
-                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-                    resolve(true);
-                },
-            });
-        });
-    };
-
-    const handleCloseConfirm = () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+    const fetchOpportunity = async () => {
+        try {
+            setError(null);
+            const response = await api.get(`/opportunity/${opportunityid}`);
+            setOpportunity(response.data.data);
+        } catch (e) {
+            setNotFound(e.response?.status === 404);
+            setError(
+                e.response?.status === 404
+                    ? 'This opportunity doesn’t exist or was deleted.'
+                    : 'Couldn’t load this opportunity. Check your connection and try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
         fetchOpportunity();
     }, [opportunityid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const fetchOpportunity = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get(`/opportunity/${opportunityid}`);
-            setOpportunity(response.data.data);
-            setError(null);
-        } catch (error) {
-            console.error('Error fetching opportunity:', error);
-            setError('Failed to fetch opportunity details');
-            toast.error('Failed to fetch opportunity details');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleEdit = () => {
-        setShowModal(true);
-    };
-
     const handleDelete = async () => {
-        const confirmed = await showConfirm({
-            title: 'Delete Opportunity',
-            message: `Are you sure you want to delete "${opportunity.name}"? This action cannot be undone.`,
-            variant: 'danger',
-        });
-
-        if (confirmed) {
-            try {
-                await api.delete(`/opportunity/delete/${opportunity._id}`);
-                toast.success('Opportunity deleted successfully');
-                navigate(`/${collegeslug}/opportunities`);
-            } catch (error) {
-                console.error('Error deleting opportunity:', error);
-                toast.error('Failed to delete opportunity');
-            }
+        try {
+            await api.delete(`/opportunity/delete/${opportunity._id}`);
+            toast.success('Opportunity deleted');
+            navigate(`/${collegeslug}/opportunities`);
+        } catch (e) {
+            toast.error(
+                e.response?.data?.message || 'Couldn’t delete the opportunity',
+            );
         }
     };
 
-    const handleModalClose = () => {
-        setShowModal(false);
-    };
-
-    const handleModalSuccess = () => {
-        fetchOpportunity();
-        handleModalClose();
-    };
-
-    const getStatusBadge = (status) => {
-        switch (status) {
-            case 'approved':
-                return (
-                    <span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'>
-                        <CheckCircle className='h-4 w-4' />
-                        Approved
-                    </span>
-                );
-            case 'rejected':
-                return (
-                    <span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'>
-                        <XCircle className='h-4 w-4' />
-                        Rejected
-                    </span>
-                );
-            default:
-                return (
-                    <span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800'>
-                        <Clock className='h-4 w-4' />
-                        Pending
-                    </span>
-                );
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div className='flex items-center justify-center min-h-[60vh]'>
-                    <Loader className='h-8 w-8 animate-spin text-blue-600' />
-                </div>
-            </div>
-        );
-    }
+    if (loading) return <Loader />;
 
     if (error || !opportunity) {
         return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-                    <button
-                        onClick={() => navigate(-1)}
-                        className='flex items-center text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 mb-8 transition-colors'
-                    >
-                        <ArrowLeft className='h-4 w-4 mr-2' />
-                        Back to Opportunities
-                    </button>
-                    <div className='text-center py-12'>
-                        <div className='w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4'>
-                            <AlertTriangle className='h-8 w-8 text-red-600 dark:text-red-400' />
-                        </div>
-                        <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2'>
-                            Opportunity Not Found
-                        </h3>
-                        <p className='text-gray-500 dark:text-gray-400'>
-                            {error ||
-                                'The requested opportunity could not be found.'}
-                        </p>
-                    </div>
+            <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+                <div className='bg-sheet border border-line rounded-xl'>
+                    <EmptyState
+                        icon={Briefcase}
+                        tone='error'
+                        title='Opportunity not found'
+                        description={error}
+                        action={
+                            <div className='flex flex-wrap justify-center gap-2'>
+                                {!notFound && (
+                                    <Button onClick={fetchOpportunity}>
+                                        Try again
+                                    </Button>
+                                )}
+                                <Button to={`/${collegeslug}/opportunities`}>
+                                    Back to opportunities
+                                </Button>
+                            </div>
+                        }
+                    />
                 </div>
             </div>
         );
     }
 
+    const o = opportunity;
+    const views = viewsOf(o);
+    const status = o.submissionStatus || 'pending';
+    const owner = o.owner?._id ? (
+        <Link
+            to={`/users/${o.owner._id}`}
+            className='font-medium text-link hover:underline'
+        >
+            @{o.owner.username || 'student'}
+        </Link>
+    ) : (
+        <span className='font-medium'>@{o.owner?.username || 'unknown'}</span>
+    );
+
+    const applyRows = [
+        o.link && {
+            key: 'link',
+            icon: ExternalLink,
+            label: 'Online form',
+            value: o.link,
+            action: (
+                <a
+                    href={o.link}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='text-[13px] font-medium text-link hover:underline whitespace-nowrap'
+                >
+                    Open form
+                </a>
+            ),
+        },
+        o.email && {
+            key: 'email',
+            icon: Mail,
+            label: 'Email',
+            value: o.email,
+            action: (
+                <a
+                    href={`mailto:${o.email}`}
+                    className='text-[13px] font-medium text-link hover:underline whitespace-nowrap'
+                >
+                    Send email
+                </a>
+            ),
+        },
+        o.whatsapp && {
+            key: 'whatsapp',
+            icon: MessageSquare,
+            label: 'WhatsApp',
+            value: showPhone ? o.whatsapp : maskPhone(o.whatsapp),
+            action: (
+                <button
+                    type='button'
+                    aria-pressed={showPhone}
+                    onClick={() => setShowPhone((v) => !v)}
+                    className='text-[13px] font-medium text-link hover:underline cursor-pointer'
+                >
+                    {showPhone ? 'Hide' : 'Show'}
+                </button>
+            ),
+        },
+    ].filter(Boolean);
+
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans'>
-            <Header />
-            <Sidebar />
-            <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-                {/* Top Navigation & Actions */}
-                <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8'>
-                    <div className='flex items-center gap-4'>
-                        <button
-                            onClick={() => navigate(-1)}
-                            className='p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors'
-                        >
-                            <ArrowLeft className='h-5 w-5' />
-                        </button>
-                        <div>
-                            <h1 className='text-2xl font-bold flex items-center gap-3'>
-                                {opportunity.name}
-                                {getStatusBadge(opportunity.submissionStatus)}
-                            </h1>
-                            <p className='text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2'>
-                                <span className='font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded'>
-                                    ID: {opportunity._id}
-                                </span>
-                                <span>•</span>
-                                <span>
-                                    Posted{' '}
-                                    {new Date(
-                                        opportunity.createdAt,
-                                    ).toLocaleDateString()}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
-                    <div className='flex items-center gap-2'>
-                        <button
-                            onClick={handleEdit}
-                            className='flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium'
-                        >
-                            <Edit2 className='h-4 w-4' />
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                eyebrow='Opportunity'
+                badge={
+                    <>
+                        <StatusBadge status={status} />
+                        {o.deleted && (
+                            <StatusBadge tone='outline'>Deleted</StatusBadge>
+                        )}
+                        {status === 'approved' && !o.deleted && (
+                            <span className='text-[13px] text-muted'>
+                                Live for students
+                            </span>
+                        )}
+                    </>
+                }
+                title={o.name || 'Untitled opportunity'}
+                meta={
+                    <p className='flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-2'>
+                        <span>
+                            Posted by {owner} {relativeTime(o.createdAt)}
+                        </span>
+                        <span aria-hidden='true' className='text-faint'>
+                            ·
+                        </span>
+                        <span>
+                            {formatNumber(views)} view{views === 1 ? '' : 's'}
+                        </span>
+                    </p>
+                }
+                actions={
+                    <>
+                        <Button icon={Pencil} onClick={() => setEditing(true)}>
                             Edit
-                        </button>
+                        </Button>
+                        <Button
+                            variant='danger'
+                            iconOnly
+                            icon={Trash2}
+                            aria-label='Delete opportunity'
+                            onClick={() => setConfirmDelete(true)}
+                        />
+                    </>
+                }
+            />
+
+            <div className='grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start'>
+                <div className='flex flex-col gap-5 min-w-0'>
+                    <Panel
+                        title='Description'
+                        titleId='desc-title'
+                        bodyClassName='px-5 py-4'
+                    >
+                        {o.description ? (
+                            <p className='text-sm leading-relaxed text-ink-2 whitespace-pre-wrap break-words'>
+                                {o.description}
+                            </p>
+                        ) : (
+                            <p className='text-sm text-muted'>
+                                The poster didn’t add a description.
+                            </p>
+                        )}
+                    </Panel>
+
+                    <Panel title='How students apply' titleId='apply-title'>
+                        {applyRows.length ? (
+                            <ul>
+                                {applyRows.map((row) => {
+                                    const Icon = row.icon;
+                                    return (
+                                        <li
+                                            key={row.key}
+                                            className='grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[120px_minmax(0,1fr)_auto] gap-x-3.5 gap-y-1 items-center px-5 py-3 border-b border-line-soft last:border-b-0 text-[13.5px]'
+                                        >
+                                            <span className='inline-flex items-center gap-2 text-ink-2'>
+                                                <Icon
+                                                    className='w-[15px] h-[15px] text-muted'
+                                                    aria-hidden='true'
+                                                />
+                                                {row.label}
+                                            </span>
+                                            <code className='order-3 sm:order-none col-span-2 sm:col-span-1 font-mono text-[12.5px] text-ink truncate'>
+                                                {row.value}
+                                            </code>
+                                            {row.action}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        ) : (
+                            <p className='px-5 py-4 text-sm text-muted'>
+                                No link, email or WhatsApp number given, so
+                                students have no way to apply.
+                            </p>
+                        )}
+                    </Panel>
+                </div>
+
+                <div className='flex flex-col gap-4'>
+                    <ApprovalActions
+                        variant='panel'
+                        resourceType='Opportunity'
+                        currentStatus={o.submissionStatus}
+                        rejectionReason={o.rejectionReason}
+                        apiEndpoint={`/opportunity/edit/${o._id}`}
+                        onStatusChange={fetchOpportunity}
+                        approveNote='Approving shows this opportunity to every student at the college.'
+                    />
+
+                    <Panel
+                        title='Reach'
+                        titleId='reach-title'
+                        bodyClassName='px-5 py-4'
+                    >
+                        <p className='flex items-baseline gap-2'>
+                            <span className='font-serif font-bold text-[28px] leading-none text-ink'>
+                                {formatNumber(views)}
+                            </span>
+                            <span className='text-[13px] text-muted'>
+                                view{views === 1 ? '' : 's'} in{' '}
+                                {formatNumber(daysSince(o.createdAt))} day
+                                {daysSince(o.createdAt) === 1 ? '' : 's'}
+                            </span>
+                        </p>
+                    </Panel>
+
+                    <Panel
+                        title='Details'
+                        titleId='details-title'
+                        bodyClassName='px-5 py-4 flex flex-col gap-3'
+                    >
+                        <MetaList
+                            items={[
+                                { label: 'Posted by', value: owner },
+                                { label: 'Slug', value: o.slug, mono: true },
+                                {
+                                    label: 'Created',
+                                    value: formatDateTime(o.createdAt),
+                                },
+                                {
+                                    label: 'Updated',
+                                    value: formatDateTime(
+                                        o.updatedAt || o.createdAt,
+                                    ),
+                                },
+                                { label: 'ID', value: o._id, mono: true },
+                            ]}
+                        />
                         <button
-                            onClick={handleDelete}
-                            className='flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium'
+                            type='button'
+                            aria-expanded={showRaw}
+                            onClick={() => setShowRaw((v) => !v)}
+                            className='self-start text-[13px] font-medium text-link hover:underline cursor-pointer'
                         >
-                            <Trash2 className='h-4 w-4' />
-                            Delete
+                            {showRaw ? 'Hide raw data' : 'Show raw data'}
                         </button>
-                    </div>
+                        {showRaw && (
+                            <pre className='max-h-80 overflow-auto p-3 rounded-lg bg-sunken font-mono text-[11.5px] leading-relaxed text-ink-2'>
+                                {JSON.stringify(o, null, 2)}
+                            </pre>
+                        )}
+                    </Panel>
                 </div>
-
-                <ApprovalActions
-                    resourceId={opportunity._id}
-                    resourceType='Opportunity'
-                    currentStatus={opportunity.submissionStatus}
-                    apiEndpoint={`/opportunity/edit/${opportunity._id}`}
-                    onStatusChange={fetchOpportunity}
-                />
-
-                <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
-                    {/* Left Column: Description */}
-                    <div className='lg:col-span-2 space-y-8'>
-                        {/* Status Alert - Only if rejected */}
-                        {opportunity.submissionStatus === 'rejected' &&
-                            opportunity.rejectionReason && (
-                                <div className='bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg'>
-                                    <div className='flex'>
-                                        <div className='flex-shrink-0'>
-                                            <AlertTriangle className='h-5 w-5 text-red-500' />
-                                        </div>
-                                        <div className='ml-3'>
-                                            <h3 className='text-sm font-medium text-red-800 dark:text-red-200'>
-                                                Submission Rejected
-                                            </h3>
-                                            <div className='mt-2 text-sm text-red-700 dark:text-red-300'>
-                                                <p>
-                                                    {
-                                                        opportunity.rejectionReason
-                                                    }
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                        {/* Description Card */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
-                            <h2 className='text-lg font-semibold mb-4'>
-                                Description
-                            </h2>
-                            <div className='prose prose-sm dark:prose-invert max-w-none text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed'>
-                                {opportunity.description ||
-                                    'No description provided.'}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Column: Metadata & Details */}
-                    <div className='space-y-8'>
-                        {/* Contact Card */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
-                            <h2 className='text-lg font-semibold mb-6 flex items-center gap-2'>
-                                <User className='h-5 w-5 text-gray-400' />
-                                Contact Info
-                            </h2>
-                            <dl className='space-y-4'>
-                                {opportunity.email && (
-                                    <div>
-                                        <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
-                                            Email
-                                        </dt>
-                                        <dd className='flex items-center gap-2 text-sm'>
-                                            <Mail className='h-4 w-4 text-gray-400' />
-                                            <a
-                                                href={`mailto:${opportunity.email}`}
-                                                className='text-blue-600 dark:text-blue-400 hover:underline'
-                                            >
-                                                {opportunity.email}
-                                            </a>
-                                        </dd>
-                                    </div>
-                                )}
-                                {opportunity.whatsapp && (
-                                    <div>
-                                        <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
-                                            WhatsApp
-                                        </dt>
-                                        <dd className='flex items-center gap-2 text-sm'>
-                                            <Phone className='h-4 w-4 text-green-500' />
-                                            {opportunity.whatsapp}
-                                        </dd>
-                                    </div>
-                                )}
-                                {opportunity.link && (
-                                    <div>
-                                        <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
-                                            Application Link
-                                        </dt>
-                                        <dd className='flex items-center gap-2 text-sm'>
-                                            <ExternalLink className='h-4 w-4 text-gray-400' />
-                                            <a
-                                                href={opportunity.link}
-                                                target='_blank'
-                                                rel='noopener noreferrer'
-                                                className='text-blue-600 dark:text-blue-400 hover:underline break-all'
-                                            >
-                                                Apply Online
-                                            </a>
-                                        </dd>
-                                    </div>
-                                )}
-                            </dl>
-                        </div>
-
-                        {/* Info Card */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6'>
-                            <h2 className='text-lg font-semibold mb-6 flex items-center gap-2'>
-                                <Briefcase className='h-5 w-5 text-gray-400' />
-                                Opportunity Details
-                            </h2>
-                            <dl className='space-y-4'>
-                                <div>
-                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
-                                        Posted By
-                                    </dt>
-                                    <dd className='flex items-center gap-2 text-sm'>
-                                        <div className='h-6 w-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400'>
-                                            <User className='h-3.5 w-3.5' />
-                                        </div>
-                                        {opportunity.owner?.username ||
-                                            'Unknown'}
-                                    </dd>
-                                </div>
-
-                                <div className='pt-4 border-t border-gray-100 dark:border-gray-700'>
-                                    <dt className='text-sm text-gray-500 dark:text-gray-400 font-medium mb-1'>
-                                        Timestamps
-                                    </dt>
-                                    <dd className='space-y-2 text-sm'>
-                                        <div className='flex justify-between'>
-                                            <span className='text-gray-500'>
-                                                Created
-                                            </span>
-                                            <span className='font-mono'>
-                                                {new Date(
-                                                    opportunity.createdAt,
-                                                ).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                        <div className='flex justify-between'>
-                                            <span className='text-gray-500'>
-                                                Updated
-                                            </span>
-                                            <span className='font-mono'>
-                                                {new Date(
-                                                    opportunity.updatedAt ||
-                                                        opportunity.createdAt,
-                                                ).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                    </dd>
-                                </div>
-                            </dl>
-                        </div>
-
-                        {/* Raw Data Toggle */}
-                        <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                            <button
-                                onClick={() => setShowRawData(!showRawData)}
-                                className='w-full flex items-center justify-between px-6 py-4 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors'
-                            >
-                                <span className='text-gray-900 dark:text-white'>
-                                    Raw Data
-                                </span>
-                                <span className='text-blue-600 dark:text-blue-400'>
-                                    {showRawData ? 'Hide' : 'Show'}
-                                </span>
-                            </button>
-                            {showRawData && (
-                                <div className='border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 overflow-x-auto'>
-                                    <pre className='text-xs font-mono text-gray-600 dark:text-gray-400'>
-                                        {JSON.stringify(opportunity, null, 2)}
-                                    </pre>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Modals */}
-                <ConfirmModal
-                    isOpen={confirmModal.isOpen}
-                    onClose={handleCloseConfirm}
-                    onConfirm={confirmModal.onConfirm}
-                    title={confirmModal.title}
-                    message={confirmModal.message}
-                    variant={confirmModal.variant}
-                />
-
-                <OpportunityEditModal
-                    isOpen={showModal}
-                    onClose={handleModalClose}
-                    opportunity={opportunity}
-                    onSuccess={handleModalSuccess}
-                />
             </div>
+
+            <OpportunityEditModal
+                isOpen={editing}
+                onClose={() => setEditing(false)}
+                opportunity={o}
+                onSuccess={() => {
+                    fetchOpportunity();
+                    setEditing(false);
+                }}
+            />
+
+            <ConfirmModal
+                isOpen={confirmDelete}
+                onClose={() => setConfirmDelete(false)}
+                onConfirm={handleDelete}
+                title='Delete this opportunity?'
+                message='Students stop seeing it straight away and the poster can’t get it back. This can’t be undone.'
+                confirmText='Delete'
+                variant='danger'
+            />
         </div>
     );
 };

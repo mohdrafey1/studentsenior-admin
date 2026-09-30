@@ -1,7 +1,11 @@
 import axios from 'axios';
 
-const configuredBase = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/+$/, '');
-const API_BASE_URL = configuredBase.endsWith('/dashboard') ? configuredBase : `${configuredBase}/dashboard`;
+const configuredBase = (
+    import.meta.env.VITE_API_URL || 'http://localhost:5001'
+).replace(/\/+$/, '');
+const API_BASE_URL = configuredBase.endsWith('/dashboard')
+    ? configuredBase
+    : `${configuredBase}/dashboard`;
 
 // Create axios instance
 const api = axios.create({

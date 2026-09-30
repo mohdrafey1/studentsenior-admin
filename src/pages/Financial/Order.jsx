@@ -1,34 +1,57 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
-import api from '../../utils/api';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FileText } from 'lucide-react';
+import { Download, ShoppingBag } from 'lucide-react';
+import api from '../../utils/api';
+import { downloadCsv } from '../../utils/csv';
+import { formatDateTime, formatNumber } from '../../utils/format';
 import Pagination from '../../components/Pagination';
-import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
 import FilterBar from '../../components/Common/FilterBar';
+import { getTimeFilterLabel } from '../../components/Common/timeFilterUtils';
 import {
-    getTimeFilterLabel,
-} from '../../components/Common/timeFilterUtils';
+    Alert,
+    Button,
+    EmptyState,
+    PageHeader,
+    Stat,
+    StatusBadge,
+    Table,
+    Tabs,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+import {
+    EXPORT_LIMIT,
+    ORDER_TYPE_LABELS,
+    PAYMENT_METHOD_LABELS,
+    fetchAllPages,
+    formatOrderAmount,
+    orderTypeLabel,
+    paymentMethodLabel,
+    shortId,
+} from './financeFormat';
+import { DateCell, PointsValue, RupeeValue, UserCell } from './financeParts';
 
-const statusClass = (status) => {
-    switch ((status || '').toLowerCase()) {
-        case 'pending':
-            return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-        case 'processing':
-            return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-        case 'completed':
-            return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-        case 'failed':
-            return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-        case 'cancelled':
-            return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-        default:
-            return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+const STATUS_TABS = [
+    ['', 'All'],
+    ['pending', 'Pending'],
+    ['processing', 'Processing'],
+    ['completed', 'Completed'],
+    ['failed', 'Failed'],
+    ['cancelled', 'Cancelled'],
+];
+
+/** What was bought: the PYQ or note title, or the top-up size. */
+const itemTitle = (o) => {
+    if (o.orderType === 'add_points') {
+        // Top-ups are paid in rupees and credit 5 pts per rupee.
+        return o.paymentMethod === 'points'
+            ? 'Wallet top-up'
+            : `Wallet top-up · ${formatNumber(Number(o.amount || 0) * 5)} pts`;
     }
+    return o.metadata?.resourceTitle || 'Untitled item';
 };
 
 export default function OrderPage() {
@@ -38,6 +61,8 @@ export default function OrderPage() {
     const [hasLoaded, setHasLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [refresh, setRefresh] = useState(0);
+    const [exporting, setExporting] = useState(false);
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState('');
     const [orderType, setOrderType] = useState('');
@@ -50,9 +75,19 @@ export default function OrderPage() {
     const [viewMode, setViewMode] = useState(() =>
         window.innerWidth >= 1024 ? 'table' : 'grid',
     );
-    const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
     const location = useLocation();
+
+    const listParams = () => ({
+        search,
+        status,
+        orderType,
+        paymentMethod,
+        timeFilter,
+        sortBy,
+        sortOrder,
+        timezoneOffset: new Date().getTimezoneOffset(),
+    });
 
     useEffect(() => {
         const controller = new AbortController();
@@ -61,26 +96,50 @@ export default function OrderPage() {
             setError(null);
             try {
                 const response = await api.get('/order', {
-                    params: { page, pageSize, search, status, orderType, paymentMethod, timeFilter, sortBy, sortOrder, timezoneOffset: new Date().getTimezoneOffset() },
+                    params: { page, pageSize, ...listParams() },
                     signal: controller.signal,
                 });
                 const result = response.data?.data;
-                if (!Array.isArray(result?.items) || !result.pagination) throw new Error('Invalid list response');
+                if (!Array.isArray(result?.items) || !result.pagination)
+                    throw new Error('Invalid list response');
                 setItems(result.items);
                 setTotalItems(result.pagination.total);
                 setTotals(result.totals);
-                if (result.pagination.totalPages > 0 && page > result.pagination.totalPages) setPage(result.pagination.totalPages);
+                if (
+                    result.pagination.totalPages > 0 &&
+                    page > result.pagination.totalPages
+                )
+                    setPage(result.pagination.totalPages);
             } catch (failure) {
                 if (controller.signal.aborted) return;
-                const message = failure.response?.data?.message || 'Could not load records. Please retry.';
-                setError(message);
-                toast.error(message);
+                setError(
+                    failure.response?.data?.message ||
+                        'Couldn’t load orders. Check your connection and try again.',
+                );
             } finally {
-                if (!controller.signal.aborted) { setLoading(false); setHasLoaded(true); }
+                if (!controller.signal.aborted) {
+                    setLoading(false);
+                    setHasLoaded(true);
+                }
             }
         }, 250);
-        return () => { clearTimeout(timer); controller.abort(); };
-    }, [page, pageSize, search, status, orderType, paymentMethod, timeFilter, sortBy, sortOrder]);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        page,
+        pageSize,
+        search,
+        status,
+        orderType,
+        paymentMethod,
+        timeFilter,
+        sortBy,
+        sortOrder,
+        refresh,
+    ]);
 
     // Read URL params on mount
     useEffect(() => {
@@ -142,339 +201,419 @@ export default function OrderPage() {
         navigate,
     ]);
 
-    // Responsive view mode - auto switch on resize
-    useEffect(() => {
-        const handleResize = () => {
-            setViewMode(window.innerWidth >= 1024 ? 'table' : 'grid');
-        };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    const hasFilters = Boolean(
+        search ||
+            orderType ||
+            paymentMethod ||
+            (timeFilter && timeFilter !== 'all'),
+    );
+    const clearFilters = () => {
+        setSearch('');
+        setOrderType('');
+        setPaymentMethod('');
+        setTimeFilter('all');
+        setPage(1);
+    };
 
-    const uniqueOrderTypes = ['pyq_purchase', 'note_purchase', 'add_points'];
-    const uniquePaymentMethods = ['points', 'online', 'iap'];
-    const uniqueStatuses = ['pending', 'processing', 'completed', 'failed', 'cancelled'];
-    const current = items;
-
-    // total pages handled inside Pagination component
+    const exportCsv = async () => {
+        setExporting(true);
+        try {
+            const { rows, total } = await fetchAllPages('/order', listParams());
+            downloadCsv(
+                'orders',
+                [
+                    {
+                        label: 'Created',
+                        value: (o) => formatDateTime(o.createdAt),
+                    },
+                    { label: 'Order ID', value: (o) => o._id },
+                    { label: 'Username', value: (o) => o.user?.username },
+                    { label: 'Email', value: (o) => o.user?.email },
+                    { label: 'Type', value: (o) => o.orderType },
+                    { label: 'Item', value: (o) => o.metadata?.resourceTitle },
+                    { label: 'Paid with', value: (o) => o.paymentMethod },
+                    {
+                        label: 'Amount (rupees)',
+                        value: (o) =>
+                            o.paymentMethod === 'points' ? '' : o.amount,
+                    },
+                    {
+                        label: 'Amount (points)',
+                        value: (o) =>
+                            o.paymentMethod === 'points' ? o.amount : '',
+                    },
+                    { label: 'Status', value: (o) => o.status },
+                    { label: 'Failure reason', value: (o) => o.failureReason },
+                    { label: 'Payment ID', value: (o) => o.paymentId },
+                ],
+                rows,
+            );
+            toast.success(
+                total > EXPORT_LIMIT
+                    ? `Exported the first ${formatNumber(EXPORT_LIMIT)} of ${formatNumber(total)} orders`
+                    : `Exported ${formatNumber(rows.length)} orders`,
+            );
+        } catch (failure) {
+            toast.error(
+                failure.response?.data?.message ||
+                    'Couldn’t export orders. Try again.',
+            );
+        } finally {
+            setExporting(false);
+        }
+    };
 
     if (loading && !hasLoaded) {
         return <Loader />;
     }
 
-    return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
-            <main
-                className={`py-4 ${mainContentMargin} transition-all duration-300`}
+    const timeLabel = getTimeFilterLabel(timeFilter).toLowerCase();
+    const statusLabel = STATUS_TABS.find(([v]) => v === status)?.[1] || 'All';
+    const scope = `${statusLabel === 'All' ? 'All statuses' : statusLabel} · ${timeLabel}`;
+    const paymentLink = (o) =>
+        o.paymentId ? `/reports/payments/${o.paymentId}` : null;
+
+    const pagination = (
+        <Pagination
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+            }}
+        />
+    );
+
+    const empty = (
+        <EmptyState
+            icon={ShoppingBag}
+            title={hasFilters || status ? 'No orders match' : 'No orders yet'}
+            description={
+                hasFilters || status
+                    ? 'Try another search, status or date range.'
+                    : 'PYQ and note unlocks and wallet top-ups appear here.'
+            }
+            action={
+                hasFilters ? (
+                    <Button onClick={clearFilters}>Clear filters</Button>
+                ) : undefined
+            }
+        />
+    );
+
+    const orderIdCell = (o) =>
+        paymentLink(o) ? (
+            <Link
+                to={paymentLink(o)}
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`Open the payment for order ${o._id}`}
+                title={o._id}
+                className='font-mono text-xs text-link hover:underline'
             >
-                <div className='max-w-7xl mx-auto px-4 sm:px-6'>
-                    {/* Compact Header */}
-                    <BackButton title='Orders' TitleIcon={FileText} />
+                {shortId(o._id)}
+            </Link>
+        ) : (
+            <code title={o._id} className='font-mono text-xs text-ink-2'>
+                {shortId(o._id)}
+            </code>
+        );
 
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
-                        {/* Total Amount - Compact */}
-                        {timeFilter && (
-                            <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
-                                <span className='text-gray-600 dark:text-gray-400'>
-                                    Total ({getTimeFilterLabel(timeFilter)}
-                                    ):
-                                </span>
-                                <span className='font-semibold text-gray-900 dark:text-white'>
-                                    ₹{totals.rupees.toLocaleString()} · {totals.points.toLocaleString()} pts
-                                </span>
-                            </div>
-                        )}
-                        <FilterBar
-                            search={search}
-                            onSearch={(value) => { setSearch(value); setPage(1); }}
-                            filters={[
-                                {
-                                    label: 'Order Type',
-                                    value: orderType,
-                                    onChange: setOrderType,
-                                    options: [
-                                        { value: '', label: 'All Types' },
-                                        ...uniqueOrderTypes.map((t) => ({
-                                            value: t,
-                                            label: t?.replace('_', ' '),
-                                        })),
-                                    ],
-                                },
-                                {
-                                    label: 'Status',
-                                    value: status,
-                                    onChange: setStatus,
-                                    options: [
-                                        { value: '', label: 'All Status' },
-                                        ...uniqueStatuses.map((s) => ({
-                                            value: s,
-                                            label: s,
-                                        })),
-                                    ],
-                                },
-                                {
-                                    label: 'Payment Method',
-                                    value: paymentMethod,
-                                    onChange: setPaymentMethod,
-                                    options: [
-                                        { value: '', label: 'All Methods' },
-                                        ...uniquePaymentMethods.map((m) => ({
-                                            value: m,
-                                            label: m,
-                                        })),
-                                    ],
-                                },
-                            ]}
-                            timeFilter={{
-                                value: timeFilter,
-                                onChange: (v) => {
-                                    setTimeFilter(v);
-                                    setPage(1);
-                                },
-                            }}
-                            sortBy={{
-                                value: sortBy,
-                                onChange: setSortBy,
-                                options: [
-                                    {
-                                        value: 'createdAt',
-                                        label: 'Sort by Date',
-                                    },
-                                    {
-                                        value: 'amount',
-                                        label: 'Sort by Amount',
-                                    },
-                                ],
-                            }}
-                            sortOrder={{
-                                value: sortOrder,
-                                onToggle: () =>
-                                    setSortOrder(
-                                        sortOrder === 'asc' ? 'desc' : 'asc',
-                                    ),
-                            }}
-                            viewMode={{
-                                value: viewMode,
-                                onChange: setViewMode,
-                            }}
-                            onClear={() => {
-                                setSearch('');
-                                setStatus('');
-                                setOrderType('');
-                                setPaymentMethod('');
-                                setTimeFilter('all');
-                                setPage(1);
-                            }}
-                            showClear={
-                                !!(
-                                    search ||
-                                    status ||
-                                    orderType ||
-                                    paymentMethod ||
-                                    (timeFilter && timeFilter !== 'all')
-                                )
-                            }
-                        />
-                    </div>
+    const statusCell = (o) => (
+        <div className='flex flex-col items-start gap-1'>
+            <StatusBadge status={o.status} />
+            {o.failureReason && (
+                <span className='text-xs text-muted max-w-[200px] line-clamp-2'>
+                    {o.failureReason}
+                </span>
+            )}
+        </div>
+    );
 
-                    {loading && <p role='status' className='text-sm text-gray-500 mb-2'>Updating records…</p>}
+    return (
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Orders'
+                description='Every purchase attempt: PYQ and note unlocks, and wallet top-ups.'
+                actions={
+                    <Button
+                        icon={Download}
+                        onClick={exportCsv}
+                        disabled={!totalItems || exporting}
+                    >
+                        {exporting ? 'Exporting…' : 'Export CSV'}
+                    </Button>
+                }
+            />
 
-                    {/* Error */}
-                    {error && (
-                        <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded text-sm mb-3'>
-                            {error}
-                        </div>
-                    )}
+            <div className='grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6'>
+                <Stat
+                    label='Paid in rupees'
+                    value={<RupeeValue amount={totals?.rupees} />}
+                    note={`Online and in-app · ${scope}`}
+                />
+                <Stat
+                    label='Paid in points'
+                    value={<PointsValue points={totals?.points} />}
+                    note={`From wallets · ${scope}`}
+                />
+                <Stat
+                    className='col-span-2 lg:col-span-1'
+                    label='Orders'
+                    value={formatNumber(totalItems)}
+                    note={
+                        orderType
+                            ? orderTypeLabel(orderType)
+                            : 'Unlocks and top-ups'
+                    }
+                />
+            </div>
 
-                    {/* Grid/Table Views */}
-                    {current.length > 0 ? (
-                        <>
-                            {/* Compact Grid View */}
-                            {viewMode === 'grid' && (
-                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mb-3'>
-                                    {current.map((o) => {
-                                        const amountLabel =
-                                            o.paymentMethod !== 'points'
-                                                ? `₹ ${o.amount}`
-                                                : `${o.amount} pts`;
-                                        return (
-                                            <div
-                                                key={o._id}
-                                                className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 hover:border-gray-300 dark:hover:border-gray-600 transition-colors'
-                                            >
-                                                <div className='flex justify-between items-start mb-2'>
-                                                    <span
-                                                        className={`px-1.5 py-0.5 text-xs rounded ${statusClass(o.status)}`}
-                                                    >
-                                                        {o.status}
-                                                    </span>
-                                                    <span className='text-xs text-gray-500 dark:text-gray-400 capitalize'>
-                                                        {o.orderType?.replace(
-                                                            '_',
-                                                            ' ',
+            <Tabs
+                label='Order status'
+                className='mb-4'
+                value={status}
+                onChange={(value) => {
+                    setStatus(value);
+                    setPage(1);
+                }}
+                items={STATUS_TABS.map(([value, label]) => ({
+                    value,
+                    label,
+                }))}
+            />
+
+            <FilterBar
+                className='mb-4'
+                search={search}
+                onSearch={(value) => {
+                    setSearch(value);
+                    setPage(1);
+                }}
+                searchPlaceholder='Search by username, email or order ID'
+                filters={[
+                    {
+                        label: 'Order type',
+                        value: orderType,
+                        onChange: (value) => {
+                            setOrderType(value);
+                            setPage(1);
+                        },
+                        options: [
+                            { value: '', label: 'Any type' },
+                            ...Object.entries(ORDER_TYPE_LABELS).map(
+                                ([value, label]) => ({ value, label }),
+                            ),
+                        ],
+                    },
+                    {
+                        label: 'Payment method',
+                        value: paymentMethod,
+                        onChange: (value) => {
+                            setPaymentMethod(value);
+                            setPage(1);
+                        },
+                        options: [
+                            { value: '', label: 'Any payment method' },
+                            ...Object.entries(PAYMENT_METHOD_LABELS).map(
+                                ([value, label]) => ({ value, label }),
+                            ),
+                        ],
+                    },
+                ]}
+                timeFilter={{
+                    value: timeFilter,
+                    onChange: (v) => {
+                        setTimeFilter(v);
+                        setPage(1);
+                    },
+                }}
+                sortBy={{
+                    value: sortBy,
+                    onChange: setSortBy,
+                    options: [
+                        { value: 'createdAt', label: 'Sort by date' },
+                        { value: 'amount', label: 'Sort by amount' },
+                    ],
+                }}
+                sortOrder={{
+                    value: sortOrder,
+                    onToggle: () =>
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                }}
+                viewMode={{
+                    value: viewMode,
+                    onChange: setViewMode,
+                }}
+                onClear={clearFilters}
+                showClear={hasFilters}
+            />
+
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button
+                            size='sm'
+                            onClick={() => setRefresh((v) => v + 1)}
+                        >
+                            Try again
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
+
+            <p role='status' className='sr-only'>
+                {loading ? 'Updating orders…' : ''}
+            </p>
+
+            {viewMode === 'table' ? (
+                <div
+                    aria-busy={loading}
+                    className={`bg-sheet border border-line rounded-xl overflow-hidden transition-opacity ${loading ? 'opacity-60' : ''}`}
+                >
+                    {items.length === 0 ? (
+                        empty
+                    ) : (
+                        <Table minWidth={1000}>
+                            <thead>
+                                <tr>
+                                    <Th>Order</Th>
+                                    <Th>User</Th>
+                                    <Th>Item</Th>
+                                    <Th>Paid with</Th>
+                                    <Th align='right'>Amount</Th>
+                                    <Th>Status</Th>
+                                    <Th>Created</Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {items.map((o) => (
+                                    <Tr
+                                        key={o._id}
+                                        onClick={
+                                            paymentLink(o)
+                                                ? () => navigate(paymentLink(o))
+                                                : undefined
+                                        }
+                                    >
+                                        <Td>{orderIdCell(o)}</Td>
+                                        <Td className='max-w-[220px]'>
+                                            <UserCell user={o.user} />
+                                        </Td>
+                                        <Td className='max-w-[300px]'>
+                                            <div className='flex flex-col gap-0.5 min-w-0'>
+                                                <span className='text-ink truncate'>
+                                                    {itemTitle(o)}
+                                                </span>
+                                                {o.orderType !==
+                                                    'add_points' && (
+                                                    <span className='text-[12.5px] text-muted'>
+                                                        {orderTypeLabel(
+                                                            o.orderType,
                                                         )}
                                                     </span>
-                                                </div>
-                                                <div className='mb-2'>
-                                                    <div className='text-sm font-medium text-gray-900 dark:text-white truncate'>
-                                                        {o.user?.username ||
-                                                            'N/A'}
-                                                    </div>
-                                                    <div className='text-xs text-gray-500 dark:text-gray-400 truncate'>
-                                                        {o.user?.email || 'N/A'}
-                                                    </div>
-                                                </div>
-                                                <div className='mb-1'>
-                                                    <div className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                                        {amountLabel}
-                                                    </div>
-                                                    <div className='text-xs text-gray-500 dark:text-gray-400 capitalize'>
-                                                        {o.paymentMethod}
-                                                    </div>
-                                                </div>
-                                                <div className='text-xs text-gray-500 dark:text-gray-400 mb-1'>
-                                                    {o.createdAt
-                                                        ? new Date(
-                                                              o.createdAt,
-                                                          ).toLocaleDateString()
-                                                        : 'N/A'}
-                                                </div>
-                                                <div className='text-xs text-gray-400 dark:text-gray-500 truncate'>
-                                                    {o._id}
-                                                </div>
+                                                )}
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                        </Td>
+                                        <Td className='whitespace-nowrap text-ink-2'>
+                                            {paymentMethodLabel(
+                                                o.paymentMethod,
+                                            )}
+                                        </Td>
+                                        <Td
+                                            align='right'
+                                            mono
+                                            className='font-medium whitespace-nowrap'
+                                        >
+                                            {formatOrderAmount(o)}
+                                        </Td>
+                                        <Td>{statusCell(o)}</Td>
+                                        <Td>
+                                            <DateCell value={o.createdAt} />
+                                        </Td>
+                                    </Tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                    {totalItems > 0 && (
+                        <div className='flex flex-col gap-2 px-4 py-3 border-t border-line-soft'>
+                            {items.some((o) => o.paymentId) && (
+                                <span className='text-xs text-muted'>
+                                    Online orders open their payment.
+                                </span>
                             )}
-
-                            {/* Compact Table View */}
-                            {viewMode === 'table' && (
-                                <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden mb-3'>
-                                    <div className='overflow-x-auto'>
-                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                            <thead className='bg-gray-50 dark:bg-gray-900'>
-                                                <tr>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Order
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        User
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Type
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Method
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Amount
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Status
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase'>
-                                                        Created
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                                {current.map((o) => {
-                                                    const amountLabel =
-                                                        o.paymentMethod ===
-                                                        'online'
-                                                            ? `₹ ${o.amount}`
-                                                            : `${o.amount} pts`;
-                                                    return (
-                                                        <tr
-                                                            key={o._id}
-                                                            className='hover:bg-gray-50 dark:hover:bg-gray-900'
-                                                        >
-                                                            <td className='px-3 py-2 whitespace-nowrap'>
-                                                                <div className='text-xs font-mono text-gray-600 dark:text-gray-400 truncate max-w-[120px]'>
-                                                                    {o._id}
-                                                                </div>
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap'>
-                                                                <div className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                                    {o.user
-                                                                        ?.username ||
-                                                                        'N/A'}
-                                                                </div>
-                                                                <div className='text-xs text-gray-500 dark:text-gray-400'>
-                                                                    {o.user
-                                                                        ?.email ||
-                                                                        'N/A'}
-                                                                </div>
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap'>
-                                                                <span className='text-xs text-gray-600 dark:text-gray-400 capitalize'>
-                                                                    {o.orderType?.replace(
-                                                                        '_',
-                                                                        ' ',
-                                                                    )}
-                                                                </span>
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap capitalize text-xs text-gray-600 dark:text-gray-400'>
-                                                                {
-                                                                    o.paymentMethod
-                                                                }
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white'>
-                                                                {amountLabel}
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap'>
-                                                                <span
-                                                                    className={`px-1.5 py-0.5 text-xs rounded ${statusClass(o.status)}`}
-                                                                >
-                                                                    {o.status}
-                                                                </span>
-                                                            </td>
-                                                            <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400'>
-                                                                {o.createdAt
-                                                                    ? new Date(
-                                                                          o.createdAt,
-                                                                      ).toLocaleDateString()
-                                                                    : 'N/A'}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Compact Pagination */}
-                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 px-3 py-2'>
-                                <Pagination
-                                    currentPage={page}
-                                    pageSize={pageSize}
-                                    totalItems={totalItems}
-                                    onPageChange={setPage}
-                                    onPageSizeChange={(s) => {
-                                        setPageSize(s);
-                                        setPage(1);
-                                    }}
-                                />
-                            </div>
-                        </>
-                    ) : (
-                        <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-center py-12'>
-                            <FileText className='w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3' />
-                            <h3 className='text-sm font-medium text-gray-900 dark:text-white mb-1'>
-                                No Orders Found
-                            </h3>
-                            <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                No orders match your current filters.
-                            </p>
+                            {pagination}
                         </div>
                     )}
                 </div>
-            </main>
+            ) : items.length === 0 ? (
+                <div className='bg-sheet border border-line rounded-xl'>
+                    {empty}
+                </div>
+            ) : (
+                <div
+                    aria-busy={loading}
+                    className={`flex flex-col gap-4 transition-opacity ${loading ? 'opacity-60' : ''}`}
+                >
+                    <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
+                        {items.map((o) => (
+                            <article
+                                key={o._id}
+                                onClick={
+                                    paymentLink(o)
+                                        ? () => navigate(paymentLink(o))
+                                        : undefined
+                                }
+                                className={`flex flex-col gap-3 p-4 bg-sheet border border-line rounded-xl ${paymentLink(o) ? 'hover:border-line-strong cursor-pointer transition-colors' : ''}`}
+                            >
+                                <div className='flex items-start gap-2'>
+                                    <div className='flex-1 min-w-0'>
+                                        <UserCell user={o.user} />
+                                    </div>
+                                    <StatusBadge status={o.status} />
+                                </div>
+                                {o.failureReason && (
+                                    <p className='text-[13px] text-ink-2'>
+                                        <span className='text-muted'>
+                                            Failure:{' '}
+                                        </span>
+                                        {o.failureReason}
+                                    </p>
+                                )}
+                                <div className='flex flex-col gap-0.5 min-w-0'>
+                                    <span className='text-[13.5px] text-ink truncate'>
+                                        {itemTitle(o)}
+                                    </span>
+                                    <span className='text-[12.5px] text-muted'>
+                                        {orderTypeLabel(o.orderType)} ·{' '}
+                                        {paymentMethodLabel(o.paymentMethod)}
+                                    </span>
+                                </div>
+                                <span className='font-mono text-lg font-medium text-ink'>
+                                    {formatOrderAmount(o)}
+                                </span>
+                                <div className='flex items-center gap-2 pt-3 border-t border-line-soft text-xs text-muted'>
+                                    <span className='flex-1 min-w-0 truncate'>
+                                        {orderIdCell(o)}
+                                    </span>
+                                    <span className='whitespace-nowrap'>
+                                        {formatDateTime(o.createdAt)}
+                                    </span>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                    <div className='bg-sheet border border-line rounded-xl px-4 py-3'>
+                        {pagination}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

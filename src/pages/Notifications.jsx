@@ -1,46 +1,84 @@
-import React, { useState, useEffect } from 'react';
-import Header from '../components/Header';
-import api from '../utils/api';
+import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
+import { Bell, RotateCcw, Send } from 'lucide-react';
+import api from '../utils/api';
+import { useColleges } from '../context/CollegeContext';
+import { formatNumber, formatShortDateTime } from '../utils/format';
+import Pagination from '../components/Pagination';
+import ConfirmModal from '../components/ConfirmModal';
 import {
-    Bell,
-    Send,
-    Users,
-    CheckCircle,
-    XCircle,
-    Clock,
-    ExternalLink,
-    RotateCcw,
-} from 'lucide-react';
+    Button,
+    EmptyState,
+    Input,
+    PageHeader,
+    Panel,
+    Select,
+    SkeletonRows,
+    Table,
+    Td,
+    Textarea,
+    Th,
+    Tr,
+} from '../components/ui';
 
-// Navigation screen options
+// Screens the app can open when a notification is tapped.
 const NAVIGATION_SCREENS = [
-    { value: '', label: 'No navigation (default)' },
-    { value: 'pyqs', label: 'PYQs Page' },
-    { value: 'notes', label: 'Notes Page' },
-    { value: 'syllabus', label: 'Syllabus Page' },
-    { value: 'store', label: 'Store Page' },
-    { value: 'college', label: 'College Home' },
-    { value: 'profile', label: 'User Profile' },
+    { value: '', label: 'Nothing, just open the app' },
+    { value: 'pyqs', label: 'PYQs page' },
+    { value: 'notes', label: 'Notes page' },
+    { value: 'syllabus', label: 'Syllabus page' },
+    { value: 'store', label: 'Store page' },
+    { value: 'college', label: 'College home' },
+    { value: 'profile', label: 'User profile' },
     { value: 'settings', label: 'Settings' },
-    { value: 'collection', label: 'Saved Collection' },
+    { value: 'collection', label: 'Saved collection' },
 ];
 
+// Screens that need a college, and the ones that can open a single item.
+const COLLEGE_SCREENS = ['pyqs', 'notes', 'syllabus', 'store', 'college'];
+const ITEM_SCREENS = ['pyqs', 'notes', 'syllabus', 'store'];
+
+const EMPTY_FORM = {
+    title: '',
+    body: '',
+    screen: '',
+    college: '',
+    slug: '',
+};
+
+function CountedLabel({ htmlFor, children, count, max }) {
+    return (
+        <div className='flex items-baseline gap-2'>
+            <label
+                htmlFor={htmlFor}
+                className='flex-1 text-[13px] font-medium text-ink'
+            >
+                {children}
+                <span className='text-bad-ink' aria-hidden='true'>
+                    {' '}
+                    *
+                </span>
+            </label>
+            <span className='font-mono text-[11.5px] text-muted'>
+                {count}/{max}
+            </span>
+        </div>
+    );
+}
+
 const Notifications = () => {
+    const { colleges } = useColleges();
+    const formRef = useRef(null);
     const [loading, setLoading] = useState(false);
     const [sending, setSending] = useState(false);
+    const [confirming, setConfirming] = useState(false);
+    const [statsLoaded, setStatsLoaded] = useState(false);
     const [stats, setStats] = useState({
         usersWithPushTokens: 0,
         totalNotificationsSent: 0,
     });
     const [notifications, setNotifications] = useState([]);
-    const [formData, setFormData] = useState({
-        title: '',
-        body: '',
-        screen: '',
-        college: '',
-        slug: '',
-    });
+    const [formData, setFormData] = useState(EMPTY_FORM);
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 10,
@@ -57,6 +95,8 @@ const Notifications = () => {
             }
         } catch (error) {
             console.error('Error fetching stats:', error);
+        } finally {
+            setStatsLoaded(true);
         }
     };
 
@@ -80,7 +120,7 @@ const Notifications = () => {
             console.error('Error fetching notifications:', error);
             toast.error(
                 error.response?.data?.message ||
-                    'Failed to fetch notification history',
+                    'Couldn’t load sent notifications. Try again.',
             );
         } finally {
             setLoading(false);
@@ -93,20 +133,27 @@ const Notifications = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Handle form submission
-    const handleSubmit = async (e) => {
+    const setField = (key, value) =>
+        setFormData((prev) => ({ ...prev, [key]: value }));
+
+    // Checks the form, then asks for confirmation before anything is sent.
+    const handleSubmit = (e) => {
         e.preventDefault();
 
         if (!formData.title.trim() || !formData.body.trim()) {
-            toast.error('Title and body are required');
+            toast.error('Add a title and a message');
             return;
         }
 
         if (stats.usersWithPushTokens === 0) {
-            toast.error('No users with push tokens to send notifications to');
+            toast.error('No devices can receive notifications yet');
             return;
         }
 
+        setConfirming(true);
+    };
+
+    const sendNotification = async () => {
         try {
             setSending(true);
 
@@ -136,15 +183,9 @@ const Notifications = () => {
 
             if (response.data.success) {
                 toast.success(
-                    `Notification sent to ${response.data.data.successCount} users!`,
+                    `Notification sent to ${formatNumber(response.data.data.successCount)} devices`,
                 );
-                setFormData({
-                    title: '',
-                    body: '',
-                    screen: '',
-                    college: '',
-                    slug: '',
-                });
+                setFormData(EMPTY_FORM);
                 fetchStats();
                 fetchNotifications();
             } else {
@@ -155,22 +196,15 @@ const Notifications = () => {
         } catch (error) {
             console.error('Error sending notification:', error);
             toast.error(
-                error.response?.data?.message || 'Failed to send notification',
+                error.response?.data?.message ||
+                    'Couldn’t send the notification. Try again.',
             );
         } finally {
             setSending(false);
         }
     };
 
-    // Format date
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleString('en-IN', {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-        });
-    };
-
-    // Handle repeat notification - populate form with existing notification data
+    // Copy an earlier notification into the form so it can be edited and sent.
     const handleRepeatNotification = (notification) => {
         setFormData({
             title: notification.title,
@@ -180,482 +214,398 @@ const Notifications = () => {
             slug: notification.data?.params?.slug || '',
         });
 
-        // Scroll to form
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-        toast.success('Notification loaded! Edit and send again.');
+        toast.success('Copied into the form. Edit it and send.');
     };
 
+    const changeScreen = (screen) =>
+        setFormData((prev) => ({
+            ...prev,
+            screen,
+            // Clear what the new screen can't use.
+            college: COLLEGE_SCREENS.includes(screen) ? prev.college : '',
+            slug: ITEM_SCREENS.includes(screen) ? prev.slug : '',
+        }));
+
+    const devices = stats.usersWithPushTokens || 0;
+    const needsCollege = COLLEGE_SCREENS.includes(formData.screen);
+    const needsItem = ITEM_SCREENS.includes(formData.screen);
+
+    const collegeOptions = colleges.map((c) => ({
+        value: c.slug,
+        label: c.name,
+    }));
+    if (
+        formData.college &&
+        !collegeOptions.some((option) => option.value === formData.college)
+    ) {
+        collegeOptions.push({
+            value: formData.college,
+            label: formData.college,
+        });
+    }
+
+    const screenLabel = NAVIGATION_SCREENS.find(
+        (s) => s.value === formData.screen,
+    )?.label;
+    const collegeName = collegeOptions.find(
+        (c) => c.value === formData.college,
+    )?.label;
+    const opensText = [
+        screenLabel,
+        needsCollege && collegeName,
+        needsItem && formData.slug,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-
-            <main className='pt-4 md:pt-6 pb-8 md:pb-12'>
-                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-                    <div className='space-y-6'>
-                        {/* Page Header */}
-                        <div className='flex items-center gap-3 mb-6'>
-                            <Bell className='w-8 h-8 text-blue-600 dark:text-blue-400' />
-                            <div>
-                                <h1 className='text-2xl md:text-3xl font-bold text-gray-900 dark:text-white'>
-                                    Push Notifications
-                                </h1>
-                                <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                    Send push notifications to all app users
-                                </p>
-                            </div>
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Push notifications'
+                description='Send one message to every phone with the StudentSenior app and notifications turned on.'
+                actions={
+                    <div className='flex items-end gap-6'>
+                        <div className='flex flex-col sm:items-end gap-0.5'>
+                            <span className='font-serif font-bold text-2xl leading-tight text-ink'>
+                                {formatNumber(devices)}
+                            </span>
+                            <span className='text-[12.5px] text-muted'>
+                                devices can receive
+                            </span>
                         </div>
-
-                        {/* Stats Cards */}
-                        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                            <div className='bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700'>
-                                <div className='flex items-center gap-4'>
-                                    <div className='p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full'>
-                                        <Users className='w-6 h-6 text-blue-600 dark:text-blue-400' />
-                                    </div>
-                                    <div>
-                                        <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                            Users with Push Tokens
-                                        </p>
-                                        <p className='text-2xl font-bold text-gray-900 dark:text-white'>
-                                            {stats.usersWithPushTokens}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className='bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700'>
-                                <div className='flex items-center gap-4'>
-                                    <div className='p-3 bg-green-100 dark:bg-green-900/30 rounded-full'>
-                                        <Send className='w-6 h-6 text-green-600 dark:text-green-400' />
-                                    </div>
-                                    <div>
-                                        <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                            Total Notifications Sent
-                                        </p>
-                                        <p className='text-2xl font-bold text-gray-900 dark:text-white'>
-                                            {stats.totalNotificationsSent}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Send Notification Form */}
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700'>
-                            <div className='p-6 border-b border-gray-200 dark:border-gray-700'>
-                                <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                    Send New Notification
-                                </h2>
-                                <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                    This notification will be sent to all users
-                                    who have enabled push notifications
-                                </p>
-                            </div>
-
-                            <form
-                                onSubmit={handleSubmit}
-                                className='p-6 space-y-4'
-                            >
-                                <div>
-                                    <label
-                                        htmlFor='title'
-                                        className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
-                                    >
-                                        Title{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <input
-                                        type='text'
-                                        id='title'
-                                        value={formData.title}
-                                        onChange={(e) =>
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                title: e.target.value,
-                                            }))
-                                        }
-                                        maxLength={100}
-                                        placeholder='Enter notification title'
-                                        className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                                    />
-                                    <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                        {formData.title.length}/100 characters
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label
-                                        htmlFor='body'
-                                        className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
-                                    >
-                                        Message{' '}
-                                        <span className='text-red-500'>*</span>
-                                    </label>
-                                    <textarea
-                                        id='body'
-                                        value={formData.body}
-                                        onChange={(e) =>
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                body: e.target.value,
-                                            }))
-                                        }
-                                        maxLength={500}
-                                        rows={4}
-                                        placeholder='Enter notification message'
-                                        className='w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none'
-                                    />
-                                    <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                        {formData.body.length}/500 characters
-                                    </p>
-                                </div>
-
-                                {/* Navigation Options */}
-                                <div className='border-t border-gray-200 dark:border-gray-700 pt-4'>
-                                    <div className='flex items-center gap-2 mb-3'>
-                                        <ExternalLink className='w-4 h-4 text-gray-500' />
-                                        <span className='text-sm font-medium text-gray-700 dark:text-gray-300'>
-                                            Deep Link (Optional)
-                                        </span>
-                                    </div>
-                                    <p className='text-xs text-gray-500 dark:text-gray-400 mb-3'>
-                                        When users tap the notification, they
-                                        will be navigated to the selected
-                                        screen.
-                                    </p>
-
-                                    <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-                                        {/* Screen Selector */}
-                                        <div>
-                                            <label
-                                                htmlFor='screen'
-                                                className='block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1'
-                                            >
-                                                Navigate To
-                                            </label>
-                                            <select
-                                                id='screen'
-                                                value={formData.screen}
-                                                onChange={(e) =>
-                                                    setFormData((prev) => ({
-                                                        ...prev,
-                                                        screen: e.target.value,
-                                                        // Reset college and slug when screen changes
-                                                        college:
-                                                            e.target.value ===
-                                                                'profile' ||
-                                                            e.target.value ===
-                                                                'settings' ||
-                                                            e.target.value ===
-                                                                'collection' ||
-                                                            e.target.value ===
-                                                                ''
-                                                                ? ''
-                                                                : prev.college,
-                                                        slug:
-                                                            e.target.value ===
-                                                                'college' ||
-                                                            e.target.value ===
-                                                                'profile' ||
-                                                            e.target.value ===
-                                                                'settings' ||
-                                                            e.target.value ===
-                                                                'collection' ||
-                                                            e.target.value ===
-                                                                ''
-                                                                ? ''
-                                                                : prev.slug,
-                                                    }))
-                                                }
-                                                className='w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                                            >
-                                                {NAVIGATION_SCREENS.map(
-                                                    (option) => (
-                                                        <option
-                                                            key={option.value}
-                                                            value={option.value}
-                                                        >
-                                                            {option.label}
-                                                        </option>
-                                                    ),
-                                                )}
-                                            </select>
-                                        </div>
-
-                                        {/* College Slug - shown for pyqs, notes, syllabus, store, college */}
-                                        {[
-                                            'pyqs',
-                                            'notes',
-                                            'syllabus',
-                                            'store',
-                                            'college',
-                                        ].includes(formData.screen) && (
-                                            <div>
-                                                <label
-                                                    htmlFor='college'
-                                                    className='block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1'
-                                                >
-                                                    College Slug
-                                                </label>
-                                                <input
-                                                    type='text'
-                                                    id='college'
-                                                    value={formData.college}
-                                                    onChange={(e) =>
-                                                        setFormData((prev) => ({
-                                                            ...prev,
-                                                            college:
-                                                                e.target.value
-                                                                    .toLowerCase()
-                                                                    .replace(
-                                                                        /\s+/g,
-                                                                        '-',
-                                                                    ),
-                                                        }))
-                                                    }
-                                                    placeholder='e.g., integral-university'
-                                                    className='w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                                                />
-                                            </div>
-                                        )}
-
-                                        {/* Item Slug - shown for pyqs, notes, syllabus, store */}
-                                        {[
-                                            'pyqs',
-                                            'notes',
-                                            'syllabus',
-                                            'store',
-                                        ].includes(formData.screen) && (
-                                            <div>
-                                                <label
-                                                    htmlFor='slug'
-                                                    className='block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1'
-                                                >
-                                                    Item Slug (Optional)
-                                                </label>
-                                                <input
-                                                    type='text'
-                                                    id='slug'
-                                                    value={formData.slug}
-                                                    onChange={(e) =>
-                                                        setFormData((prev) => ({
-                                                            ...prev,
-                                                            slug: e.target
-                                                                .value,
-                                                        }))
-                                                    }
-                                                    placeholder='Specific item slug'
-                                                    className='w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className='flex items-center justify-between pt-4'>
-                                    <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                        Will be sent to{' '}
-                                        <strong>
-                                            {stats.usersWithPushTokens}
-                                        </strong>{' '}
-                                        users
-                                    </p>
-                                    <button
-                                        type='submit'
-                                        disabled={
-                                            sending ||
-                                            stats.usersWithPushTokens === 0
-                                        }
-                                        className='inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors'
-                                    >
-                                        {sending ? (
-                                            <>
-                                                <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' />
-                                                Sending...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Send className='w-4 h-4' />
-                                                Send Notification
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-
-                        {/* Notification History */}
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700'>
-                            <div className='p-6 border-b border-gray-200 dark:border-gray-700'>
-                                <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                    Notification History
-                                </h2>
-                            </div>
-
-                            {loading ? (
-                                <div className='p-8 text-center'>
-                                    <div className='w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto' />
-                                    <p className='text-gray-500 dark:text-gray-400 mt-2'>
-                                        Loading...
-                                    </p>
-                                </div>
-                            ) : notifications.length === 0 ? (
-                                <div className='p-8 text-center'>
-                                    <Bell className='w-12 h-12 text-gray-400 mx-auto mb-3' />
-                                    <p className='text-gray-500 dark:text-gray-400'>
-                                        No notifications sent yet
-                                    </p>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className='overflow-x-auto'>
-                                        <table className='w-full'>
-                                            <thead className='bg-gray-50 dark:bg-gray-700'>
-                                                <tr>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Notification
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Sent At
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Recipients
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Status
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Actions
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className='divide-y divide-gray-200 dark:divide-gray-700'>
-                                                {notifications.map(
-                                                    (notification) => (
-                                                        <tr
-                                                            key={
-                                                                notification._id
-                                                            }
-                                                            className='hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                                                        >
-                                                            <td className='px-6 py-4'>
-                                                                <div>
-                                                                    <p className='font-medium text-gray-900 dark:text-white'>
-                                                                        {
-                                                                            notification.title
-                                                                        }
-                                                                    </p>
-                                                                    <p className='text-sm text-gray-500 dark:text-gray-400 line-clamp-2'>
-                                                                        {
-                                                                            notification.body
-                                                                        }
-                                                                    </p>
-                                                                </div>
-                                                            </td>
-                                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                                <div className='flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400'>
-                                                                    <Clock className='w-4 h-4' />
-                                                                    {formatDate(
-                                                                        notification.createdAt,
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                                <span className='text-sm text-gray-900 dark:text-white'>
-                                                                    {
-                                                                        notification.recipientCount
-                                                                    }
-                                                                </span>
-                                                            </td>
-                                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                                <div className='flex items-center gap-4'>
-                                                                    <div className='flex items-center gap-1 text-green-600 dark:text-green-400'>
-                                                                        <CheckCircle className='w-4 h-4' />
-                                                                        <span className='text-sm'>
-                                                                            {notification.successCount ||
-                                                                                0}
-                                                                        </span>
-                                                                    </div>
-                                                                    {notification.failureCount >
-                                                                        0 && (
-                                                                        <div className='flex items-center gap-1 text-red-600 dark:text-red-400'>
-                                                                            <XCircle className='w-4 h-4' />
-                                                                            <span className='text-sm'>
-                                                                                {
-                                                                                    notification.failureCount
-                                                                                }
-                                                                            </span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                            <td className='px-6 py-4 whitespace-nowrap'>
-                                                                <button
-                                                                    onClick={() =>
-                                                                        handleRepeatNotification(
-                                                                            notification,
-                                                                        )
-                                                                    }
-                                                                    className='inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md transition-colors'
-                                                                    title='Repeat this notification'
-                                                                >
-                                                                    <RotateCcw className='w-3.5 h-3.5' />
-                                                                    Repeat
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    ),
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    {/* Pagination */}
-                                    {pagination.pages > 1 && (
-                                        <div className='p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between'>
-                                            <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                                Showing {notifications.length}{' '}
-                                                of {pagination.total}{' '}
-                                                notifications
-                                            </p>
-                                            <div className='flex gap-2'>
-                                                <button
-                                                    onClick={() =>
-                                                        fetchNotifications(
-                                                            pagination.page - 1,
-                                                        )
-                                                    }
-                                                    disabled={
-                                                        pagination.page === 1
-                                                    }
-                                                    className='px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md disabled:opacity-50'
-                                                >
-                                                    Previous
-                                                </button>
-                                                <button
-                                                    onClick={() =>
-                                                        fetchNotifications(
-                                                            pagination.page + 1,
-                                                        )
-                                                    }
-                                                    disabled={
-                                                        pagination.page ===
-                                                        pagination.pages
-                                                    }
-                                                    className='px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md disabled:opacity-50'
-                                                >
-                                                    Next
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            )}
+                        <div className='flex flex-col sm:items-end gap-0.5'>
+                            <span className='font-serif font-bold text-2xl leading-tight text-ink'>
+                                {formatNumber(stats.totalNotificationsSent)}
+                            </span>
+                            <span className='text-[12.5px] text-muted'>
+                                sent so far
+                            </span>
                         </div>
                     </div>
-                </div>
-            </main>
+                }
+            />
+
+            <div className='grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 items-stretch mb-6'>
+                <form
+                    ref={formRef}
+                    onSubmit={handleSubmit}
+                    aria-labelledby='compose-title'
+                    className='flex flex-col gap-4 p-5 sm:px-[22px] bg-sheet border border-line rounded-xl scroll-mt-6'
+                >
+                    <h2
+                        id='compose-title'
+                        className='text-[15px] font-semibold text-ink'
+                    >
+                        New notification
+                    </h2>
+
+                    <div className='flex flex-col gap-1.5'>
+                        <CountedLabel
+                            htmlFor='notification-title'
+                            count={formData.title.length}
+                            max={100}
+                        >
+                            Title
+                        </CountedLabel>
+                        <Input
+                            id='notification-title'
+                            value={formData.title}
+                            onChange={(e) => setField('title', e.target.value)}
+                            maxLength={100}
+                            placeholder='For example: New PYQs for your end-semester exams'
+                            className='h-10'
+                        />
+                    </div>
+
+                    <div className='flex flex-col gap-1.5'>
+                        <CountedLabel
+                            htmlFor='notification-body'
+                            count={formData.body.length}
+                            max={500}
+                        >
+                            Message
+                        </CountedLabel>
+                        <Textarea
+                            id='notification-body'
+                            value={formData.body}
+                            onChange={(e) => setField('body', e.target.value)}
+                            maxLength={500}
+                            rows={3}
+                            placeholder='What students should know, in a sentence or two'
+                        />
+                    </div>
+
+                    <fieldset className='flex flex-col gap-3 p-3.5 rounded-[10px] bg-sunken border border-line-soft'>
+                        <legend className='sr-only'>When tapped</legend>
+                        <label
+                            htmlFor='notification-screen'
+                            className='text-[13px] font-medium text-ink'
+                        >
+                            When tapped, open
+                        </label>
+                        <Select
+                            id='notification-screen'
+                            value={formData.screen}
+                            onChange={(e) => changeScreen(e.target.value)}
+                            options={NAVIGATION_SCREENS}
+                        />
+                        {needsCollege && (
+                            <div className='grid grid-cols-1 sm:grid-cols-2 gap-2.5'>
+                                <div className='flex flex-col gap-1.5'>
+                                    <label
+                                        htmlFor='notification-college'
+                                        className='text-[12.5px] text-ink-2'
+                                    >
+                                        College
+                                    </label>
+                                    <Select
+                                        id='notification-college'
+                                        value={formData.college}
+                                        onChange={(e) =>
+                                            setField('college', e.target.value)
+                                        }
+                                        placeholder='Choose a college'
+                                        options={collegeOptions}
+                                    />
+                                </div>
+                                {needsItem && (
+                                    <div className='flex flex-col gap-1.5'>
+                                        <label
+                                            htmlFor='notification-slug'
+                                            className='text-[12.5px] text-ink-2'
+                                        >
+                                            Specific item (optional)
+                                        </label>
+                                        <Input
+                                            id='notification-slug'
+                                            value={formData.slug}
+                                            onChange={(e) =>
+                                                setField('slug', e.target.value)
+                                            }
+                                            placeholder='Item slug'
+                                            className='font-mono text-[12.5px]'
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </fieldset>
+
+                    <div className='flex flex-wrap items-center gap-3 mt-auto pt-1'>
+                        <Button
+                            type='submit'
+                            variant='primary'
+                            size='lg'
+                            icon={Send}
+                            disabled={sending || devices === 0}
+                        >
+                            {sending
+                                ? 'Sending…'
+                                : !statsLoaded
+                                  ? 'Send notification'
+                                  : devices === 0
+                                    ? 'No devices to send to'
+                                    : `Send to ${formatNumber(devices)} devices`}
+                        </Button>
+                        <span className='text-[12.5px] text-muted'>
+                            You’ll be asked to confirm. This can’t be undone.
+                        </span>
+                    </div>
+                </form>
+
+                <section
+                    aria-label='Preview'
+                    className='flex flex-col gap-4 p-6 rounded-xl bg-inverse'
+                >
+                    <span className='eyebrow text-on-inverse! opacity-70'>
+                        Preview on a phone
+                    </span>
+                    <div className='flex-1 flex items-center justify-center py-4'>
+                        <div className='w-full max-w-[340px] flex flex-col gap-2 px-4 py-3.5 rounded-[18px] bg-sheet shadow-[0_8px_24px_rgba(0,0,0,0.25)]'>
+                            <div className='flex items-center gap-2'>
+                                <span
+                                    aria-hidden='true'
+                                    className='w-5 h-5 rounded-[5px] bg-inverse text-on-inverse flex items-center justify-center font-serif font-bold text-xs'
+                                >
+                                    S
+                                </span>
+                                <span className='flex-1 text-xs text-ink-2'>
+                                    StudentSenior
+                                </span>
+                                <span className='text-xs text-muted'>now</span>
+                            </div>
+                            <span
+                                className={`text-sm font-semibold break-words ${
+                                    formData.title ? 'text-ink' : 'text-muted'
+                                }`}
+                            >
+                                {formData.title || 'Your title'}
+                            </span>
+                            <span
+                                className={`text-[13.5px] leading-snug break-words ${
+                                    formData.body ? 'text-ink-2' : 'text-muted'
+                                }`}
+                            >
+                                {formData.body ||
+                                    'Your message appears here, as students will see it.'}
+                            </span>
+                        </div>
+                    </div>
+                    <span className='text-[12.5px] text-on-inverse opacity-70'>
+                        Tapping opens:{' '}
+                        <b className='font-medium opacity-100'>{opensText}</b>
+                    </span>
+                </section>
+            </div>
+
+            <Panel title='Sent before' titleId='history-title'>
+                {loading ? (
+                    <SkeletonRows rows={4} />
+                ) : notifications.length === 0 ? (
+                    <EmptyState
+                        icon={Bell}
+                        title='No notifications sent yet'
+                        description='Notifications you send appear here, with how many reached a phone.'
+                    />
+                ) : (
+                    <>
+                        <Table minWidth={820}>
+                            <thead>
+                                <tr>
+                                    <Th>Notification</Th>
+                                    <Th>Sent</Th>
+                                    <Th align='right'>Recipients</Th>
+                                    <Th>Delivered</Th>
+                                    <Th>
+                                        <span className='sr-only'>Actions</span>
+                                    </Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {notifications.map((notification) => {
+                                    const recipients =
+                                        notification.recipientCount || 0;
+                                    const delivered =
+                                        notification.successCount || 0;
+                                    const failed =
+                                        notification.failureCount || 0;
+                                    const pct = recipients
+                                        ? Math.round(
+                                              (delivered / recipients) * 1000,
+                                          ) / 10
+                                        : 0;
+                                    return (
+                                        <Tr key={notification._id}>
+                                            <Td className='max-w-[380px]'>
+                                                <div className='flex flex-col gap-0.5 min-w-0'>
+                                                    <span className='font-medium text-ink'>
+                                                        {notification.title}
+                                                    </span>
+                                                    <span className='text-[12.5px] text-muted line-clamp-2'>
+                                                        {notification.body}
+                                                    </span>
+                                                </div>
+                                            </Td>
+                                            <Td>
+                                                <div className='flex flex-col gap-0.5'>
+                                                    <span className='whitespace-nowrap text-[13px] text-ink-2'>
+                                                        {formatShortDateTime(
+                                                            notification.createdAt,
+                                                        )}
+                                                    </span>
+                                                    {notification.sentBy
+                                                        ?.name && (
+                                                        <span className='text-xs text-muted whitespace-nowrap'>
+                                                            by{' '}
+                                                            {
+                                                                notification
+                                                                    .sentBy.name
+                                                            }
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </Td>
+                                            <Td align='right' mono>
+                                                {formatNumber(recipients)}
+                                            </Td>
+                                            <Td className='w-[190px]'>
+                                                <div className='flex flex-col gap-1'>
+                                                    <div className='flex items-center gap-2'>
+                                                        <div
+                                                            aria-hidden='true'
+                                                            className={`flex-1 h-1.5 rounded-full ${
+                                                                failed
+                                                                    ? 'bg-bad-soft'
+                                                                    : 'bg-line-soft'
+                                                            }`}
+                                                        >
+                                                            <div
+                                                                className='h-full rounded-full bg-ok'
+                                                                style={{
+                                                                    width: `${Math.min(pct, 100)}%`,
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <span className='font-mono text-xs text-ink-2'>
+                                                            {pct}%
+                                                        </span>
+                                                    </div>
+                                                    <span className='text-xs text-muted'>
+                                                        {formatNumber(
+                                                            delivered,
+                                                        )}{' '}
+                                                        delivered
+                                                        {failed > 0 &&
+                                                            ` · ${formatNumber(failed)} failed`}
+                                                    </span>
+                                                </div>
+                                            </Td>
+                                            <Td align='right'>
+                                                <Button
+                                                    size='sm'
+                                                    icon={RotateCcw}
+                                                    onClick={() =>
+                                                        handleRepeatNotification(
+                                                            notification,
+                                                        )
+                                                    }
+                                                    aria-label={`Reuse “${notification.title}”`}
+                                                >
+                                                    Reuse
+                                                </Button>
+                                            </Td>
+                                        </Tr>
+                                    );
+                                })}
+                            </tbody>
+                        </Table>
+                        {pagination.pages > 1 && (
+                            <div className='px-4 py-3 border-t border-line-soft'>
+                                <Pagination
+                                    currentPage={pagination.page}
+                                    totalItems={pagination.total}
+                                    pageSize={pagination.limit}
+                                    onPageChange={(page) =>
+                                        fetchNotifications(page)
+                                    }
+                                />
+                            </div>
+                        )}
+                    </>
+                )}
+            </Panel>
+
+            <ConfirmModal
+                isOpen={confirming}
+                onClose={() => setConfirming(false)}
+                onConfirm={sendNotification}
+                title='Send this notification?'
+                message={`It goes to ${formatNumber(devices)} devices straight away and can’t be recalled.`}
+                confirmText='Send now'
+                variant='info'
+            />
         </div>
     );
 };

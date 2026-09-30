@@ -1,19 +1,69 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
-import api from '../../utils/api';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { BookOpen, Calendar, BookMarked, Sparkles, Plus } from 'lucide-react';
+import {
+    BookMarked,
+    BookOpen,
+    CheckCircle2,
+    CircleDashed,
+    Pencil,
+    Plus,
+    Sparkles,
+    Trash2,
+} from 'lucide-react';
+import api from '../../utils/api';
+import { formatDate, formatNumber } from '../../utils/format';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import SyllabusModal from '../../components/SyllabusModal';
-import BackButton from '../../components/Common/BackButton';
 import Loader from '../../components/Common/Loader';
 import FilterBar from '../../components/Common/FilterBar';
 import { filterByTime } from '../../components/Common/timeFilterUtils';
 import AddSubjectModal from '../../components/AddSubjectModal';
+import {
+    Alert,
+    Button,
+    EmptyState,
+    PageHeader,
+    Table,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+import {
+    SEMESTERS,
+    SORT_OPTIONS,
+    hasSyllabus,
+    hasTimeFilter,
+    quickNotesPath,
+    sortCatalog,
+    syllabusPath,
+} from './catalogUtils';
+
+// The three cards above the list; they filter by syllabus.
+const VIEWS = [
+    { value: '', label: 'All subjects', dot: 'bg-neutral' },
+    {
+        value: 'ready',
+        label: 'Syllabus ready',
+        dot: 'bg-ok',
+        note: 'Quick notes can be generated',
+    },
+    {
+        value: 'missing',
+        label: 'No syllabus',
+        dot: 'bg-warn',
+        note: 'Add one to unlock quick notes',
+    },
+];
+
+const matchesView = (subject, view) =>
+    !view || (view === 'ready' ? hasSyllabus(subject) : !hasSyllabus(subject));
+
+const branchLine = (subject) =>
+    [subject.course?.courseCode, subject.branch?.branchCode]
+        .filter(Boolean)
+        .join(' · ') || 'No branch';
 
 const Subjects = () => {
     const [subjects, setSubjects] = useState([]);
@@ -29,6 +79,7 @@ const Subjects = () => {
     const [filterCourse, setFilterCourse] = useState('');
     const [filterBranch, setFilterBranch] = useState('');
     const [filterSemester, setFilterSemester] = useState('');
+    const [filterSyllabus, setFilterSyllabus] = useState(''); // '' | 'ready' | 'missing'
     const [sortBy, setSortBy] = useState('createdAt'); // 'createdAt' | 'name'
     const [sortOrder, setSortOrder] = useState('desc');
     const [timeFilter, setTimeFilter] = useState('');
@@ -55,7 +106,6 @@ const Subjects = () => {
         description: '',
     });
     const [submittingSyllabus, setSubmittingSyllabus] = useState(false);
-    const { mainContentMargin } = useSidebarLayout();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -64,6 +114,7 @@ const Subjects = () => {
         isOpen: false,
         title: '',
         message: '',
+        confirmText: 'Delete',
         onConfirm: null,
         variant: 'danger',
     });
@@ -72,8 +123,9 @@ const Subjects = () => {
         return new Promise((resolve) => {
             setConfirmModal({
                 isOpen: true,
-                title: config.title || 'Confirm Action',
+                title: config.title,
                 message: config.message,
+                confirmText: config.confirmText || 'Delete',
                 variant: config.variant || 'danger',
                 onConfirm: () => resolve(true),
             });
@@ -100,8 +152,9 @@ const Subjects = () => {
             setColleges(collegesRes.data.data || []);
         } catch (e) {
             console.error(e);
-            setError('Failed to load data');
-            toast.error('Failed to load data');
+            setError(
+                'Couldn’t load subjects. Check your connection and try again.',
+            );
         } finally {
             setLoading(false);
         }
@@ -121,6 +174,7 @@ const Subjects = () => {
         const fc = params.get('course') || '';
         const fb = params.get('branch') || '';
         const fs = params.get('semester') || '';
+        const fsy = params.get('syllabus') || '';
         const tf = params.get('timeFilter') || '';
         const sb = params.get('sortBy') || 'createdAt';
         const so = params.get('sortOrder') || 'desc';
@@ -134,6 +188,7 @@ const Subjects = () => {
         setFilterCourse(fc);
         setFilterBranch(fb);
         setFilterSemester(fs);
+        setFilterSyllabus(fsy === 'ready' || fsy === 'missing' ? fsy : '');
         setTimeFilter(tf);
         setSortBy(sb === 'name' ? 'name' : 'createdAt');
         setSortOrder(so === 'asc' ? 'asc' : 'desc');
@@ -151,6 +206,8 @@ const Subjects = () => {
         params.set('course', filterCourse || '');
         params.set('branch', filterBranch || '');
         params.set('semester', filterSemester || '');
+        if (filterSyllabus) params.set('syllabus', filterSyllabus);
+        else params.delete('syllabus');
         params.set('timeFilter', timeFilter || '');
         params.set('sortBy', sortBy);
         params.set('sortOrder', sortOrder);
@@ -167,6 +224,7 @@ const Subjects = () => {
         filterCourse,
         filterBranch,
         filterSemester,
+        filterSyllabus,
         timeFilter,
         sortBy,
         sortOrder,
@@ -175,14 +233,6 @@ const Subjects = () => {
         navigate,
     ]);
 
-    // Responsive view auto-switch
-    useEffect(() => {
-        const handleResize = () =>
-            setViewMode(window.innerWidth >= 1024 ? 'table' : 'grid');
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
     const handleEdit = (subject) => {
         setEditingSubject(subject);
         setShowModal(true);
@@ -190,19 +240,20 @@ const Subjects = () => {
 
     const handleDelete = async (subject) => {
         const ok = await showConfirm({
-            title: 'Delete Subject',
-            message: `Are you sure you want to delete "${subject.subjectName}"? This action cannot be undone.`,
-            variant: 'danger',
+            title: `Delete ${subject.subjectName}?`,
+            message:
+                'Students can no longer find it, and PYQs and notes linked to it lose their subject. This can’t be undone.',
+            confirmText: 'Delete subject',
         });
         if (!ok) return;
 
         try {
             await api.delete(`/resource/subjects/${subject._id}`);
             setSubjects(subjects.filter((s) => s._id !== subject._id));
-            toast.success('Subject deleted successfully');
+            toast.success('Subject deleted');
         } catch (e) {
             console.error(e);
-            toast.error('Failed to delete subject');
+            toast.error('Couldn’t delete the subject. Try again.');
         }
     };
 
@@ -304,62 +355,54 @@ const Subjects = () => {
                 ...syllabusFormData,
                 collegeSlug,
             });
-            toast.success('Syllabus created successfully');
+            toast.success('Syllabus created');
             handleCloseSyllabusModal();
             fetchData(); // Refresh to get updated data
         } catch (e) {
             console.error(e);
             toast.error(
-                e.response?.data?.message || 'Failed to create syllabus',
+                e.response?.data?.message ||
+                    'Couldn’t create the syllabus. Try again.',
             );
         } finally {
             setSubmittingSyllabus(false);
         }
     };
 
-    const filteredAndSorted = useMemo(() => {
+    // Everything except the syllabus cards, so their counts follow the other filters.
+    const base = useMemo(() => {
         const q = search.trim().toLowerCase();
-        const list = subjects
-            .filter((s) => {
-                const matchesSearch =
-                    !q ||
-                    s.subjectName?.toLowerCase().includes(q) ||
-                    s.subjectCode?.toLowerCase().includes(q) ||
-                    s.course?.courseName?.toLowerCase().includes(q) ||
-                    s.branch?.branchName?.toLowerCase().includes(q) ||
-                    s.semester?.toString().includes(q);
-                const matchesCollege =
-                    !filterCollege || (s.college?._id || '') === filterCollege;
-                const matchesCourse =
-                    !filterCourse || (s.course?._id || '') === filterCourse;
-                const matchesBranch =
-                    !filterBranch || (s.branch?._id || '') === filterBranch;
-                const matchesSemester =
-                    !filterSemester ||
-                    String(s.semester || '') === String(filterSemester);
-                return (
-                    matchesSearch &&
-                    matchesCollege &&
-                    matchesCourse &&
-                    matchesBranch &&
-                    matchesSemester
-                );
-            })
-            // Apply time filter
-            .filter((s) => filterByTime(s, timeFilter))
-            .sort((a, b) => {
-                if (sortBy === 'createdAt') {
-                    const aVal = new Date(a.createdAt || 0).getTime();
-                    const bVal = new Date(b.createdAt || 0).getTime();
-                    return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-                } else {
-                    const aVal = (a.subjectName || '').toLowerCase();
-                    const bVal = (b.subjectName || '').toLowerCase();
-                    const cmp = aVal.localeCompare(bVal);
-                    return sortOrder === 'asc' ? cmp : -cmp;
-                }
-            });
-        return list;
+        return (
+            subjects
+                .filter((s) => {
+                    const matchesSearch =
+                        !q ||
+                        s.subjectName?.toLowerCase().includes(q) ||
+                        s.subjectCode?.toLowerCase().includes(q) ||
+                        s.course?.courseName?.toLowerCase().includes(q) ||
+                        s.branch?.branchName?.toLowerCase().includes(q) ||
+                        s.semester?.toString().includes(q);
+                    const matchesCollege =
+                        !filterCollege ||
+                        (s.college?._id || '') === filterCollege;
+                    const matchesCourse =
+                        !filterCourse || (s.course?._id || '') === filterCourse;
+                    const matchesBranch =
+                        !filterBranch || (s.branch?._id || '') === filterBranch;
+                    const matchesSemester =
+                        !filterSemester ||
+                        String(s.semester || '') === String(filterSemester);
+                    return (
+                        matchesSearch &&
+                        matchesCollege &&
+                        matchesCourse &&
+                        matchesBranch &&
+                        matchesSemester
+                    );
+                })
+                // Apply time filter
+                .filter((s) => filterByTime(s, timeFilter))
+        );
     }, [
         subjects,
         search,
@@ -368,9 +411,18 @@ const Subjects = () => {
         filterBranch,
         filterSemester,
         timeFilter,
-        sortBy,
-        sortOrder,
     ]);
+
+    const filteredAndSorted = useMemo(
+        () =>
+            sortCatalog(
+                base.filter((s) => matchesView(s, filterSyllabus)),
+                sortBy,
+                sortOrder,
+                'subjectName',
+            ),
+        [base, filterSyllabus, sortBy, sortOrder],
+    );
 
     const totalItems = filteredAndSorted.length;
     const start = (page - 1) * pageSize;
@@ -380,433 +432,435 @@ const Subjects = () => {
         return <Loader />;
     }
 
-    return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
-            <main
-                className={`py-4 ${mainContentMargin} transition-all duration-300`}
+    const viewCounts = {
+        '': base.length,
+        ready: base.filter(hasSyllabus).length,
+        missing: base.filter((s) => !hasSyllabus(s)).length,
+    };
+    const collegeCount = new Set(
+        base.map((s) => s.college?._id).filter(Boolean),
+    ).size;
+
+    const filtersActive = Boolean(
+        search ||
+            filterCollege ||
+            filterCourse ||
+            filterBranch ||
+            filterSemester ||
+            hasTimeFilter(timeFilter),
+    );
+    const clearFilters = () => {
+        setSearch('');
+        setFilterCollege('');
+        setFilterCourse('');
+        setFilterBranch('');
+        setFilterSemester('');
+        setTimeFilter('');
+        setPage(1);
+    };
+    const setFilter = (setter) => (value) => {
+        setter(value);
+        setPage(1);
+    };
+
+    const syllabusStatus = (subject) => {
+        if (!hasSyllabus(subject)) {
+            return (
+                <span className='inline-flex items-center gap-1.5 text-[13px] text-warn-ink whitespace-nowrap'>
+                    <CircleDashed
+                        className='w-3.5 h-3.5 shrink-0'
+                        aria-hidden='true'
+                    />
+                    Missing
+                </span>
+            );
+        }
+        const path = syllabusPath(subject);
+        const body = (
+            <>
+                <CheckCircle2
+                    className='w-3.5 h-3.5 shrink-0'
+                    aria-hidden='true'
+                />
+                Ready
+            </>
+        );
+        return path ? (
+            <Link
+                to={path}
+                className='inline-flex items-center gap-1.5 text-[13px] text-ok-ink hover:underline whitespace-nowrap'
+                aria-label={`Syllabus ready for ${subject.subjectName}, open it`}
             >
-                <div className='max-w-7xl mx-auto px-4 sm:px-6'>
-                    {/* Header */}
-                    <div className='flex items-center justify-between'>
-                        <BackButton title='Subjects' TitleIcon={BookOpen} />
+                {body}
+            </Link>
+        ) : (
+            <span className='inline-flex items-center gap-1.5 text-[13px] text-ok-ink whitespace-nowrap'>
+                {body}
+            </span>
+        );
+    };
 
+    const rowActions = (subject) => (
+        <>
+            {hasSyllabus(subject) ? (
+                <Button
+                    size='sm'
+                    icon={Sparkles}
+                    to={quickNotesPath(subject)}
+                    aria-label={`Quick notes for ${subject.subjectName}`}
+                >
+                    Quick notes
+                </Button>
+            ) : (
+                <Button
+                    size='sm'
+                    icon={BookMarked}
+                    onClick={() => handleAddSyllabus(subject)}
+                    aria-label={`Add syllabus for ${subject.subjectName}`}
+                >
+                    Add syllabus
+                </Button>
+            )}
+            <Button
+                variant='ghost'
+                size='sm'
+                iconOnly
+                icon={Pencil}
+                aria-label={`Edit ${subject.subjectName}`}
+                onClick={() => handleEdit(subject)}
+            />
+            <Button
+                variant='ghost'
+                size='sm'
+                iconOnly
+                icon={Trash2}
+                aria-label={`Delete ${subject.subjectName}`}
+                className='text-bad-ink hover:text-bad-ink'
+                onClick={() => handleDelete(subject)}
+            />
+        </>
+    );
+
+    const empty = (
+        <EmptyState
+            icon={BookOpen}
+            tone={
+                filterSyllabus === 'missing' && !filtersActive && base.length
+                    ? 'done'
+                    : 'neutral'
+            }
+            title={
+                subjects.length === 0
+                    ? 'No subjects yet'
+                    : filterSyllabus === 'missing' &&
+                        !filtersActive &&
+                        base.length
+                      ? 'Every subject has a syllabus'
+                      : 'No subjects match'
+            }
+            description={
+                subjects.length === 0
+                    ? 'Subjects you add, or import from a branch, appear here.'
+                    : filterSyllabus === 'missing' && !filtersActive
+                      ? undefined
+                      : 'Try another search or clear the filters.'
+            }
+            action={
+                filtersActive ? (
+                    <Button onClick={clearFilters}>Clear filters</Button>
+                ) : undefined
+            }
+        />
+    );
+
+    const pagination = (
+        <Pagination
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+            }}
+        />
+    );
+
+    return (
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Subjects'
+                description='Every subject across colleges, and whether it has a syllabus yet.'
+                actions={
+                    <Button
+                        variant='primary'
+                        icon={Plus}
+                        onClick={() => {
+                            setEditingSubject(null);
+                            setShowModal(true);
+                        }}
+                    >
+                        Add subject
+                    </Button>
+                }
+            />
+
+            <div
+                role='group'
+                aria-label='Show'
+                className='grid grid-cols-3 gap-2 sm:gap-3 mb-5'
+            >
+                {VIEWS.map((view) => {
+                    const pressed = filterSyllabus === view.value;
+                    return (
                         <button
-                            onClick={() => setShowModal(true)}
-                            className='inline-flex mb-3 items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
-                        >
-                            <Plus className='w-4 h-4 mr-2' />
-                            Add Subject
-                        </button>
-                    </div>
-
-                    {/* Compact Filters */}
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
-                        <FilterBar
-                            search={search}
-                            onSearch={setSearch}
-                            searchPlaceholder='Search by subject name, code, course, branch, or semester...'
-                            filters={[
-                                {
-                                    label: 'College',
-                                    value: filterCollege,
-                                    onChange: setFilterCollege,
-                                    options: [
-                                        { value: '', label: 'All Colleges' },
-                                        ...colleges.map((c) => ({
-                                            value: c._id,
-                                            label: c.slug,
-                                        })),
-                                    ],
-                                },
-                                {
-                                    label: 'Course',
-                                    value: filterCourse,
-                                    onChange: (v) => {
-                                        setFilterCourse(v);
-                                        setFilterBranch('');
-                                    },
-                                    options: [
-                                        { value: '', label: 'All Courses' },
-                                        ...courses.map((c) => ({
-                                            value: c._id,
-                                            label: c.courseCode,
-                                        })),
-                                    ],
-                                },
-                                {
-                                    label: 'Branch',
-                                    value: filterBranch,
-                                    onChange: setFilterBranch,
-                                    options: [
-                                        { value: '', label: 'All Branches' },
-                                        ...(filterCourse
-                                            ? branches.filter(
-                                                  (b) =>
-                                                      (b.course?._id || '') ===
-                                                      filterCourse,
-                                              )
-                                            : branches
-                                        ).map((b) => ({
-                                            value: b._id,
-                                            label: b.branchCode,
-                                        })),
-                                    ],
-                                },
-                                {
-                                    label: 'Semester',
-                                    value: filterSemester,
-                                    onChange: setFilterSemester,
-                                    options: [
-                                        { value: '', label: 'All Semesters' },
-                                        ...[1, 2, 3, 4, 5, 6, 7, 8].map(
-                                            (sem) => ({
-                                                value: String(sem),
-                                                label: `Semester ${sem}`,
-                                            }),
-                                        ),
-                                    ],
-                                },
-                            ]}
-                            timeFilter={{
-                                value: timeFilter,
-                                onChange: (v) => {
-                                    setTimeFilter(v);
-                                    setPage(1);
-                                },
-                            }}
-                            sortBy={{
-                                value: sortBy,
-                                onChange: setSortBy,
-                                options: [
-                                    {
-                                        value: 'createdAt',
-                                        label: 'Sort by Date',
-                                    },
-                                    {
-                                        value: 'name',
-                                        label: 'Sort by Name',
-                                    },
-                                ],
-                            }}
-                            sortOrder={{
-                                value: sortOrder,
-                                onToggle: () =>
-                                    setSortOrder(
-                                        sortOrder === 'asc' ? 'desc' : 'asc',
-                                    ),
-                            }}
-                            viewMode={{
-                                value: viewMode,
-                                onChange: setViewMode,
-                            }}
-                            onClear={() => {
-                                setSearch('');
-                                setFilterCollege('');
-                                setFilterCourse('');
-                                setFilterBranch('');
-                                setFilterSemester('');
-                                setTimeFilter('');
+                            key={view.value || 'all'}
+                            type='button'
+                            aria-pressed={pressed}
+                            onClick={() => {
+                                setFilterSyllabus(view.value);
                                 setPage(1);
                             }}
-                            showClear={
-                                !!(
-                                    search ||
-                                    filterCollege ||
-                                    filterCourse ||
-                                    filterBranch ||
-                                    filterSemester ||
-                                    timeFilter
-                                )
-                            }
-                        />
-                    </div>
-
-                    {error && (
-                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 px-3 py-2 rounded mb-3'>
-                            {error}
-                        </div>
-                    )}
-
-                    {/* Grid/Table Views */}
-                    {current.length > 0 ? (
-                        <>
-                            {/* Grid View */}
-                            {viewMode === 'grid' && (
-                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mb-3'>
-                                    {current.map((subject) => (
-                                        <div
-                                            key={subject._id}
-                                            className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 hover:border-gray-300 dark:hover:border-gray-600 transition-colors'
-                                        >
-                                            <div className='text-sm font-semibold text-gray-900 dark:text-white mb-1'>
-                                                {subject.subjectName}
-                                            </div>
-                                            <div className='text-xs text-gray-500 dark:text-gray-400 mb-2'>
-                                                Code: {subject.subjectCode}
-                                            </div>
-                                            <div className='text-xs text-gray-700 dark:text-gray-300'>
-                                                College:{' '}
-                                                <span className='font-semibold'>
-                                                    {subject.college?.slug ||
-                                                        'N/A'}
-                                                </span>
-                                            </div>
-                                            <div className='text-xs text-gray-700 dark:text-gray-300'>
-                                                Course:{' '}
-                                                <span className='font-semibold'>
-                                                    {subject.course
-                                                        ?.courseCode || 'N/A'}
-                                                </span>
-                                            </div>
-                                            <div className='text-xs text-gray-700 dark:text-gray-300'>
-                                                Branch:{' '}
-                                                <span className='font-semibold'>
-                                                    {subject.branch
-                                                        ?.branchCode || 'N/A'}
-                                                </span>
-                                            </div>
-                                            <div className='text-xs text-gray-700 dark:text-gray-300 mb-3'>
-                                                Semester:{' '}
-                                                <span className='font-semibold'>
-                                                    {subject.semester || 'N/A'}
-                                                </span>
-                                            </div>
-                                            <div className='flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-4'>
-                                                <Calendar className='w-4 h-4' />
-                                                {subject.createdAt
-                                                    ? new Date(
-                                                          subject.createdAt,
-                                                      ).toLocaleDateString()
-                                                    : 'N/A'}
-                                            </div>
-                                            <div className='flex gap-2 justify-end'>
-                                                {/* Only show Add Syllabus button if subject doesn't have syllabus */}
-                                                {(!subject.syllabi ||
-                                                    subject.syllabi.length ===
-                                                        0) && (
-                                                    <button
-                                                        onClick={() =>
-                                                            handleAddSyllabus(
-                                                                subject,
-                                                            )
-                                                        }
-                                                        className='inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-green-600 text-white hover:bg-green-700'
-                                                        title='Add Syllabus'
-                                                    >
-                                                        <BookMarked className='w-3 h-3' />
-                                                        Syllabus
-                                                    </button>
-                                                )}
-                                                {subject.syllabi &&
-                                                    subject.syllabi.length >
-                                                        0 && (
-                                                        <button
-                                                            onClick={() =>
-                                                                navigate(
-                                                                    `/reports/subjects/${subject._id}/quick-notes`,
-                                                                )
-                                                            }
-                                                            className='inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-purple-600 text-white hover:bg-purple-700'
-                                                            title='Quick Notes'
-                                                        >
-                                                            <Sparkles className='w-3 h-3' />
-                                                            Q Notes
-                                                        </button>
-                                                    )}
-                                                <button
-                                                    onClick={() =>
-                                                        handleEdit(subject)
-                                                    }
-                                                    className='inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700'
-                                                >
-                                                    Edit
-                                                </button>
-                                                <button
-                                                    onClick={() =>
-                                                        handleDelete(subject)
-                                                    }
-                                                    className='inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700'
-                                                >
-                                                    Delete
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Table View */}
-                            {viewMode === 'table' && (
-                                <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                    <div className='overflow-x-auto'>
-                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                            <thead className='bg-gray-50 dark:bg-gray-900'>
-                                                <tr>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Subject Name
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Subject Code
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        College
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Course
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Branch
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Semester
-                                                    </th>
-                                                    <th className='px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                                                        Created
-                                                    </th>
-                                                    <th className='px-3 py-2'></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                                {current.map((subject) => (
-                                                    <tr
-                                                        key={subject._id}
-                                                        className='hover:bg-gray-50 dark:hover:bg-gray-700'
-                                                    >
-                                                        <td className='px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white'>
-                                                            {
-                                                                subject.subjectName
-                                                            }
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-900 dark:text-white'>
-                                                            {
-                                                                subject.subjectCode
-                                                            }
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-900 dark:text-white'>
-                                                            {subject.college
-                                                                ?.slug || 'N/A'}
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-900 dark:text-white'>
-                                                            {subject.course
-                                                                ?.courseCode ||
-                                                                'N/A'}
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-900 dark:text-white'>
-                                                            {subject.branch
-                                                                ?.branchCode ||
-                                                                'N/A'}
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-900 dark:text-white'>
-                                                            Sem{' '}
-                                                            {subject.semester ||
-                                                                'N/A'}
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400'>
-                                                            {subject.createdAt
-                                                                ? new Date(
-                                                                      subject.createdAt,
-                                                                  ).toLocaleDateString()
-                                                                : 'N/A'}
-                                                        </td>
-                                                        <td className='px-3 py-2 whitespace-nowrap text-sm text-right'>
-                                                            <div className='inline-flex gap-2'>
-                                                                {/* Only show Add Syllabus button if subject doesn't have syllabus */}
-                                                                {(!subject.syllabi ||
-                                                                    subject
-                                                                        .syllabi
-                                                                        .length ===
-                                                                        0) && (
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            handleAddSyllabus(
-                                                                                subject,
-                                                                            )
-                                                                        }
-                                                                        className='px-3 py-1.5 rounded-md text-xs font-medium bg-green-600 text-white hover:bg-green-700 inline-flex items-center gap-1'
-                                                                        title='Add Syllabus'
-                                                                    >
-                                                                        <BookMarked className='w-3 h-3' />
-                                                                        Syllabus
-                                                                    </button>
-                                                                )}
-                                                                {subject.syllabi &&
-                                                                    subject
-                                                                        .syllabi
-                                                                        .length >
-                                                                        0 && (
-                                                                        <button
-                                                                            onClick={() =>
-                                                                                navigate(
-                                                                                    `/reports/subjects/${subject._id}/quick-notes`,
-                                                                                )
-                                                                            }
-                                                                            className='px-3 py-1.5 rounded-md text-xs font-medium bg-purple-600 text-white hover:bg-purple-700 inline-flex items-center gap-1'
-                                                                            title='Quick Notes'
-                                                                        >
-                                                                            <Sparkles className='w-3 h-3' />
-                                                                            Q
-                                                                            Notes
-                                                                        </button>
-                                                                    )}
-                                                                <button
-                                                                    onClick={() =>
-                                                                        handleEdit(
-                                                                            subject,
-                                                                        )
-                                                                    }
-                                                                    className='px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700'
-                                                                >
-                                                                    Edit
-                                                                </button>
-                                                                <button
-                                                                    onClick={() =>
-                                                                        handleDelete(
-                                                                            subject,
-                                                                        )
-                                                                    }
-                                                                    className='px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700'
-                                                                >
-                                                                    Delete
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Pagination */}
-                            <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 px-4 py-3'>
-                                <Pagination
-                                    currentPage={page}
-                                    pageSize={pageSize}
-                                    totalItems={totalItems}
-                                    onPageChange={setPage}
-                                    onPageSizeChange={(s) => {
-                                        setPageSize(s);
-                                        setPage(1);
-                                    }}
+                            className={`flex flex-col gap-1.5 px-3 sm:px-4 py-3 sm:py-3.5 rounded-xl border bg-sheet text-left cursor-pointer transition-colors ${
+                                pressed
+                                    ? 'border-brand ring-1 ring-brand'
+                                    : 'border-line hover:border-line-strong'
+                            }`}
+                        >
+                            <span className='flex items-center gap-2 text-[12.5px] sm:text-[13px] text-ink-2 leading-tight'>
+                                <span
+                                    className={`w-2 h-2 rounded-full shrink-0 ${view.dot}`}
+                                    aria-hidden='true'
                                 />
-                            </div>
-                        </>
+                                {view.label}
+                            </span>
+                            <span className='font-serif font-bold text-[22px] sm:text-[26px] leading-none text-ink'>
+                                {formatNumber(viewCounts[view.value])}
+                            </span>
+                            <span className='hidden sm:block text-[12.5px] text-muted'>
+                                {view.note ||
+                                    `Across ${collegeCount} college${collegeCount === 1 ? '' : 's'}`}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            <FilterBar
+                className='mb-4'
+                search={search}
+                onSearch={setFilter(setSearch)}
+                searchPlaceholder='Search by subject, code, course, branch or semester'
+                filters={[
+                    {
+                        label: 'College',
+                        value: filterCollege,
+                        onChange: setFilter(setFilterCollege),
+                        options: [
+                            { value: '', label: 'Any college' },
+                            ...colleges.map((c) => ({
+                                value: c._id,
+                                label: c.name || c.slug,
+                            })),
+                        ],
+                    },
+                    {
+                        label: 'Course',
+                        value: filterCourse,
+                        onChange: (v) => {
+                            setFilterCourse(v);
+                            setFilterBranch('');
+                            setPage(1);
+                        },
+                        options: [
+                            { value: '', label: 'Any course' },
+                            ...courses.map((c) => ({
+                                value: c._id,
+                                label: c.courseCode,
+                            })),
+                        ],
+                    },
+                    {
+                        label: 'Branch',
+                        value: filterBranch,
+                        onChange: setFilter(setFilterBranch),
+                        options: [
+                            { value: '', label: 'Any branch' },
+                            ...(filterCourse
+                                ? branches.filter(
+                                      (b) =>
+                                          (b.course?._id || '') ===
+                                          filterCourse,
+                                  )
+                                : branches
+                            ).map((b) => ({
+                                value: b._id,
+                                label: b.branchCode,
+                            })),
+                        ],
+                    },
+                    {
+                        label: 'Semester',
+                        value: filterSemester,
+                        onChange: setFilter(setFilterSemester),
+                        options: [
+                            { value: '', label: 'Any semester' },
+                            ...SEMESTERS.map((sem) => ({
+                                value: String(sem),
+                                label: `Semester ${sem}`,
+                            })),
+                        ],
+                    },
+                ]}
+                timeFilter={{
+                    value: timeFilter,
+                    onChange: setFilter(setTimeFilter),
+                }}
+                sortBy={{
+                    value: sortBy,
+                    onChange: setSortBy,
+                    options: SORT_OPTIONS,
+                }}
+                sortOrder={{
+                    value: sortOrder,
+                    onToggle: () =>
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                }}
+                viewMode={{
+                    value: viewMode,
+                    onChange: setViewMode,
+                }}
+                onClear={clearFilters}
+                showClear={filtersActive}
+            />
+
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button size='sm' onClick={fetchData}>
+                            Try again
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
+
+            {viewMode === 'table' ? (
+                <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
+                    {current.length === 0 ? (
+                        empty
                     ) : (
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-center p-12'>
-                            <BookOpen className='w-16 h-16 mx-auto text-gray-400 mb-4' />
-                            <h3 className='text-xl font-medium text-gray-900 dark:text-white mb-2'>
-                                No Subjects Found
-                            </h3>
-                            <p className='text-gray-600 dark:text-gray-400'>
-                                No subjects match your current filters.
-                            </p>
+                        <Table minWidth={1040}>
+                            <thead>
+                                <tr>
+                                    <Th>Subject</Th>
+                                    <Th>College · branch</Th>
+                                    <Th>Sem</Th>
+                                    <Th>Syllabus</Th>
+                                    <Th>Added</Th>
+                                    <Th>
+                                        <span className='sr-only'>Actions</span>
+                                    </Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {current.map((subject) => (
+                                    <Tr key={subject._id}>
+                                        <Td className='max-w-[300px]'>
+                                            <div className='flex flex-col gap-0.5 min-w-0'>
+                                                <span className='font-medium text-ink truncate'>
+                                                    {subject.subjectName}
+                                                </span>
+                                                <code className='font-mono text-[12px] text-muted'>
+                                                    {subject.subjectCode}
+                                                </code>
+                                            </div>
+                                        </Td>
+                                        <Td className='max-w-[240px]'>
+                                            <div className='flex flex-col gap-0.5 min-w-0'>
+                                                <span className='truncate'>
+                                                    {subject.college?.name ||
+                                                        subject.college?.slug ||
+                                                        'No college'}
+                                                </span>
+                                                <span className='text-[12.5px] text-muted truncate'>
+                                                    {branchLine(subject)}
+                                                </span>
+                                            </div>
+                                        </Td>
+                                        <Td mono>{subject.semester || '—'}</Td>
+                                        <Td>{syllabusStatus(subject)}</Td>
+                                        <Td className='text-ink-2 whitespace-nowrap'>
+                                            {formatDate(subject.createdAt)}
+                                        </Td>
+                                        <Td align='right'>
+                                            <div className='flex justify-end items-center gap-1'>
+                                                {rowActions(subject)}
+                                            </div>
+                                        </Td>
+                                    </Tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                    {totalItems > 0 && (
+                        <div className='px-4 py-3 border-t border-line-soft'>
+                            {pagination}
                         </div>
                     )}
                 </div>
-            </main>
+            ) : current.length === 0 ? (
+                <div className='bg-sheet border border-line rounded-xl'>
+                    {empty}
+                </div>
+            ) : (
+                <div className='flex flex-col gap-4'>
+                    <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
+                        {current.map((subject) => (
+                            <article
+                                key={subject._id}
+                                className='flex flex-col gap-3 p-4 bg-sheet border border-line rounded-xl'
+                            >
+                                <div className='flex items-start gap-2'>
+                                    <div className='flex-1 min-w-0 flex flex-col gap-0.5'>
+                                        <span className='font-medium text-ink'>
+                                            {subject.subjectName}
+                                        </span>
+                                        <span className='text-[12.5px] text-muted truncate'>
+                                            <code className='font-mono'>
+                                                {subject.subjectCode}
+                                            </code>
+                                            {subject.semester &&
+                                                ` · Sem ${subject.semester}`}
+                                        </span>
+                                    </div>
+                                    {syllabusStatus(subject)}
+                                </div>
+                                <div className='flex flex-wrap gap-x-3 gap-y-1 text-[13px] text-ink-2'>
+                                    <span>
+                                        {subject.college?.name ||
+                                            subject.college?.slug ||
+                                            'No college'}
+                                    </span>
+                                    <span>{branchLine(subject)}</span>
+                                    <span>
+                                        Added {formatDate(subject.createdAt)}
+                                    </span>
+                                </div>
+                                <div className='flex flex-wrap items-center justify-end gap-1 pt-3 border-t border-line-soft'>
+                                    {rowActions(subject)}
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                    <div className='bg-sheet border border-line rounded-xl px-4 py-3'>
+                        {pagination}
+                    </div>
+                </div>
+            )}
 
             {/* Subject Modal */}
             <AddSubjectModal
@@ -841,6 +895,7 @@ const Subjects = () => {
                 onConfirm={confirmModal.onConfirm}
                 title={confirmModal.title}
                 message={confirmModal.message}
+                confirmText={confirmModal.confirmText}
                 variant={confirmModal.variant}
             />
         </div>

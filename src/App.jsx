@@ -12,6 +12,8 @@ import OfflineIndicator from './components/OfflineIndicator';
 import { lazy, Suspense } from 'react';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorBoundary from './components/ErrorBoundary';
+import AppLayout from './components/layout/AppLayout';
+import { CollegeProvider } from './context/CollegeContext';
 
 // Auth
 const Login = lazy(() => import('./pages/Auth/Login'));
@@ -112,516 +114,336 @@ function App() {
         <AuthProvider>
             <SidebarProvider>
                 <Router>
-                    <ErrorBoundary>
-                        <OfflineIndicator />
-                        <Toaster
-                            position='top-right'
-                            toastOptions={{
-                                duration: 4000,
-                                style: {
-                                    background: '#363636',
-                                    color: '#fff',
+                    <CollegeProvider>
+                        <ErrorBoundary>
+                            <OfflineIndicator />
+                            <Toaster
+                                position='bottom-right'
+                                toastOptions={{
+                                    duration: 5000,
+                                    style: {
+                                        background: 'var(--ss-inverse)',
+                                        color: 'var(--ss-on-inverse)',
+                                        borderRadius: '12px',
+                                        fontSize: '13.5px',
+                                        padding: '10px 14px',
+                                        boxShadow:
+                                            '0 8px 24px rgba(20, 19, 17, 0.2)',
+                                    },
+                                    success: {
+                                        iconTheme: {
+                                            primary: 'var(--ss-ok)',
+                                            secondary: '#ffffff',
+                                        },
+                                    },
+                                    error: {
+                                        duration: 6000,
+                                        iconTheme: {
+                                            primary: 'var(--ss-bad)',
+                                            secondary: '#ffffff',
+                                        },
+                                    },
+                                }}
+                                containerStyle={{
                                     zIndex: 99999,
-                                },
-                                success: {
-                                    duration: 3000,
-                                    theme: {
-                                        primary: 'green',
-                                        secondary: 'black',
-                                    },
-                                },
-                                error: {
-                                    duration: 4000,
-                                    theme: {
-                                        primary: 'red',
-                                        secondary: 'black',
-                                    },
-                                },
-                            }}
-                            containerStyle={{
-                                zIndex: 99999,
-                            }}
-                        />
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <Routes>
-                                <Route path="/reports/refunds" element={<ProtectedRoute><Refunds /></ProtectedRoute>} />
-                                {/* Public routes */}
-                                <Route path='/login' element={<Login />} />
-                                {/* <Route path='/signup' element={<Signup />} /> */}
+                                }}
+                            />
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <Routes>
+                                    {/* Public routes */}
+                                    <Route path='/login' element={<Login />} />
+                                    {/* <Route path='/signup' element={<Signup />} /> */}
 
-                                {/* Protected routes */}
-                                <Route
-                                    path='/dashboard'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Dashboard />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                    {/* Protected routes */}
+                                    <Route
+                                        element={
+                                            <ProtectedRoute>
+                                                <AppLayout />
+                                            </ProtectedRoute>
+                                        }
+                                    >
+                                        <Route
+                                            path='/reports/refunds'
+                                            element={<Refunds />}
+                                        />
+                                        <Route
+                                            path='/dashboard'
+                                            element={<Dashboard />}
+                                        />
 
-                                <Route
-                                    path='/analytics'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Analytics />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        <Route
+                                            path='/analytics'
+                                            element={<Analytics />}
+                                        />
 
-                                <Route
-                                    path='/tasks'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Tasks />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        <Route
+                                            path='/tasks'
+                                            element={<Tasks />}
+                                        />
 
-                                <Route
-                                    path='/notifications'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Notifications />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        <Route
+                                            path='/notifications'
+                                            element={<Notifications />}
+                                        />
 
-                                <Route
-                                    path='/affiliate-products'
-                                    element={
-                                        <ProtectedRoute>
-                                            <AffiliateProducts />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        <Route
+                                            path='/affiliate-products'
+                                            element={<AffiliateProducts />}
+                                        />
 
-                                {/* Blog — not college-scoped, so these sit
+                                        {/* Blog — not college-scoped, so these sit
                                     at the top level rather than under a slug */}
-                                <Route
-                                    path='/blog'
-                                    element={
-                                        <ProtectedRoute>
-                                            <BlogShell>
-                                                <BlogList />
-                                            </BlogShell>
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/blog/create'
-                                    element={
-                                        <ProtectedRoute>
-                                            <BlogShell>
-                                                <BlogCreate />
-                                            </BlogShell>
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/blog/analytics'
-                                    element={
-                                        <ProtectedRoute>
-                                            <BlogShell>
-                                                <BlogAnalytics />
-                                            </BlogShell>
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/blog/edit/:id'
-                                    element={
-                                        <ProtectedRoute>
-                                            <BlogShell>
-                                                <BlogEdit />
-                                            </BlogShell>
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        <Route
+                                            path='/blog'
+                                            element={
+                                                <BlogShell>
+                                                    <BlogList />
+                                                </BlogShell>
+                                            }
+                                        />
+                                        <Route
+                                            path='/blog/create'
+                                            element={
+                                                <BlogShell>
+                                                    <BlogCreate />
+                                                </BlogShell>
+                                            }
+                                        />
+                                        <Route
+                                            path='/blog/analytics'
+                                            element={
+                                                <BlogShell>
+                                                    <BlogAnalytics />
+                                                </BlogShell>
+                                            }
+                                        />
+                                        <Route
+                                            path='/blog/edit/:id'
+                                            element={
+                                                <BlogShell>
+                                                    <BlogEdit />
+                                                </BlogShell>
+                                            }
+                                        />
 
-                                {/* Reports route */}
-                                <Route
-                                    path='/reports'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Reports />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* Reports route */}
+                                        <Route
+                                            path='/reports'
+                                            element={<Reports />}
+                                        />
 
-                                {/* Community moderation */}
-                                <Route
-                                    path='/community'
-                                    element={
-                                        <ProtectedRoute>
-                                            <CommunityModeration />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* Community moderation */}
+                                        <Route
+                                            path='/community'
+                                            element={<CommunityModeration />}
+                                        />
 
-                                {/* Users routes */}
-                                <Route
-                                    path='/users'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Users />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/users/:userId'
-                                    element={
-                                        <ProtectedRoute>
-                                            <UserDetail />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* Users routes */}
+                                        <Route
+                                            path='/users'
+                                            element={<Users />}
+                                        />
+                                        <Route
+                                            path='/users/:userId'
+                                            element={<UserDetail />}
+                                        />
 
-                                {/* Reports detail routes */}
-                                <Route
-                                    path='/reports/payments'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Payments />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/orders'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Order />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/payments/:id'
-                                    element={
-                                        <ProtectedRoute>
-                                            <PaymentDetail />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/contacts'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Contacts />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/redemptions'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Redemptions />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/transactions'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Transactions />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/subscriptions'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Subscriptions />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/content-purchases'
-                                    element={
-                                        <ProtectedRoute>
-                                            <ContentPurchases />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/clients'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Users />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/dashboard-users'
-                                    element={
-                                        <ProtectedRoute>
-                                            <DashboardUsers />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/courses'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Courses />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/branches'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Branches />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/branches/:branchId/subjects'
-                                    element={
-                                        <ProtectedRoute>
-                                            <BranchSubjects />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/subjects'
-                                    element={
-                                        <ProtectedRoute>
-                                            <Subjects />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/reports/subjects/:subjectId/quick-notes'
-                                    element={
-                                        <ProtectedRoute>
-                                            <QuickNotes />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* Reports detail routes */}
+                                        <Route
+                                            path='/reports/payments'
+                                            element={<Payments />}
+                                        />
+                                        <Route
+                                            path='/reports/orders'
+                                            element={<Order />}
+                                        />
+                                        <Route
+                                            path='/reports/payments/:id'
+                                            element={<PaymentDetail />}
+                                        />
+                                        <Route
+                                            path='/reports/contacts'
+                                            element={<Contacts />}
+                                        />
+                                        <Route
+                                            path='/reports/redemptions'
+                                            element={<Redemptions />}
+                                        />
+                                        <Route
+                                            path='/reports/transactions'
+                                            element={<Transactions />}
+                                        />
+                                        <Route
+                                            path='/reports/subscriptions'
+                                            element={<Subscriptions />}
+                                        />
+                                        <Route
+                                            path='/reports/content-purchases'
+                                            element={<ContentPurchases />}
+                                        />
+                                        <Route
+                                            path='/reports/clients'
+                                            element={<Users />}
+                                        />
+                                        <Route
+                                            path='/reports/dashboard-users'
+                                            element={<DashboardUsers />}
+                                        />
+                                        <Route
+                                            path='/reports/courses'
+                                            element={<Courses />}
+                                        />
+                                        <Route
+                                            path='/reports/branches'
+                                            element={<Branches />}
+                                        />
+                                        <Route
+                                            path='/reports/branches/:branchId/subjects'
+                                            element={<BranchSubjects />}
+                                        />
+                                        <Route
+                                            path='/reports/subjects'
+                                            element={<Subjects />}
+                                        />
+                                        <Route
+                                            path='/reports/subjects/:subjectId/quick-notes'
+                                            element={<QuickNotes />}
+                                        />
 
-                                {/* PYQ routes */}
-                                <Route
-                                    path='/:collegeslug/pyqs'
-                                    element={
-                                        <ProtectedRoute>
-                                            <PyqList />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/:collegeslug/pyqs-bulk-import'
-                                    element={
-                                        <ProtectedRoute>
-                                            <PyqBulkImport />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/:collegeslug/pyqs/:pyqid'
-                                    element={
-                                        <ProtectedRoute>
-                                            <PyqDetail />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* PYQ routes */}
+                                        <Route
+                                            path='/:collegeslug/pyqs'
+                                            element={<PyqList />}
+                                        />
+                                        <Route
+                                            path='/:collegeslug/pyqs-bulk-import'
+                                            element={<PyqBulkImport />}
+                                        />
+                                        <Route
+                                            path='/:collegeslug/pyqs/:pyqid'
+                                            element={<PyqDetail />}
+                                        />
 
-                                <Route
-                                    path='/:collegeslug/pyqs/:pyqid/aisolution'
-                                    element={
-                                        <ProtectedRoute>
-                                            <PyqSolutionPage />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                {/* Notes routes */}
-                                <Route
-                                    path='/:collegeslug/notes'
-                                    element={
-                                        <ProtectedRoute>
-                                            <NotesList />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/:collegeslug/notes/:noteid'
-                                    element={
-                                        <ProtectedRoute>
-                                            <NotesDetail />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        <Route
+                                            path='/:collegeslug/pyqs/:pyqid/aisolution'
+                                            element={<PyqSolutionPage />}
+                                        />
+                                        {/* Notes routes */}
+                                        <Route
+                                            path='/:collegeslug/notes'
+                                            element={<NotesList />}
+                                        />
+                                        <Route
+                                            path='/:collegeslug/notes/:noteid'
+                                            element={<NotesDetail />}
+                                        />
 
-                                {/* Syllabus routes */}
-                                <Route
-                                    path='/:collegeslug/syllabus'
-                                    element={
-                                        <ProtectedRoute>
-                                            <SyllabusList />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/:collegeslug/syllabus/:syllabusid'
-                                    element={
-                                        <ProtectedRoute>
-                                            <SyllabusDetail />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* Syllabus routes */}
+                                        <Route
+                                            path='/:collegeslug/syllabus'
+                                            element={<SyllabusList />}
+                                        />
+                                        <Route
+                                            path='/:collegeslug/syllabus/:syllabusid'
+                                            element={<SyllabusDetail />}
+                                        />
 
-                                {/* Product routes */}
-                                <Route
-                                    path='/:collegeslug/products'
-                                    element={
-                                        <ProtectedRoute>
-                                            <ProductList />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/:collegeslug/products/:productid'
-                                    element={
-                                        <ProtectedRoute>
-                                            <ProductDetail />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* Product routes */}
+                                        <Route
+                                            path='/:collegeslug/products'
+                                            element={<ProductList />}
+                                        />
+                                        <Route
+                                            path='/:collegeslug/products/:productid'
+                                            element={<ProductDetail />}
+                                        />
 
-                                {/* Senior routes */}
-                                <Route
-                                    path='/:collegeslug/seniors'
-                                    element={
-                                        <ProtectedRoute>
-                                            <SeniorList />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/:collegeslug/seniors/:seniorid'
-                                    element={
-                                        <ProtectedRoute>
-                                            <SeniorDetail />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* Senior routes */}
+                                        <Route
+                                            path='/:collegeslug/seniors'
+                                            element={<SeniorList />}
+                                        />
+                                        <Route
+                                            path='/:collegeslug/seniors/:seniorid'
+                                            element={<SeniorDetail />}
+                                        />
 
-                                {/* Group routes */}
-                                <Route
-                                    path='/:collegeslug/groups'
-                                    element={
-                                        <ProtectedRoute>
-                                            <GroupList />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/:collegeslug/groups/:groupid'
-                                    element={
-                                        <ProtectedRoute>
-                                            <GroupDetail />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* Group routes */}
+                                        <Route
+                                            path='/:collegeslug/groups'
+                                            element={<GroupList />}
+                                        />
+                                        <Route
+                                            path='/:collegeslug/groups/:groupid'
+                                            element={<GroupDetail />}
+                                        />
 
-                                {/* Opportunity routes */}
-                                <Route
-                                    path='/:collegeslug/opportunities'
-                                    element={
-                                        <ProtectedRoute>
-                                            <OpportunityList />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/:collegeslug/opportunities/:opportunityid'
-                                    element={
-                                        <ProtectedRoute>
-                                            <OpportunityDetail />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* Opportunity routes */}
+                                        <Route
+                                            path='/:collegeslug/opportunities'
+                                            element={<OpportunityList />}
+                                        />
+                                        <Route
+                                            path='/:collegeslug/opportunities/:opportunityid'
+                                            element={<OpportunityDetail />}
+                                        />
 
-                                {/* Lost & Found routes */}
-                                <Route
-                                    path='/:collegeslug/lost-found'
-                                    element={
-                                        <ProtectedRoute>
-                                            <LostFoundList />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/:collegeslug/lost-found/:itemid'
-                                    element={
-                                        <ProtectedRoute>
-                                            <LostFoundDetail />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                {/* Video routes */}
-                                <Route
-                                    path='/:collegeslug/videos'
-                                    element={
-                                        <ProtectedRoute>
-                                            <VideoList />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path='/:collegeslug/videos/:videoid'
-                                    element={
-                                        <ProtectedRoute>
-                                            <VideoDetail />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* Lost & Found routes */}
+                                        <Route
+                                            path='/:collegeslug/lost-found'
+                                            element={<LostFoundList />}
+                                        />
+                                        <Route
+                                            path='/:collegeslug/lost-found/:itemid'
+                                            element={<LostFoundDetail />}
+                                        />
+                                        {/* Video routes */}
+                                        <Route
+                                            path='/:collegeslug/videos'
+                                            element={<VideoList />}
+                                        />
+                                        <Route
+                                            path='/:collegeslug/videos/:videoid'
+                                            element={<VideoDetail />}
+                                        />
 
-                                {/* College detail route */}
-                                <Route
-                                    path='/:collegeslug'
-                                    element={
-                                        <ProtectedRoute>
-                                            <CollegeDetail />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* College detail route */}
+                                        <Route
+                                            path='/:collegeslug'
+                                            element={<CollegeDetail />}
+                                        />
 
-                                {/* Pyqs routes */}
-                                <Route
-                                    path='/:collegeslug/pyqs-solutions'
-                                    element={
-                                        <ProtectedRoute>
-                                            <PyqSolutionList />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        {/* Pyqs routes */}
+                                        <Route
+                                            path='/:collegeslug/pyqs-solutions'
+                                            element={<PyqSolutionList />}
+                                        />
 
-                                <Route
-                                    path='/:collegeslug/quick-notes'
-                                    element={
-                                        <ProtectedRoute>
-                                            <QuickNotesList />
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                        <Route
+                                            path='/:collegeslug/quick-notes'
+                                            element={<QuickNotesList />}
+                                        />
+                                    </Route>
 
-                                {/* Default redirect */}
-                                <Route
-                                    path='/'
-                                    element={
-                                        <Navigate to='/dashboard' replace />
-                                    }
-                                />
+                                    {/* Default redirect */}
+                                    <Route
+                                        path='/'
+                                        element={
+                                            <Navigate to='/dashboard' replace />
+                                        }
+                                    />
 
-                                {/* Catch all other routes */}
-                                <Route
-                                    path='*'
-                                    element={
-                                        <Navigate to='/dashboard' replace />
-                                    }
-                                />
-                            </Routes>
-                        </Suspense>
-                    </ErrorBoundary>
+                                    {/* Catch all other routes */}
+                                    <Route
+                                        path='*'
+                                        element={
+                                            <Navigate to='/dashboard' replace />
+                                        }
+                                    />
+                                </Routes>
+                            </Suspense>
+                        </ErrorBoundary>
+                    </CollegeProvider>
                 </Router>
             </SidebarProvider>
         </AuthProvider>

@@ -1,5 +1,4 @@
-import React from 'react';
-import { WifiOff, Wifi } from 'lucide-react';
+import { WifiOff } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/usePWA';
 
 const OfflineIndicator = () => {
@@ -10,13 +9,12 @@ const OfflineIndicator = () => {
     }
 
     return (
-        <div className='fixed top-0 left-0 right-0 bg-red-600 text-white px-4 py-2 text-center z-50'>
-            <div className='flex items-center justify-center'>
-                <WifiOff className='h-4 w-4 mr-2' />
-                <span className='text-sm font-medium'>
-                    You're offline. Some features may not be available.
-                </span>
-            </div>
+        <div
+            role='status'
+            className='fixed top-3 left-1/2 -translate-x-1/2 z-[80] flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-inverse text-on-inverse text-[13.5px] shadow-[0_8px_24px_rgba(20,19,17,0.2)]'
+        >
+            <WifiOff className='w-4 h-4 text-warn' aria-hidden='true' />
+            You’re offline. Changes can’t be saved until you reconnect.
         </div>
     );
 };

@@ -1,322 +1,248 @@
 import {
-    Bot,
-    Users,
-    MessageSquare,
-    Zap,
-    Target,
-    TrendingUp,
-    BookOpen,
-    PieChart,
-    Activity,
-} from 'lucide-react';
+    Bar,
+    BarChart,
+    CartesianGrid,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
+import { formatNumber } from '../../utils/format';
+import { Panel } from '../ui';
+import ChartTooltip from './ChartTooltip';
+import ContentCard from './ContentCard';
+import {
+    AXIS_PROPS,
+    BAR_CURSOR,
+    BAR_RADIUS,
+    GRID_PROPS,
+    dayLabel,
+    fullDayLabel,
+    lastDays,
+} from './analyticsData';
 
+const RESOURCE_LABELS = {
+    pyq: 'PYQs',
+    pyqs: 'PYQs',
+    note: 'Notes',
+    notes: 'Notes',
+    syllabus: 'Syllabus',
+    video: 'Videos',
+    videos: 'Videos',
+};
+
+const resourceLabel = (type) =>
+    RESOURCE_LABELS[String(type).toLowerCase()] ||
+    String(type || 'Other').replace(/^\w/, (c) => c.toUpperCase());
+
+function MiniStat({ label, value, note }) {
+    return (
+        <div className='flex flex-col gap-2 px-[18px] py-3.5 rounded-xl bg-sunken border border-line-soft'>
+            <span className='text-[12.5px] text-ink-2'>{label}</span>
+            <span className='font-serif font-bold text-2xl leading-none text-ink'>
+                {value}
+            </span>
+            {note && <span className='text-xs text-muted'>{note}</span>}
+        </div>
+    );
+}
+
+function BarListPanel({ title, titleId, note, rows, empty }) {
+    const max = rows[0]?.count || 0;
+    return (
+        <Panel
+            title={title}
+            titleId={titleId}
+            action={
+                note && <span className='text-[12.5px] text-muted'>{note}</span>
+            }
+            bodyClassName='px-5 py-4'
+        >
+            {rows.length === 0 ? (
+                <p className='py-6 text-center text-[13.5px] text-muted'>
+                    {empty}
+                </p>
+            ) : (
+                <ul className='flex flex-col gap-3'>
+                    {rows.map((row) => (
+                        <ContentCard
+                            key={row.key}
+                            label={row.label}
+                            sublabel={row.sublabel}
+                            value={formatNumber(row.count)}
+                            share={row.share}
+                            pct={max ? (row.count / max) * 100 : 0}
+                        />
+                    ))}
+                </ul>
+            )}
+        </Panel>
+    );
+}
+
+/** The in-app study assistant: who uses it and what they ask about. */
 function ChatbotAnalytics({ chatbotData }) {
     if (!chatbotData) return null;
 
+    const resources = [...(chatbotData.resourceStats || [])].sort(
+        (a, b) => b.count - a.count,
+    );
+    const resourcesTotal = resources.reduce((sum, r) => sum + r.count, 0);
+    const daily = lastDays(chatbotData.dailyUsers, 30);
+    const peak = Math.max(0, ...daily.map((d) => d.value));
+
     return (
-        <div className='mt-6 md:mt-8'>
-            <div className='flex items-center space-x-2 md:space-x-3 mb-4 md:mb-6'>
-                <Bot className='w-6 h-6 md:w-8 md:h-8 text-indigo-600 dark:text-indigo-400' />
-                <h2 className='text-xl md:text-2xl font-bold text-gray-900 dark:text-white'>
-                    Chatbot Analytics
+        <section
+            aria-labelledby='assistant-title'
+            className='flex flex-col gap-4 pt-2'
+        >
+            <div className='flex flex-wrap items-baseline gap-x-3 gap-y-1'>
+                <h2
+                    id='assistant-title'
+                    className='font-serif font-bold text-[22px] text-ink'
+                >
+                    Study assistant
                 </h2>
+                <span className='text-[13px] text-muted'>
+                    The in-app chatbot · all time
+                </span>
             </div>
 
-            {/* Chatbot Overview Stats */}
-            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8'>
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6'>
-                    <div className='flex items-center justify-between'>
-                        <div className='flex-1'>
-                            <p className='text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400 mb-1'>
-                                Total Users
-                            </p>
-                            <p className='text-2xl md:text-3xl font-bold text-gray-900 dark:text-white'>
-                                {chatbotData.totalUsers.toLocaleString()}
-                            </p>
-                            <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                {chatbotData.guestUsers} guests •{' '}
-                                {chatbotData.registeredUsers} registered
-                            </p>
-                        </div>
-                        <div className='p-2 md:p-3 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex-shrink-0'>
-                            <Users className='w-5 h-5 md:w-6 md:h-6 text-indigo-600 dark:text-indigo-400' />
-                        </div>
-                    </div>
-                </div>
-
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6'>
-                    <div className='flex items-center justify-between'>
-                        <div className='flex-1'>
-                            <p className='text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400 mb-1'>
-                                Total Sessions
-                            </p>
-                            <p className='text-2xl md:text-3xl font-bold text-gray-900 dark:text-white'>
-                                {chatbotData.totalSessions.toLocaleString()}
-                            </p>
-                        </div>
-                        <div className='p-2 md:p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex-shrink-0'>
-                            <MessageSquare className='w-5 h-5 md:w-6 md:h-6 text-blue-600 dark:text-blue-400' />
-                        </div>
-                    </div>
-                </div>
-
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6'>
-                    <div className='flex items-center justify-between'>
-                        <div className='flex-1'>
-                            <p className='text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400 mb-1'>
-                                Avg Interactions
-                            </p>
-                            <p className='text-2xl md:text-3xl font-bold text-gray-900 dark:text-white'>
-                                {chatbotData.averageInteractionsPerSession.toFixed(
-                                    1,
-                                )}
-                            </p>
-                            <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                                per session
-                            </p>
-                        </div>
-                        <div className='p-2 md:p-3 rounded-lg bg-green-100 dark:bg-green-900/30 flex-shrink-0'>
-                            <Zap className='w-5 h-5 md:w-6 md:h-6 text-green-600 dark:text-green-400' />
-                        </div>
-                    </div>
-                </div>
-
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6'>
-                    <div className='flex items-center justify-between'>
-                        <div className='flex-1'>
-                            <p className='text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400 mb-1'>
-                                Resources Viewed
-                            </p>
-                            <p className='text-2xl md:text-3xl font-bold text-gray-900 dark:text-white'>
-                                {chatbotData.resourceStats.reduce(
-                                    (sum, r) => sum + r.count,
-                                    0,
-                                )}
-                            </p>
-                        </div>
-                        <div className='p-2 md:p-3 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex-shrink-0'>
-                            <Target className='w-5 h-5 md:w-6 md:h-6 text-purple-600 dark:text-purple-400' />
-                        </div>
-                    </div>
-                </div>
+            <div className='grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-3.5'>
+                <MiniStat
+                    label='Users'
+                    value={formatNumber(chatbotData.totalUsers)}
+                    note={`${formatNumber(chatbotData.guestUsers)} guests · ${formatNumber(chatbotData.registeredUsers)} signed in`}
+                />
+                <MiniStat
+                    label='Sessions'
+                    value={formatNumber(chatbotData.totalSessions)}
+                />
+                <MiniStat
+                    label='Messages per session'
+                    value={Number(
+                        chatbotData.averageInteractionsPerSession || 0,
+                    ).toFixed(1)}
+                    note='On average'
+                />
+                <MiniStat
+                    label='Resources opened'
+                    value={formatNumber(resourcesTotal)}
+                    note='From links in the chat'
+                />
             </div>
 
-            {/* Chatbot Detailed Metrics */}
-            <div className='grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8'>
-                {/* Popular Colleges */}
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6'>
-                    <div className='flex items-center justify-between mb-4 md:mb-6'>
-                        <h3 className='text-base md:text-xl font-semibold text-gray-900 dark:text-white'>
-                            Popular Colleges
-                        </h3>
-                        <TrendingUp className='w-4 h-4 md:w-5 md:h-5 text-indigo-500' />
-                    </div>
+            <Panel
+                title='Daily active users'
+                titleId='dau-title'
+                action={
+                    <span className='text-[12.5px] text-muted'>
+                        Last 30 days
+                        {peak > 0 && ` · peak ${formatNumber(peak)}`}
+                    </span>
+                }
+                bodyClassName='px-3 pt-4 pb-3'
+            >
+                {peak === 0 ? (
+                    <p className='h-[180px] flex items-center justify-center text-[13.5px] text-muted'>
+                        No one used the assistant in the last 30 days.
+                    </p>
+                ) : (
+                    <figure
+                        className='m-0 h-[180px]'
+                        aria-label={`Bar chart of daily assistant users over the last 30 days, peaking at ${formatNumber(peak)}.`}
+                    >
+                        <ResponsiveContainer width='100%' height='100%'>
+                            <BarChart
+                                data={daily}
+                                margin={{
+                                    top: 8,
+                                    right: 12,
+                                    bottom: 0,
+                                    left: 0,
+                                }}
+                            >
+                                <CartesianGrid {...GRID_PROPS} />
+                                <XAxis
+                                    {...AXIS_PROPS}
+                                    dataKey='key'
+                                    tickFormatter={dayLabel}
+                                    minTickGap={24}
+                                    tickMargin={8}
+                                />
+                                <YAxis
+                                    {...AXIS_PROPS}
+                                    axisLine={false}
+                                    allowDecimals={false}
+                                    width={40}
+                                    tickFormatter={formatNumber}
+                                />
+                                <Tooltip
+                                    cursor={BAR_CURSOR}
+                                    content={
+                                        <ChartTooltip
+                                            unit='users'
+                                            formatLabel={fullDayLabel}
+                                        />
+                                    }
+                                />
+                                <Bar
+                                    dataKey='value'
+                                    name='Users'
+                                    fill='var(--ss-brand)'
+                                    radius={BAR_RADIUS}
+                                    maxBarSize={24}
+                                    isAnimationActive={false}
+                                />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </figure>
+                )}
+            </Panel>
 
-                    <div className='space-y-3 md:space-y-4 max-h-80 overflow-y-auto'>
-                        {chatbotData.popularColleges &&
-                        chatbotData.popularColleges.length > 0 ? (
-                            chatbotData.popularColleges.map(
-                                (college, index) => (
-                                    <div
-                                        key={index}
-                                        className='flex items-center justify-between p-3 md:p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg'
-                                    >
-                                        <div className='flex items-center space-x-2 md:space-x-3 flex-1 min-w-0'>
-                                            <div className='flex-shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs md:text-sm'>
-                                                {index + 1}
-                                            </div>
-                                            <p className='text-xs md:text-sm font-medium text-gray-900 dark:text-white truncate'>
-                                                {college.name}
-                                            </p>
-                                        </div>
-                                        <span className='text-xs md:text-sm font-semibold text-indigo-600 dark:text-indigo-400 whitespace-nowrap ml-2'>
-                                            {college.count} searches
-                                        </span>
-                                    </div>
-                                ),
-                            )
-                        ) : (
-                            <p className='text-center text-sm text-gray-500 dark:text-gray-400 py-4'>
-                                No college data available
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                {/* Popular Subjects */}
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6'>
-                    <div className='flex items-center justify-between mb-4 md:mb-6'>
-                        <h3 className='text-base md:text-xl font-semibold text-gray-900 dark:text-white'>
-                            Popular Subjects
-                        </h3>
-                        <BookOpen className='w-4 h-4 md:w-5 md:h-5 text-blue-500' />
-                    </div>
-
-                    <div className='space-y-3 md:space-y-4 max-h-80 overflow-y-auto'>
-                        {chatbotData.popularSubjects &&
-                        chatbotData.popularSubjects.length > 0 ? (
-                            chatbotData.popularSubjects.map(
-                                (subject, index) => (
-                                    <div
-                                        key={index}
-                                        className='flex items-center justify-between p-3 md:p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg'
-                                    >
-                                        <div className='flex items-center space-x-2 md:space-x-3 flex-1 min-w-0'>
-                                            <div className='flex-shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs md:text-sm'>
-                                                {index + 1}
-                                            </div>
-                                            <div className='flex-1 min-w-0'>
-                                                <p className='text-xs md:text-sm font-medium text-gray-900 dark:text-white truncate'>
-                                                    {subject.name}
-                                                </p>
-                                                <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                                    {subject.code}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <span className='text-xs md:text-sm font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap ml-2'>
-                                            {subject.count} searches
-                                        </span>
-                                    </div>
-                                ),
-                            )
-                        ) : (
-                            <p className='text-center text-sm text-gray-500 dark:text-gray-400 py-4'>
-                                No subject data available
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                {/* Resource Types Distribution */}
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6'>
-                    <div className='flex items-center justify-between mb-4 md:mb-6'>
-                        <h3 className='text-base md:text-xl font-semibold text-gray-900 dark:text-white'>
-                            Resource Types
-                        </h3>
-                        <PieChart className='w-4 h-4 md:w-5 md:h-5 text-green-500' />
-                    </div>
-
-                    <div className='space-y-3 md:space-y-4'>
-                        {chatbotData.resourceStats &&
-                        chatbotData.resourceStats.length > 0 ? (
-                            chatbotData.resourceStats.map((resource, index) => {
-                                const total = chatbotData.resourceStats.reduce(
-                                    (sum, r) => sum + r.count,
-                                    0,
-                                );
-                                const percentage =
-                                    total > 0
-                                        ? (
-                                              (resource.count / total) *
-                                              100
-                                          ).toFixed(1)
-                                        : 0;
-                                const colors = [
-                                    'from-yellow-500 to-orange-500',
-                                    'from-blue-500 to-cyan-500',
-                                    'from-purple-500 to-pink-500',
-                                ];
-                                return (
-                                    <div key={index} className='space-y-2'>
-                                        <div className='flex items-center justify-between'>
-                                            <span className='text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 capitalize'>
-                                                {resource._id}
-                                            </span>
-                                            <span className='text-xs md:text-sm font-semibold text-gray-900 dark:text-white'>
-                                                {resource.count} ({percentage}%)
-                                            </span>
-                                        </div>
-                                        <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2'>
-                                            <div
-                                                className={`bg-gradient-to-r ${colors[index % 3]} h-2 rounded-full transition-all duration-300`}
-                                                style={{
-                                                    width: `${percentage}%`,
-                                                }}
-                                            ></div>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        ) : (
-                            <p className='text-center text-sm text-gray-500 dark:text-gray-400 py-4'>
-                                No resource data available
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                {/* Daily Active Users */}
-                <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6'>
-                    <div className='flex items-center justify-between mb-4 md:mb-6'>
-                        <h3 className='text-base md:text-xl font-semibold text-gray-900 dark:text-white'>
-                            Daily Active Users (Last 30 Days)
-                        </h3>
-                        <Activity className='w-4 h-4 md:w-5 md:h-5 text-purple-500' />
-                    </div>
-
-                    <div className='space-y-2 md:space-y-3'>
-                        {chatbotData.dailyUsers &&
-                        chatbotData.dailyUsers.length > 0 ? (
-                            <div className='max-h-64 overflow-y-auto pr-2'>
-                                {chatbotData.dailyUsers
-                                    .slice(-10)
-                                    .reverse()
-                                    .map((day, index) => {
-                                        const maxCount = Math.max(
-                                            ...chatbotData.dailyUsers.map(
-                                                (d) => d.count,
-                                            ),
-                                        );
-                                        const percentage =
-                                            maxCount > 0
-                                                ? (
-                                                      (day.count / maxCount) *
-                                                      100
-                                                  ).toFixed(0)
-                                                : 0;
-                                        return (
-                                            <div
-                                                key={index}
-                                                className='space-y-1'
-                                            >
-                                                <div className='flex items-center justify-between'>
-                                                    <span className='text-xs text-gray-600 dark:text-gray-400'>
-                                                        {new Date(
-                                                            day._id,
-                                                        ).toLocaleDateString(
-                                                            'en-US',
-                                                            {
-                                                                month: 'short',
-                                                                day: 'numeric',
-                                                            },
-                                                        )}
-                                                    </span>
-                                                    <span className='text-xs font-semibold text-gray-900 dark:text-white'>
-                                                        {day.count} users
-                                                    </span>
-                                                </div>
-                                                <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2'>
-                                                    <div
-                                                        className='bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-300'
-                                                        style={{
-                                                            width: `${percentage}%`,
-                                                        }}
-                                                    ></div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                            </div>
-                        ) : (
-                            <p className='text-center text-sm text-gray-500 dark:text-gray-400 py-4'>
-                                No daily user data available
-                            </p>
-                        )}
-                    </div>
-                </div>
+            <div className='grid grid-cols-1 lg:grid-cols-3 gap-5 items-start'>
+                <BarListPanel
+                    title='Colleges asked about'
+                    titleId='assistant-colleges'
+                    note='Searches'
+                    empty='No college searches yet.'
+                    rows={(chatbotData.popularColleges || []).map(
+                        (college, i) => ({
+                            key: college._id || i,
+                            label: college.name,
+                            count: college.count,
+                        }),
+                    )}
+                />
+                <BarListPanel
+                    title='Subjects asked about'
+                    titleId='assistant-subjects'
+                    note='Searches'
+                    empty='No subject searches yet.'
+                    rows={(chatbotData.popularSubjects || []).map(
+                        (subject, i) => ({
+                            key: subject._id || i,
+                            label: subject.name,
+                            sublabel: subject.code,
+                            count: subject.count,
+                        }),
+                    )}
+                />
+                <BarListPanel
+                    title='Resources opened'
+                    titleId='assistant-resources'
+                    empty='No resources opened from the chat yet.'
+                    rows={resources.map((resource) => ({
+                        key: resource._id,
+                        label: resourceLabel(resource._id),
+                        count: resource.count,
+                        share: resourcesTotal
+                            ? `${Math.round((resource.count / resourcesTotal) * 100)}%`
+                            : undefined,
+                    }))}
+                />
             </div>
-        </div>
+        </section>
     );
 }
 

@@ -1,55 +1,48 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
+import { Link, useParams } from 'react-router-dom';
+import { Check, Copy, CreditCard, ExternalLink } from 'lucide-react';
 import api from '../../utils/api';
-import toast from 'react-hot-toast';
-import {
-    CreditCard,
-    CheckCircle2,
-    XCircle,
-    Clock,
-    Wallet,
-    Hash,
-    User2,
-    Code,
-    Eye,
-    AlertTriangle,
-    ShoppingBag,
-    Link as LinkIcon,
-} from 'lucide-react';
-import BackButton from '../../components/Common/BackButton';
+import { formatDateTime, formatNumber } from '../../utils/format';
 import Loader from '../../components/Common/Loader';
+import {
+    Button,
+    EmptyState,
+    MetaList,
+    PageHeader,
+    Panel,
+    Segmented,
+    StatusBadge,
+} from '../../components/ui';
+import {
+    copyText,
+    formatMoney,
+    formatOrderAmount,
+    formatRupees,
+    isObjectId,
+    orderTypeLabel,
+    paymentMethodLabel,
+    userName,
+} from './financeFormat';
+import { RupeeValue, UserCell } from './financeParts';
 
-const Badge = ({ color = 'gray', children }) => {
-    const map = {
-        green: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-        yellow: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-        red: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-        blue: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-        gray: 'bg-gray-100 text-gray-800 dark:bg-gray-700/50 dark:text-gray-300',
-        purple: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-        indigo: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
-        amber: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
-    };
-    return (
-        <span
-            className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${map[color]}`}
-        >
-            {children}
-        </span>
-    );
-};
+const ExternalValue = ({ href }) => (
+    <a
+        href={href}
+        target='_blank'
+        rel='noreferrer'
+        className='inline-flex items-center gap-1 text-link hover:underline break-all'
+    >
+        {href}
+        <ExternalLink className='w-3 h-3 shrink-0' aria-hidden='true' />
+    </a>
+);
 
 const PaymentDetail = () => {
     const { id } = useParams();
-    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [payment, setPayment] = useState(null);
     const [viewMode, setViewMode] = useState('formatted');
-    const { mainContentMargin } = useSidebarLayout();
 
     const fetchPayment = async () => {
         try {
@@ -57,9 +50,11 @@ const PaymentDetail = () => {
             const res = await api.get(`/payment/${id}`);
             setPayment(res.data.data || res.data);
         } catch (err) {
-            console.error('Failed to load payment', err);
-            setError('Failed to load payment details');
-            toast.error('Failed to load payment details');
+            setError(
+                err.response?.status === 404
+                    ? 'This payment doesn’t exist or the link is wrong.'
+                    : 'Couldn’t load this payment. Check your connection and try again.',
+            );
         } finally {
             setLoading(false);
         }
@@ -70,406 +65,423 @@ const PaymentDetail = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
-    const statusMeta = (status) => {
-        switch ((status || '').toLowerCase()) {
-            case 'captured':
-                return {
-                    icon: CheckCircle2,
-                    color: 'green',
-                    label: 'Captured',
-                };
-            case 'pending':
-                return { icon: Clock, color: 'yellow', label: 'Pending' };
-            case 'created':
-                return { icon: Clock, color: 'blue', label: 'Created' };
-            case 'failed':
-                return { icon: XCircle, color: 'red', label: 'Failed' };
-            case 'refunded':
-                return { icon: XCircle, color: 'purple', label: 'Refunded' };
-            default:
-                return {
-                    icon: HelpCircle, // helper
-                    color: 'gray',
-                    label: status || 'Unknown',
-                };
-        }
-    };
-
-    // Helper for unknown icons
-    const HelpCircle = (props) => (
-        <svg
-            {...props}
-            xmlns='http://www.w3.org/2000/svg'
-            viewBox='0 0 24 24'
-            fill='none'
-            stroke='currentColor'
-            strokeWidth='2'
-            strokeLinecap='round'
-            strokeLinejoin='round'
-        >
-            <circle cx='12' cy='12' r='10' />
-            <path d='M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3' />
-            <path d='M12 17h.01' />
-        </svg>
-    );
-
     if (loading) {
         return <Loader />;
     }
 
-    if (error) {
+    if (error || !payment) {
         return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <main
-                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 ${mainContentMargin} transition-all duration-300`}
-                >
-                    <div className='bg-red-50 dark:bg-red-900/40 border-l-4 border-red-500 text-red-700 dark:text-red-300 p-4 rounded-lg flex items-center justify-between'>
-                        <div>{error}</div>
-                        <button
-                            onClick={() => navigate(-1)}
-                            className='text-sm underline hover:text-red-900 dark:hover:text-red-100'
-                        >
-                            Go Back
-                        </button>
-                    </div>
-                </main>
+            <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+                <div className='bg-sheet border border-line rounded-xl'>
+                    <EmptyState
+                        icon={CreditCard}
+                        tone='error'
+                        title={
+                            error?.startsWith('This payment doesn’t')
+                                ? 'Payment not found'
+                                : 'Couldn’t load the payment'
+                        }
+                        description={error}
+                        action={
+                            <div className='flex flex-wrap justify-center gap-2'>
+                                <Button to='/reports/payments'>
+                                    Back to payments
+                                </Button>
+                                <Button
+                                    variant='primary'
+                                    onClick={() => {
+                                        setLoading(true);
+                                        fetchPayment();
+                                    }}
+                                >
+                                    Try again
+                                </Button>
+                            </div>
+                        }
+                    />
+                </div>
             </div>
         );
     }
 
-    if (!payment) return null;
-
-    const { icon: StatusIcon } = statusMeta(payment.status);
+    const order =
+        payment.orderId && typeof payment.orderId === 'object'
+            ? payment.orderId
+            : null;
+    const gateway = payment.gatewayResponse || {};
+    const gatewayPaymentId = gateway.razorpay_payment_id;
+    const returnUrl = order?.metadata?.returnUrl || gateway.returnUrl;
+    const resource =
+        order?.resourceId && typeof order.resourceId === 'object'
+            ? order.resourceId
+            : null;
+    const isInr = !payment.currency || payment.currency === 'INR';
+    const hasRefund = Boolean(
+        payment.refundId || payment.refundAmount || payment.refundReason,
+    );
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900 font-sans'>
-            <Header />
-            <Sidebar />
-            <main
-                className={`py-4 ${mainContentMargin} transition-all duration-300`}
-            >
-                <div className='max-w-7xl mx-auto px-4 sm:px-6'>
-                    {/* Compact Navigation */}
-                    <BackButton
-                        title='Payment Details'
-                        TitleIcon={CreditCard}
-                    />
-
-                    {/* Compact Header */}
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3'>
-                        <div className='flex items-center justify-between'>
-                            <div className='flex items-center gap-2'>
-                                <span
-                                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${
-                                        payment.status === 'captured'
-                                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-                                    }`}
-                                >
-                                    <StatusIcon className='w-3 h-3 mr-1' />
-                                    {payment.status}
-                                </span>
-                                <span className='text-xs text-gray-500 dark:text-gray-400'>
-                                    {new Date(
-                                        payment.createdAt,
-                                    ).toLocaleDateString()}
-                                </span>
-                            </div>
-                            <button
-                                type='button'
-                                onClick={() =>
-                                    setViewMode(
-                                        viewMode === 'formatted'
-                                            ? 'raw'
-                                            : 'formatted',
-                                    )
-                                }
-                                className='inline-flex items-center px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors'
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                eyebrow={`Payment · ${payment.provider || 'Unknown provider'}`}
+                badge={<StatusBadge status={payment.status} />}
+                title={
+                    isInr ? (
+                        <RupeeValue amount={payment.amount} />
+                    ) : (
+                        formatMoney(payment.amount, payment.currency)
+                    )
+                }
+                meta={
+                    <p className='text-[13px] text-ink-2'>
+                        {order ? orderTypeLabel(order.orderType) : 'Payment'} by{' '}
+                        {payment.user?._id ? (
+                            <Link
+                                to={`/users/${payment.user._id}`}
+                                className='font-medium text-link hover:underline'
                             >
-                                {viewMode === 'formatted' ? (
-                                    <>
-                                        <Code className='mr-1 h-3 w-3' />
-                                        Raw
-                                    </>
-                                ) : (
-                                    <>
-                                        <Eye className='mr-1 h-3 w-3' />
-                                        Formatted
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                        <div className='mt-2'>
-                            <div className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                {payment.currency || 'INR'}{' '}
-                                {payment.amount?.toLocaleString() || 0}
-                            </div>
-                        </div>
-                    </div>
+                                {userName(payment.user)}
+                            </Link>
+                        ) : (
+                            <span className='font-medium'>
+                                {userName(payment.user)}
+                            </span>
+                        )}{' '}
+                        · {formatDateTime(payment.createdAt)}
+                    </p>
+                }
+                actions={
+                    <>
+                        <Segmented
+                            label='View'
+                            value={viewMode}
+                            onChange={setViewMode}
+                            options={[
+                                { value: 'formatted', label: 'Details' },
+                                { value: 'raw', label: 'JSON' },
+                            ]}
+                        />
+                        <Button
+                            icon={Copy}
+                            onClick={() =>
+                                gatewayPaymentId
+                                    ? copyText(
+                                          gatewayPaymentId,
+                                          'Razorpay payment ID',
+                                      )
+                                    : copyText(payment._id, 'Payment ID')
+                            }
+                        >
+                            Copy payment ID
+                        </Button>
+                    </>
+                }
+            />
 
-                    {/* Compact Content */}
-                    <div className='grid grid-cols-1 lg:grid-cols-3 gap-3'>
-                        {/* Main Info (Left Column) */}
-                        <div className='lg:col-span-2 space-y-3'>
-                            {viewMode === 'formatted' ? (
-                                <>
-                                    {/* Transaction Info */}
-                                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                        <div className='px-3 py-2 border-b border-gray-200 dark:border-gray-700'>
-                                            <h3 className='text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1.5'>
-                                                <CreditCard className='w-3.5 h-3.5 text-gray-400' />
-                                                Transaction Details
-                                            </h3>
-                                        </div>
-                                        <div className='px-3 py-2'>
-                                            <dl className='grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2'>
-                                                <div>
-                                                    <dt className='text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1'>
-                                                        <Wallet className='w-3 h-3' />
-                                                        Provider
-                                                    </dt>
-                                                    <dd className='mt-0.5 text-sm text-gray-900 dark:text-white'>
-                                                        {payment.provider ||
-                                                            'N/A'}
-                                                    </dd>
-                                                </div>
-                                                <div>
-                                                    <dt className='text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1'>
-                                                        <Hash className='w-3 h-3' />
-                                                        Payment ID
-                                                    </dt>
-                                                    <dd className='mt-0.5 font-mono text-gray-900 dark:text-white break-all text-xs'>
-                                                        {payment._id}
-                                                    </dd>
-                                                </div>
-                                                <div className='sm:col-span-2'>
-                                                    <dt className='text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1'>
-                                                        <Hash className='w-3 h-3' />
-                                                        Merchant Order ID
-                                                    </dt>
-                                                    <dd className='mt-0.5 font-mono text-gray-900 dark:text-white break-all text-xs'>
-                                                        {payment.merchantOrderId ||
-                                                            'N/A'}
-                                                    </dd>
-                                                </div>
-                                                {payment.gatewayResponse
-                                                    ?.state && (
-                                                    <div className='sm:col-span-2'>
-                                                        <dt className='text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1'>
-                                                            <AlertTriangle className='w-4 h-4' />
-                                                            Gateway Status
-                                                        </dt>
-                                                        <dd className='mt-1 text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-100 dark:border-gray-700'>
+            <div className='grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start'>
+                <div className='flex flex-col gap-5 min-w-0'>
+                    {viewMode === 'formatted' ? (
+                        <>
+                            <Panel
+                                title='Gateway'
+                                titleId='gateway-title'
+                                bodyClassName='px-5 py-4'
+                            >
+                                <MetaList
+                                    labelWidth={148}
+                                    items={[
+                                        {
+                                            label: 'Provider',
+                                            value: payment.provider,
+                                        },
+                                        {
+                                            label: 'Razorpay payment ID',
+                                            value: gatewayPaymentId,
+                                            mono: true,
+                                        },
+                                        {
+                                            label: 'Gateway order ID',
+                                            value: payment.gatewayOrderId,
+                                            mono: true,
+                                        },
+                                        {
+                                            label: 'Merchant order ID',
+                                            value: payment.merchantOrderId,
+                                            mono: true,
+                                        },
+                                        {
+                                            label: 'Amount',
+                                            value: `${payment.currency || 'INR'} ${Number(
+                                                payment.amount || 0,
+                                            ).toLocaleString('en-IN', {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })}`,
+                                            mono: true,
+                                        },
+                                        {
+                                            label: 'Webhook',
+                                            value: payment.webhookReceived ? (
+                                                <span className='inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-ok-ink'>
+                                                    <Check
+                                                        className='w-3.5 h-3.5'
+                                                        aria-hidden='true'
+                                                    />
+                                                    Received
+                                                    {gateway.webhookEvent && (
+                                                        <span className='font-mono text-xs text-muted'>
                                                             {
-                                                                payment
-                                                                    .gatewayResponse
-                                                                    .state
+                                                                gateway.webhookEvent
                                                             }
-                                                            {payment
-                                                                .gatewayResponse
-                                                                .orderId && (
-                                                                <span className='block mt-1 text-xs text-gray-500'>
-                                                                    Order:{' '}
-                                                                    {
-                                                                        payment
-                                                                            .gatewayResponse
-                                                                            .orderId
-                                                                    }
-                                                                </span>
-                                                            )}
-                                                        </dd>
-                                                    </div>
-                                                )}
-                                                {(payment.paymentLink ||
-                                                    payment.orderId?.metadata
-                                                        ?.returnUrl) && (
-                                                    <div className='sm:col-span-2'>
-                                                        <dt className='text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1'>
-                                                            <LinkIcon className='w-4 h-4' />
-                                                            Links
-                                                        </dt>
-                                                        <dd className='mt-1 text-sm text-blue-600 dark:text-blue-400'>
-                                                            {payment.orderId
-                                                                ?.metadata
-                                                                ?.returnUrl && (
-                                                                <a
-                                                                    href={
-                                                                        payment
-                                                                            .orderId
-                                                                            .metadata
-                                                                            .returnUrl
-                                                                    }
-                                                                    target='_blank'
-                                                                    rel='noreferrer'
-                                                                    className='flex items-center gap-1 hover:underline'
-                                                                >
-                                                                    Resource URL
-                                                                    <LinkIcon className='w-3 h-3' />
-                                                                </a>
-                                                            )}
-                                                        </dd>
-                                                    </div>
-                                                )}
-                                            </dl>
-                                        </div>
-                                    </div>
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            ) : (
+                                                'Not received'
+                                            ),
+                                        },
+                                        {
+                                            label: 'Gateway status',
+                                            value: gateway.state && (
+                                                <>
+                                                    {gateway.state}
+                                                    {gateway.orderId && (
+                                                        <span className='block text-xs text-muted'>
+                                                            Order:{' '}
+                                                            {gateway.orderId}
+                                                        </span>
+                                                    )}
+                                                </>
+                                            ),
+                                        },
+                                        {
+                                            label: 'Payment link',
+                                            value: payment.paymentLink && (
+                                                <ExternalValue
+                                                    href={payment.paymentLink}
+                                                />
+                                            ),
+                                        },
+                                        {
+                                            label: 'Return URL',
+                                            value: returnUrl && (
+                                                <ExternalValue
+                                                    href={returnUrl}
+                                                />
+                                            ),
+                                        },
+                                        {
+                                            label: 'Created',
+                                            value: formatDateTime(
+                                                payment.createdAt,
+                                            ),
+                                        },
+                                        {
+                                            label: 'Updated',
+                                            value: formatDateTime(
+                                                payment.updatedAt,
+                                            ),
+                                        },
+                                        {
+                                            label: 'Record ID',
+                                            value: payment._id,
+                                            mono: true,
+                                        },
+                                    ]}
+                                />
+                            </Panel>
 
-                                    {/* Purchased Item */}
-                                    {payment.orderId?.resourceId && (
-                                        <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                            <div className='px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700'>
-                                                <h3 className='text-lg leading-6 font-medium text-gray-900 dark:text-white flex items-center gap-2'>
-                                                    <ShoppingBag className='w-3.5 h-3.5 text-gray-400' />
-                                                    Purchased Item
-                                                </h3>
-                                            </div>
-                                            <div className='px-3 py-2'>
-                                                <div className='flex items-center gap-4'>
-                                                    <div className='h-12 w-12 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400'>
-                                                        <ShoppingBag className='w-6 h-6' />
-                                                    </div>
-                                                    <div>
-                                                        <h4 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                                                            {payment.orderId
-                                                                .resourceId
-                                                                ?.title ||
-                                                                'Unknown Title'}
-                                                        </h4>
-                                                        <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                                            {payment.orderId
-                                                                .resourceId
-                                                                ?.subject ||
-                                                                'Unknown Subject'}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                    <div className='px-3 py-2 border-b border-gray-200 dark:border-gray-700'>
-                                        <h3 className='text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1.5'>
-                                            <Code className='w-3.5 h-3.5 text-gray-400' />
-                                            Raw JSON Data
-                                        </h3>
-                                    </div>
-                                    <div className='px-3 py-2'>
-                                        <pre className='bg-gray-900 text-green-400 p-2 rounded overflow-x-auto text-xs font-mono'>
-                                            {JSON.stringify(payment, null, 2)}
-                                        </pre>
-                                    </div>
-                                </div>
+                            {order?.resourceId && (
+                                <Panel
+                                    title='Purchased item'
+                                    titleId='item-title'
+                                    bodyClassName='px-5 py-4'
+                                >
+                                    <MetaList
+                                        labelWidth={148}
+                                        items={[
+                                            {
+                                                label: 'Title',
+                                                value:
+                                                    resource?.title ||
+                                                    order.metadata
+                                                        ?.resourceTitle ||
+                                                    'Unknown title',
+                                            },
+                                            {
+                                                label: 'Type',
+                                                value: orderTypeLabel(
+                                                    order.orderType,
+                                                ),
+                                            },
+                                            {
+                                                label: 'Subject',
+                                                value:
+                                                    typeof resource?.subject ===
+                                                        'string' &&
+                                                    !isObjectId(
+                                                        resource.subject,
+                                                    )
+                                                        ? resource.subject
+                                                        : undefined,
+                                            },
+                                        ]}
+                                    />
+                                </Panel>
                             )}
-                        </div>
-
-                        {/* Compact Details (Right Column) */}
-                        <div className='space-y-3'>
-                            {/* User Info */}
-                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                <div className='px-3 py-2 border-b border-gray-200 dark:border-gray-700'>
-                                    <h3 className='text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1.5'>
-                                        <User2 className='w-3.5 h-3.5 text-gray-400' />
-                                        User Details
-                                    </h3>
-                                </div>
-                                <div className='px-3 py-2'>
-                                    <div className='flex items-center gap-2'>
-                                        <div className='h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-300'>
-                                            <span className='text-xs font-bold'>
-                                                {payment.user?.username?.[0]?.toUpperCase() ||
-                                                    'U'}
-                                            </span>
-                                        </div>
-                                        <div className='overflow-hidden'>
-                                            <p className='text-sm font-medium text-gray-900 dark:text-white truncate'>
-                                                {payment.user?.username ||
-                                                    payment.user?.name ||
-                                                    'Unknown User'}
-                                            </p>
-                                            <p className='text-xs text-gray-500 dark:text-gray-400 truncate'>
-                                                {payment.user?.email || 'N/A'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Order Info */}
-                            <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                <div className='px-3 py-2 border-b border-gray-200 dark:border-gray-700'>
-                                    <h3 className='text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1.5'>
-                                        <ShoppingBag className='w-3.5 h-3.5 text-gray-400' />
-                                        Order Details
-                                    </h3>
-                                </div>
-                                <div className='px-3 py-2'>
-                                    {payment.orderId ? (
-                                        <dl>
-                                            <div className='py-2 grid grid-cols-2 gap-2 border-b border-gray-200 dark:border-gray-700'>
-                                                <dt className='text-xs font-medium text-gray-500 dark:text-gray-400'>
-                                                    Status
-                                                </dt>
-                                                <dd className='text-xs text-gray-900 dark:text-white text-right'>
-                                                    <Badge
-                                                        color={
-                                                            payment.orderId
-                                                                .status ===
-                                                            'completed'
-                                                                ? 'green'
-                                                                : 'yellow'
-                                                        }
-                                                    >
-                                                        {payment.orderId.status}
-                                                    </Badge>
-                                                </dd>
-                                            </div>
-                                            <div className='py-2 grid grid-cols-2 gap-2 border-b border-gray-200 dark:border-gray-700'>
-                                                <dt className='text-xs font-medium text-gray-500 dark:text-gray-400'>
-                                                    Type
-                                                </dt>
-                                                <dd className='text-sm text-gray-900 dark:text-white text-right capitalize'>
-                                                    {payment.orderId.orderType}
-                                                </dd>
-                                            </div>
-                                            <div className='py-2 grid grid-cols-2 gap-2 border-b border-gray-200 dark:border-gray-700'>
-                                                <dt className='text-xs font-medium text-gray-500 dark:text-gray-400'>
-                                                    Method
-                                                </dt>
-                                                <dd className='text-sm text-gray-900 dark:text-white text-right font-medium'>
-                                                    {
-                                                        payment.orderId
-                                                            .paymentMethod
-                                                    }
-                                                </dd>
-                                            </div>
-                                            <div className='py-2 grid grid-cols-2 gap-2'>
-                                                <dt className='text-xs font-medium text-gray-500 dark:text-gray-400'>
-                                                    Order Created
-                                                </dt>
-                                                <dd className='text-xs text-gray-900 dark:text-white text-right'>
-                                                    {payment.orderId.createdAt
-                                                        ? new Date(
-                                                              payment.orderId.createdAt,
-                                                          ).toLocaleDateString()
-                                                        : 'N/A'}
-                                                </dd>
-                                            </div>
-                                        </dl>
-                                    ) : (
-                                        <div className='p-6 text-sm text-gray-500 dark:text-gray-400 italic text-center'>
-                                            No order information available
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                        </>
+                    ) : (
+                        <Panel
+                            title='Raw data'
+                            titleId='raw-title'
+                            bodyClassName='p-4'
+                        >
+                            <pre className='max-h-[640px] overflow-auto p-3 rounded-lg bg-sunken font-mono text-[11.5px] leading-relaxed text-ink-2'>
+                                {JSON.stringify(payment, null, 2)}
+                            </pre>
+                        </Panel>
+                    )}
                 </div>
-            </main>
+
+                <div className='flex flex-col gap-4'>
+                    <Panel
+                        title='Paid by'
+                        titleId='user-title'
+                        bodyClassName='px-5 py-4 flex flex-col gap-3'
+                    >
+                        <UserCell
+                            user={payment.user}
+                            size='md'
+                            stopPropagation={false}
+                        />
+                        {payment.user?.wallet?.currentBalance !== undefined && (
+                            <MetaList
+                                labelWidth={112}
+                                items={[
+                                    {
+                                        label: 'Wallet balance',
+                                        value: `${formatNumber(payment.user.wallet.currentBalance)} pts`,
+                                    },
+                                ]}
+                            />
+                        )}
+                    </Panel>
+
+                    <Panel
+                        title='Order'
+                        titleId='order-title'
+                        action={
+                            order?.status && (
+                                <StatusBadge status={order.status} />
+                            )
+                        }
+                        bodyClassName='px-5 py-4 flex flex-col gap-3'
+                    >
+                        {order ? (
+                            <>
+                                <MetaList
+                                    labelWidth={112}
+                                    items={[
+                                        {
+                                            label: 'Type',
+                                            value: orderTypeLabel(
+                                                order.orderType,
+                                            ),
+                                        },
+                                        {
+                                            label: 'Method',
+                                            value:
+                                                order.paymentMethod ===
+                                                    'online' && payment.provider
+                                                    ? `Online (${payment.provider})`
+                                                    : paymentMethodLabel(
+                                                          order.paymentMethod,
+                                                      ),
+                                        },
+                                        {
+                                            label: 'Amount',
+                                            value: formatOrderAmount(order),
+                                            mono: true,
+                                        },
+                                        order.orderType === 'add_points' &&
+                                            order.paymentMethod !==
+                                                'points' && {
+                                                label: 'Points to add',
+                                                value: `${formatNumber(
+                                                    Number(order.amount || 0) *
+                                                        5,
+                                                )} pts`,
+                                            },
+                                        {
+                                            label: 'Failure',
+                                            value: order.failureReason,
+                                        },
+                                        {
+                                            label: 'Created',
+                                            value: formatDateTime(
+                                                order.createdAt,
+                                            ),
+                                        },
+                                    ]}
+                                />
+                                <Link
+                                    to={`/reports/orders?search=${order._id}`}
+                                    className='self-start text-[13px] font-medium text-link hover:underline'
+                                >
+                                    Open in Orders
+                                </Link>
+                            </>
+                        ) : (
+                            <p className='text-[13.5px] text-muted'>
+                                No order is linked to this payment.
+                            </p>
+                        )}
+                    </Panel>
+
+                    <Panel
+                        title='Refund'
+                        titleId='refund-title'
+                        bodyClassName='px-5 py-4 flex flex-col gap-3'
+                    >
+                        {hasRefund ? (
+                            <MetaList
+                                labelWidth={112}
+                                items={[
+                                    {
+                                        label: 'Amount',
+                                        value:
+                                            payment.refundAmount != null
+                                                ? formatRupees(
+                                                      payment.refundAmount,
+                                                  )
+                                                : undefined,
+                                        mono: true,
+                                    },
+                                    {
+                                        label: 'Refund ID',
+                                        value: payment.refundId,
+                                        mono: true,
+                                    },
+                                    {
+                                        label: 'Reason',
+                                        value: payment.refundReason,
+                                    },
+                                ]}
+                            />
+                        ) : (
+                            <p className='text-[13.5px] text-muted'>
+                                No refund recorded for this payment.
+                            </p>
+                        )}
+                        <Link
+                            to='/reports/refunds'
+                            className='self-start text-[13px] font-medium text-link hover:underline'
+                        >
+                            Open refund requests
+                        </Link>
+                    </Panel>
+                </div>
+            </div>
         </div>
     );
 };

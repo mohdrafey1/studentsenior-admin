@@ -1,653 +1,779 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
-import api from '../../utils/api';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
-    MessageSquare,
-    Edit2,
-    Trash2,
-    Eye,
-    CheckCircle,
-    Calendar,
-    Building,
+    Check,
+    Download,
     ExternalLink,
-    BookOpen,
+    MessageSquare,
+    Pencil,
+    Trash2,
+    X,
 } from 'lucide-react';
+import api from '../../utils/api';
+import { useColleges } from '../../context/CollegeContext';
+import { useSelection } from '../../hooks/useSelection';
+import { downloadCsv } from '../../utils/csv';
+import {
+    formatDateTime,
+    formatNumber,
+    formatShortDate,
+} from '../../utils/format';
+import FilterBar from '../../components/Common/FilterBar';
+import { filterByTime } from '../../components/Common/timeFilterUtils';
+import Loader from '../../components/Common/Loader';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
+import RejectDialog from '../../components/RejectDialog';
 import GroupEditModal from '../../components/GroupEditModal';
-import FilterBar from '../../components/Common/FilterBar';
-import BackButton from '../../components/Common/BackButton';
 import {
-    filterByTime,
-    getTimeFilterLabel,
-} from '../../components/Common/timeFilterUtils';
-import Loader from '../../components/Common/Loader';
+    Alert,
+    BulkBar,
+    BulkButton,
+    Button,
+    EmptyState,
+    PageHeader,
+    SelectCell,
+    StatusBadge,
+    Table,
+    Tabs,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+
+const STATUS_TABS = [
+    ['', 'All'],
+    ['pending', 'Pending'],
+    ['approved', 'Approved'],
+    ['rejected', 'Rejected'],
+];
+
+const EMPTY_FILTERS = {
+    submissionStatus: '',
+    domain: '',
+    deleted: '',
+};
+
+const PAGE_SIZES = [12, 24, 48, 96];
+
+// The model field is `clickCount`; older records may carry `clickCounts`.
+const clicksOf = (group) => group.clickCount ?? group.clickCounts ?? 0;
+
+const DomainChip = ({ children }) => (
+    <span className='inline-block max-w-full px-2 py-0.5 rounded-md bg-ground text-[12.5px] text-ink-2 truncate'>
+        {children}
+    </span>
+);
+
+const GroupIcon = () => (
+    <span className='w-9 h-9 rounded-[10px] bg-ground text-ink-2 flex items-center justify-center shrink-0'>
+        <MessageSquare className='w-4 h-4' aria-hidden='true' />
+    </span>
+);
 
 const GroupList = () => {
     const location = useLocation();
-    const { collegeslug } = useParams();
     const navigate = useNavigate();
+    const { collegeslug } = useParams();
+    const { currentCollege } = useColleges();
 
-    // Read URL params
+    // Filters live in the URL so a filtered list can be shared or reloaded.
     const params = new URLSearchParams(location.search);
-    const initialSearch = params.get('search') || '';
-    const initialTimeFilter = params.get('time') || '';
-    const initialPage = parseInt(params.get('page')) || 1;
-    const initialSubmissionStatus = params.get('submissionStatus') || '';
-    const initialDeleted = params.get('deleted') || '';
-
     const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [search, setSearch] = useState(initialSearch);
-    const [page, setPage] = useState(initialPage);
-    const [pageSize, setPageSize] = useState(12);
-    const [timeFilter, setTimeFilter] = useState(initialTimeFilter);
-    const [showModal, setShowModal] = useState(false);
-    const [editingGroup, setEditingGroup] = useState(null);
-    const { mainContentMargin } = useSidebarLayout();
-
-    // View mode - responsive default (small screens = grid, large screens = table)
-    const [viewMode, setViewMode] = useState(() => {
-        return window.innerWidth >= 1024 ? 'table' : 'grid';
-    });
-
-    // Filters state
-    const [filters, setFilters] = useState({
-        submissionStatus: initialSubmissionStatus,
-        deleted: initialDeleted,
-    });
+    const [search, setSearch] = useState(params.get('search') || '');
+    const [page, setPage] = useState(parseInt(params.get('page')) || 1);
+    const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+    const [timeFilter, setTimeFilter] = useState(params.get('time') || 'all');
+    const [filters, setFilters] = useState(() =>
+        Object.fromEntries(
+            Object.keys(EMPTY_FILTERS).map((key) => [
+                key,
+                params.get(key) || '',
+            ]),
+        ),
+    );
     const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState('desc');
+    const [viewMode, setViewMode] = useState(() =>
+        window.innerWidth >= 1024 ? 'table' : 'grid',
+    );
 
-    // Confirmation modal state
-    const [confirmModal, setConfirmModal] = useState({
-        isOpen: false,
-        title: '',
-        message: '',
-        onConfirm: null,
-        variant: 'danger',
-    });
+    const [editingGroup, setEditingGroup] = useState(null);
+    const [confirm, setConfirm] = useState(null);
+    const [rejecting, setRejecting] = useState(null); // array of ids
+    const [bulkBusy, setBulkBusy] = useState(false);
 
-    const showConfirm = (config) => {
-        return new Promise((resolve) => {
-            setConfirmModal({
-                isOpen: true,
-                title: config.title || 'Confirm Action',
-                message: config.message,
-                variant: config.variant || 'danger',
-                onConfirm: () => {
-                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-                    resolve(true);
-                },
-            });
-        });
-    };
-
-    const handleCloseConfirm = () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+    const fetchGroups = async () => {
+        try {
+            setError(null);
+            const response = await api.get(`/group/all/${collegeslug}`);
+            setGroups(response.data.data || []);
+        } catch {
+            setError(
+                'Couldn’t load WhatsApp groups. Check your connection and try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
         fetchGroups();
     }, [collegeslug]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Persist filters in URL
     useEffect(() => {
-        const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (timeFilter) params.set('time', timeFilter);
-        if (filters.submissionStatus)
-            params.set('submissionStatus', filters.submissionStatus);
-        if (filters.deleted) params.set('deleted', filters.deleted);
-        if (page > 1) params.set('page', page.toString());
-        navigate({ search: params.toString() }, { replace: true });
+        const next = new URLSearchParams();
+        if (search) next.set('search', search);
+        if (timeFilter && timeFilter !== 'all') next.set('time', timeFilter);
+        Object.entries(filters).forEach(
+            ([key, value]) => value && next.set(key, value),
+        );
+        if (page > 1) next.set('page', String(page));
+        navigate({ search: next.toString() }, { replace: true });
     }, [search, timeFilter, filters, page, navigate]);
 
-    // Responsive view mode - always auto-switch based on screen size
-    useEffect(() => {
-        const handleResize = () => {
-            const newMode = window.innerWidth >= 1024 ? 'table' : 'grid';
-            setViewMode(newMode);
-        };
-
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    const fetchGroups = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get(`/group/all/${collegeslug}`);
-            setGroups(response.data.data || []);
-            setError(null);
-        } catch (error) {
-            console.error('Error fetching groups:', error);
-            setError('Failed to fetch groups');
-            toast.error('Failed to fetch groups');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleEdit = (group) => {
-        setEditingGroup(group);
-        setShowModal(true);
-    };
-
-    const handleDelete = async (group) => {
-        const confirmed = await showConfirm({
-            title: 'Delete Group',
-            message: `Are you sure you want to delete "${group.title}"? This action cannot be undone.`,
-            variant: 'danger',
-        });
-
-        if (confirmed) {
-            try {
-                await api.delete(`/group/delete/${group._id}`);
-                toast.success('Group deleted successfully');
-                fetchGroups();
-            } catch (error) {
-                console.error('Error deleting group:', error);
-                toast.error('Failed to delete group');
-            }
-        }
-    };
-
-    const handleView = (group) => {
-        navigate(`/${collegeslug}/groups/${group._id}`);
-    };
-
-    const handleModalClose = () => {
-        setShowModal(false);
-        setEditingGroup(null);
-    };
-
-    const handleModalSuccess = () => {
-        fetchGroups();
-        handleModalClose();
-    };
-
-    // Get unique values for filters
-    const uniqueStatuses = ['pending', 'approved', 'rejected'];
-
-    // Apply filters and sorting
-    const filtered = groups.filter((group) => {
-        const q = search.trim().toLowerCase();
-        const matchesSearch =
-            !q ||
-            group.title?.toLowerCase().includes(q) ||
-            group.info?.toLowerCase().includes(q) ||
-            group.domain?.toLowerCase().includes(q);
-
-        const matchesStatus =
-            !filters.submissionStatus ||
-            group.submissionStatus === filters.submissionStatus;
-
-        const matchesDeleted =
-            filters.deleted === '' ||
-            (filters.deleted === 'true' ? group.deleted : !group.deleted);
-
-        // Time filter using the utility
-        const matchesTime = filterByTime(group, timeFilter);
-
-        return matchesSearch && matchesStatus && matchesDeleted && matchesTime;
-    });
-
-    // Sort
-    const sorted = [...filtered].sort((a, b) => {
-        if (sortBy === 'createdAt') {
-            const dateA = new Date(a.createdAt);
-            const dateB = new Date(b.createdAt);
-            return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-        }
-        if (sortBy === 'clickCounts') {
-            const countA = a.clickCounts || 0;
-            const countB = b.clickCounts || 0;
-            return sortOrder === 'asc' ? countA - countB : countB - countA;
-        }
-        return 0;
-    });
-
-    const start = (page - 1) * pageSize;
-    const current = sorted.slice(start, start + pageSize);
-
-    const totalItems = sorted.length;
-    const totalPages = Math.ceil(totalItems / pageSize) || 1;
-    const totalGroups = sorted.length;
-
-    const resetFilters = () => {
-        setFilters({
-            submissionStatus: '',
-            deleted: '',
-        });
-        setSortBy('createdAt');
-        setSortOrder('desc');
-    };
-
-    const clearAllFilters = () => {
-        setSearch('');
-        setTimeFilter('');
-        resetFilters();
+    const setFilter = (key, value) => {
+        setFilters((prev) => ({ ...prev, [key]: value }));
         setPage(1);
     };
 
-    const activeFiltersCount = Object.values(filters).filter(Boolean).length;
+    const domains = useMemo(
+        () =>
+            [...new Set(groups.map((g) => g.domain).filter(Boolean))].sort(
+                (a, b) => a.localeCompare(b),
+            ),
+        [groups],
+    );
 
-    if (loading) {
-        return <Loader />;
-    }
+    // Everything except the status tab, so tab counts reflect the other filters.
+    const matchesFilters = (g) => {
+        const q = search.trim().toLowerCase();
+        const matchesSearch =
+            !q ||
+            g.title?.toLowerCase().includes(q) ||
+            g.info?.toLowerCase().includes(q) ||
+            g.domain?.toLowerCase().includes(q);
+        const bool = (filter, value) =>
+            filter === '' || (filter === 'true' ? value : !value);
+        return (
+            matchesSearch &&
+            (!filters.domain || g.domain === filters.domain) &&
+            filterByTime(g, timeFilter) &&
+            bool(filters.deleted, g.deleted)
+        );
+    };
 
-    console.log('Rendered GroupList with groups:', groups);
+    const base = groups.filter(matchesFilters);
+    const counts = base.reduce(
+        (acc, g) => {
+            const status = g.submissionStatus || 'pending';
+            acc[status] = (acc[status] || 0) + 1;
+            return acc;
+        },
+        { '': base.length },
+    );
+    const filtered = base.filter(
+        (g) =>
+            !filters.submissionStatus ||
+            (g.submissionStatus || 'pending') === filters.submissionStatus,
+    );
+    const sorted = [...filtered].sort((a, b) => {
+        const diff =
+            sortBy === 'clickCounts'
+                ? clicksOf(a) - clicksOf(b)
+                : new Date(a.createdAt) - new Date(b.createdAt);
+        return sortOrder === 'desc' ? -diff : diff;
+    });
+    const current = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+    const selection = useSelection(
+        useMemo(() => current.map((g) => g._id), [current]),
+    );
+
+    const activeFilters = Object.entries(filters).filter(
+        ([key, value]) => key !== 'submissionStatus' && value,
+    ).length;
+    const clearAll = () => {
+        setSearch('');
+        setTimeFilter('all');
+        setFilters((prev) => ({
+            ...EMPTY_FILTERS,
+            submissionStatus: prev.submissionStatus,
+        }));
+        setSortBy('createdAt');
+        setSortOrder('desc');
+        setPage(1);
+    };
+
+    const updateLocal = (ids, patch) =>
+        setGroups((prev) =>
+            prev.map((g) => (ids.includes(g._id) ? { ...g, ...patch } : g)),
+        );
+
+    // Runs one request per group and reports how many went through.
+    const runBulk = async (ids, request, verb) => {
+        setBulkBusy(true);
+        const results = await Promise.allSettled(ids.map(request));
+        setBulkBusy(false);
+        const done = ids.filter((_, i) => results[i].status === 'fulfilled');
+        const failed = ids.length - done.length;
+        if (done.length)
+            toast.success(
+                `${formatNumber(done.length)} group${done.length === 1 ? '' : 's'} ${verb}`,
+            );
+        if (failed)
+            toast.error(
+                `${formatNumber(failed)} couldn’t be ${verb}. Try those again.`,
+            );
+        return done;
+    };
+
+    const approve = async (ids) => {
+        const done = await runBulk(
+            ids,
+            (id) =>
+                api.put(`/group/edit/${id}`, {
+                    submissionStatus: 'approved',
+                    rejectionReason: '',
+                }),
+            'approved',
+        );
+        updateLocal(done, {
+            submissionStatus: 'approved',
+            rejectionReason: '',
+        });
+        selection.clear();
+    };
+
+    const reject = async (ids, reason) => {
+        const done = await runBulk(
+            ids,
+            (id) =>
+                api.put(`/group/edit/${id}`, {
+                    submissionStatus: 'rejected',
+                    rejectionReason: reason,
+                }),
+            'rejected',
+        );
+        updateLocal(done, {
+            submissionStatus: 'rejected',
+            rejectionReason: reason,
+        });
+        selection.clear();
+        setRejecting(null);
+    };
+
+    const remove = (ids) =>
+        setConfirm({
+            title:
+                ids.length === 1
+                    ? 'Delete this group?'
+                    : `Delete ${formatNumber(ids.length)} groups?`,
+            message:
+                'The invite link disappears from the college page straight away. The WhatsApp group itself isn’t affected. This can’t be undone.',
+            confirmText: 'Delete',
+            onConfirm: async () => {
+                const done = await runBulk(
+                    ids,
+                    (id) => api.delete(`/group/delete/${id}`),
+                    'deleted',
+                );
+                setGroups((prev) => prev.filter((g) => !done.includes(g._id)));
+                selection.clear();
+            },
+        });
+
+    const exportCsv = () =>
+        downloadCsv(
+            `whatsapp-groups-${collegeslug}`,
+            [
+                { label: 'Title', value: (g) => g.title },
+                { label: 'Domain', value: (g) => g.domain },
+                { label: 'Invite link', value: (g) => g.link },
+                {
+                    label: 'Status',
+                    value: (g) => g.submissionStatus || 'pending',
+                },
+                { label: 'Rejection reason', value: (g) => g.rejectionReason },
+                { label: 'Link clicks', value: (g) => clicksOf(g) },
+                { label: 'Deleted', value: (g) => (g.deleted ? 'yes' : 'no') },
+                { label: 'Added', value: (g) => formatDateTime(g.createdAt) },
+            ],
+            sorted,
+        );
+
+    if (loading) return <Loader />;
+
+    const selectedIds = [...selection.selected];
+    const groupPath = (group) => `/${collegeslug}/groups/${group._id}`;
+    const openGroup = (group) => navigate(groupPath(group));
+    const stop = (fn) => (event) => {
+        event.stopPropagation();
+        fn();
+    };
+
+    const rowActions = (group) => {
+        const pending = (group.submissionStatus || 'pending') === 'pending';
+        const title = group.title || 'group';
+        return (
+            <>
+                {group.link && (
+                    <Button
+                        variant='ghost'
+                        size='sm'
+                        iconOnly
+                        icon={ExternalLink}
+                        href={group.link}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        aria-label={`Open ${title} in WhatsApp`}
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                )}
+                {pending ? (
+                    <>
+                        <Button
+                            variant='ghost'
+                            size='sm'
+                            iconOnly
+                            icon={X}
+                            aria-label={`Reject ${title}`}
+                            className='text-bad-ink hover:text-bad-ink'
+                            onClick={stop(() => setRejecting([group._id]))}
+                        />
+                        <Button
+                            variant='ghost'
+                            size='sm'
+                            iconOnly
+                            icon={Check}
+                            aria-label={`Approve ${title}`}
+                            className='text-ok-ink hover:text-ok-ink'
+                            onClick={stop(() => approve([group._id]))}
+                        />
+                    </>
+                ) : (
+                    <>
+                        <Button
+                            variant='ghost'
+                            size='sm'
+                            iconOnly
+                            icon={Pencil}
+                            aria-label={`Edit ${title}`}
+                            onClick={stop(() => setEditingGroup(group))}
+                        />
+                        <Button
+                            variant='ghost'
+                            size='sm'
+                            iconOnly
+                            icon={Trash2}
+                            aria-label={`Delete ${title}`}
+                            className='text-bad-ink hover:text-bad-ink'
+                            onClick={stop(() => remove([group._id]))}
+                        />
+                    </>
+                )}
+            </>
+        );
+    };
+
+    const badges = (group) => (
+        <div className='flex flex-wrap gap-1'>
+            <StatusBadge status={group.submissionStatus} />
+            {group.deleted && <StatusBadge tone='outline'>Deleted</StatusBadge>}
+        </div>
+    );
+
+    const pagination = (
+        <Pagination
+            currentPage={page}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZES}
+            totalItems={sorted.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+            }}
+        />
+    );
+
+    const bulkBar = (
+        <BulkBar count={selection.count} onClear={selection.clear}>
+            <BulkButton
+                primary
+                icon={Check}
+                disabled={bulkBusy}
+                onClick={() => approve(selectedIds)}
+            >
+                Approve
+            </BulkButton>
+            <BulkButton
+                icon={X}
+                disabled={bulkBusy}
+                onClick={() => setRejecting(selectedIds)}
+            >
+                Reject…
+            </BulkButton>
+            <BulkButton
+                icon={Trash2}
+                disabled={bulkBusy}
+                onClick={() => remove(selectedIds)}
+            >
+                Delete
+            </BulkButton>
+        </BulkBar>
+    );
+
+    const queueCleared =
+        filters.submissionStatus === 'pending' && !activeFilters && !search;
+    const empty = (
+        <EmptyState
+            icon={MessageSquare}
+            tone={queueCleared ? 'done' : 'neutral'}
+            title={
+                groups.length === 0
+                    ? 'No groups yet'
+                    : queueCleared
+                      ? 'Nothing waiting for review'
+                      : 'No groups match'
+            }
+            description={
+                groups.length === 0 || queueCleared
+                    ? 'New group links from students will appear here.'
+                    : 'Try another search or clear the filters.'
+            }
+            action={
+                activeFilters || search ? (
+                    <Button onClick={clearAll}>Clear filters</Button>
+                ) : undefined
+            }
+        />
+    );
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
-            <main className='pt-6 pb-12'>
-                <div
-                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
-                >
-                    {/* Header */}
-                    <BackButton
-                        title={`Groups for ${collegeslug}`}
-                        TitleIcon={MessageSquare}
-                    />
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
-                        <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
-                            <span className='text-gray-600 dark:text-gray-400'>
-                                Total ({getTimeFilterLabel(timeFilter)}):
-                            </span>
-                            <span className='font-semibold text-gray-900 dark:text-white'>
-                                {totalGroups}
-                            </span>
-                        </div>
-
-                        {/* FilterBar */}
-                        <FilterBar
-                            search={search}
-                            onSearch={(v) => {
-                                setSearch(v);
-                                setPage(1);
-                            }}
-                            searchPlaceholder='Search groups...'
-                            filters={[
-                                {
-                                    label: 'Status',
-                                    value: filters.submissionStatus,
-                                    onChange: (v) =>
-                                        setFilters({
-                                            ...filters,
-                                            submissionStatus: v,
-                                        }),
-                                    options: [
-                                        { value: '', label: 'All Statuses' },
-                                        ...uniqueStatuses.map((s) => ({
-                                            value: s,
-                                            label:
-                                                s.charAt(0).toUpperCase() +
-                                                s.slice(1),
-                                        })),
-                                    ],
-                                },
-                                {
-                                    label: 'Deleted',
-                                    value: filters.deleted,
-                                    onChange: (v) =>
-                                        setFilters({ ...filters, deleted: v }),
-                                    options: [
-                                        { value: '', label: 'All (Deleted)' },
-                                        { value: 'true', label: 'Deleted' },
-                                        {
-                                            value: 'false',
-                                            label: 'Not Deleted',
-                                        },
-                                    ],
-                                },
-                            ]}
-                            timeFilter={{
-                                value: timeFilter,
-                                onChange: (v) => {
-                                    setTimeFilter(v);
-                                    setPage(1);
-                                },
-                            }}
-                            sortBy={{
-                                value: sortBy,
-                                onChange: setSortBy,
-                                options: [
-                                    {
-                                        value: 'createdAt',
-                                        label: 'Sort by Date',
-                                    },
-                                    {
-                                        value: 'clickCounts',
-                                        label: 'Sort by Views',
-                                    },
-                                ],
-                            }}
-                            sortOrder={{
-                                value: sortOrder,
-                                onToggle: () =>
-                                    setSortOrder(
-                                        sortOrder === 'asc' ? 'desc' : 'asc',
-                                    ),
-                            }}
-                            viewMode={{
-                                value: viewMode,
-                                onChange: setViewMode,
-                            }}
-                            onClear={clearAllFilters}
-                            showClear={
-                                !!(
-                                    search ||
-                                    timeFilter ||
-                                    activeFiltersCount > 0
-                                )
-                            }
-                        />
-                    </div>
-
-                    {error && (
-                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8'>
-                            {error}
-                        </div>
-                    )}
-
-                    {/* Groups Table View */}
-                    {viewMode === 'table' && !loading && (
-                        <>
-                            <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                <div className='overflow-x-auto'>
-                                    <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                        <thead className='bg-gray-50 dark:bg-gray-700'>
-                                            <tr>
-                                                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                    Group
-                                                </th>
-                                                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                    Domain & Submission
-                                                </th>
-                                                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                    Status
-                                                </th>
-
-                                                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                    Date Created
-                                                </th>
-                                                <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                    Actions
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                            {current.map((group) => (
-                                                <tr
-                                                    key={group._id}
-                                                    onClick={() =>
-                                                        handleView(group)
-                                                    }
-                                                    className='hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer'
-                                                >
-                                                    <td className='px-6 py-4 whitespace-nowrap'>
-                                                        <div className='flex items-center'>
-                                                            <div className='flex-shrink-0 h-12 w-12'>
-                                                                <div className='h-12 w-12 bg-gradient-to-r from-green-500 to-teal-500 rounded-lg flex items-center justify-center'>
-                                                                    <MessageSquare className='h-6 w-6 text-white' />
-                                                                </div>
-                                                            </div>
-                                                            <div className='ml-4'>
-                                                                <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
-                                                                    {
-                                                                        group.title
-                                                                    }
-                                                                </div>
-                                                                <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs'>
-                                                                    {group.info ||
-                                                                        'No description'}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className='px-6 py-4 whitespace-nowrap'>
-                                                        <div className='space-y-1'>
-                                                            <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                                <Building className='h-4 w-4 text-green-500 mr-2' />
-                                                                {group.domain ||
-                                                                    'General'}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className='px-6 py-4 whitespace-nowrap'>
-                                                        <span
-                                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                                group.submissionStatus ===
-                                                                'approved'
-                                                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                                                                    : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                                                            }`}
-                                                        >
-                                                            <CheckCircle className='w-3 h-3 mr-1' />
-                                                            {group.submissionStatus ||
-                                                                'pending'}
-                                                        </span>
-
-                                                        {group.clickCounts >
-                                                            0 && (
-                                                            <div className='flex items-center gap-1 text-gray-500 dark:text-gray-400'>
-                                                                <Eye className='w-4 h-4' />
-                                                                <span className='text-xs'>
-                                                                    {
-                                                                        group.clickCounts
-                                                                    }
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </td>
-
-                                                    <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400'>
-                                                        <div className='flex items-center'>
-                                                            <Calendar className='h-4 w-4 mr-2' />
-                                                            {group.createdAt
-                                                                ? new Date(
-                                                                      group.createdAt,
-                                                                  ).toLocaleDateString()
-                                                                : 'N/A'}
-                                                        </div>
-                                                    </td>
-                                                    <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
-                                                        <div className='flex items-center justify-end space-x-2'>
-                                                            <button
-                                                                onClick={(
-                                                                    e,
-                                                                ) => {
-                                                                    e.stopPropagation();
-                                                                    handleEdit(
-                                                                        group,
-                                                                    );
-                                                                }}
-                                                                className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
-                                                                title='Edit Group'
-                                                            >
-                                                                <Edit2 className='h-4 w-4' />
-                                                            </button>
-                                                            <button
-                                                                onClick={(
-                                                                    e,
-                                                                ) => {
-                                                                    e.stopPropagation();
-                                                                    handleDelete(
-                                                                        group,
-                                                                    );
-                                                                }}
-                                                                className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
-                                                                title='Delete Group'
-                                                            >
-                                                                <Trash2 className='h-4 w-4' />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {/* Pagination */}
-                                {totalPages > 1 && (
-                                    <div className='bg-white dark:bg-gray-800 px-4 py-3 border-t border-gray-200 dark:border-gray-700'>
-                                        <Pagination
-                                            currentPage={page}
-                                            totalPages={totalPages}
-                                            onPageChange={setPage}
-                                            pageSize={pageSize}
-                                            onPageSizeChange={(newSize) => {
-                                                setPageSize(newSize);
-                                                setPage(1);
-                                            }}
-                                            totalItems={sorted.length}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        </>
-                    )}
-
-                    {/* Grid View */}
-                    {viewMode === 'grid' && !loading && (
-                        <>
-                            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
-                                {current.map((group) => (
-                                    <div
-                                        key={group._id}
-                                        onClick={() => handleView(group)}
-                                        className='bg-white mt-5 dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow cursor-pointer'
-                                    >
-                                        {/* Group Details */}
-                                        <div className='p-4'>
-                                            <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 truncate'>
-                                                {group.title}
-                                            </h3>
-                                            <p className='text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2'>
-                                                {group.info || 'No description'}
-                                            </p>
-
-                                            {/* Domain and Views */}
-                                            <div className='flex items-center justify-between mb-3'>
-                                                <div className='flex items-center text-sm text-gray-600 dark:text-gray-400'>
-                                                    <Building className='h-4 w-4 mr-1 text-green-500' />
-                                                    {group.domain || 'General'}
-                                                </div>
-                                                <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                    <Eye className='w-4 h-4 mr-1' />
-                                                    {group.clickCounts || 0}
-                                                </div>
-                                            </div>
-
-                                            {/* Submission Status and Date */}
-                                            <div className='text-xs text-gray-500 dark:text-gray-400 mb-3'>
-                                                <div className='flex items-center mb-1'>
-                                                    <BookOpen className='h-3 w-3 mr-1' />
-                                                    {group.submissionStatus ||
-                                                        'pending'}
-                                                </div>
-                                                <div className='flex items-center'>
-                                                    <Calendar className='h-3 w-3 mr-1' />
-                                                    {group.createdAt
-                                                        ? new Date(
-                                                              group.createdAt,
-                                                          ).toLocaleDateString()
-                                                        : 'N/A'}
-                                                </div>
-                                            </div>
-
-                                            {/* Actions */}
-                                            <div className='flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700'>
-                                                <div className='flex items-center space-x-2'>
-                                                    {group.link && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                window.open(
-                                                                    group.link,
-                                                                    '_blank',
-                                                                );
-                                                            }}
-                                                            className='text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors p-1 rounded'
-                                                            title='Open WhatsApp'
-                                                        >
-                                                            <ExternalLink className='h-4 w-4' />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <div className='flex items-center space-x-2'>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleEdit(group);
-                                                        }}
-                                                        className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
-                                                        title='Edit Group'
-                                                    >
-                                                        <Edit2 className='h-4 w-4' />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDelete(group);
-                                                        }}
-                                                        className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
-                                                        title='Delete Group'
-                                                    >
-                                                        <Trash2 className='h-4 w-4' />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Pagination for Grid */}
-                            {totalPages > 1 && (
-                                <div className='mt-6 bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700'>
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={totalPages}
-                                        onPageChange={setPage}
-                                        pageSize={pageSize}
-                                        onPageSizeChange={(newSize) => {
-                                            setPageSize(newSize);
-                                            setPage(1);
-                                        }}
-                                        totalItems={sorted.length}
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-            </main>
-
-            {/* Modals */}
-            <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={handleCloseConfirm}
-                onConfirm={confirmModal.onConfirm}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                variant={confirmModal.variant}
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='WhatsApp groups'
+                description={`Group invite links students have shared for ${currentCollege?.name || collegeslug}.`}
+                actions={
+                    <Button
+                        icon={Download}
+                        onClick={exportCsv}
+                        disabled={!sorted.length}
+                    >
+                        Export CSV
+                    </Button>
+                }
             />
 
+            <Tabs
+                label='Review status'
+                className='mb-4'
+                value={filters.submissionStatus}
+                onChange={(value) => {
+                    setFilter('submissionStatus', value);
+                    selection.clear();
+                }}
+                items={STATUS_TABS.map(([value, label]) => ({
+                    value,
+                    label,
+                    count: counts[value] || 0,
+                    attention: value === 'pending' && counts.pending > 0,
+                }))}
+            />
+
+            <FilterBar
+                className='mb-4'
+                search={search}
+                onSearch={(value) => {
+                    setSearch(value);
+                    setPage(1);
+                }}
+                searchPlaceholder='Search by group name, description or domain'
+                filters={[
+                    {
+                        label: 'Domain',
+                        value: filters.domain,
+                        onChange: (v) => setFilter('domain', v),
+                        options: [
+                            { value: '', label: 'Any domain' },
+                            ...domains.map((d) => ({ value: d, label: d })),
+                        ],
+                    },
+                    {
+                        label: 'Deleted',
+                        value: filters.deleted,
+                        onChange: (v) => setFilter('deleted', v),
+                        options: [
+                            { value: '', label: 'Include deleted' },
+                            { value: 'false', label: 'Hide deleted' },
+                            { value: 'true', label: 'Only deleted' },
+                        ],
+                    },
+                ]}
+                timeFilter={{
+                    value: timeFilter,
+                    onChange: (v) => {
+                        setTimeFilter(v);
+                        setPage(1);
+                    },
+                }}
+                sortBy={{
+                    value: sortBy,
+                    onChange: setSortBy,
+                    options: [
+                        { value: 'createdAt', label: 'Newest first' },
+                        { value: 'clickCounts', label: 'Most clicked' },
+                    ],
+                }}
+                sortOrder={{
+                    value: sortOrder,
+                    onToggle: () =>
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                }}
+                viewMode={{ value: viewMode, onChange: setViewMode }}
+                onClear={clearAll}
+                showClear={Boolean(
+                    search || timeFilter !== 'all' || activeFilters,
+                )}
+            />
+
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button size='sm' onClick={fetchGroups}>
+                            Try again
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
+
+            {viewMode === 'table' ? (
+                <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
+                    {bulkBar}
+                    {current.length === 0 ? (
+                        empty
+                    ) : (
+                        <Table minWidth={940}>
+                            <thead>
+                                <tr>
+                                    <SelectCell
+                                        header
+                                        label='Select all groups on this page'
+                                        checked={selection.allVisible}
+                                        indeterminate={selection.someVisible}
+                                        onChange={selection.toggleAllVisible}
+                                    />
+                                    <Th>Group</Th>
+                                    <Th>Domain</Th>
+                                    <Th>Status</Th>
+                                    <Th>Added</Th>
+                                    <Th>
+                                        <span className='sr-only'>Actions</span>
+                                    </Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {current.map((group) => (
+                                    <Tr
+                                        key={group._id}
+                                        selected={selection.isSelected(
+                                            group._id,
+                                        )}
+                                        onClick={() => openGroup(group)}
+                                    >
+                                        <SelectCell
+                                            label={`Select ${group.title || 'group'}`}
+                                            checked={selection.isSelected(
+                                                group._id,
+                                            )}
+                                            onChange={(on) =>
+                                                selection.toggle(group._id, on)
+                                            }
+                                        />
+                                        <Td className='max-w-[420px]'>
+                                            <div className='flex items-center gap-3 min-w-0'>
+                                                <GroupIcon />
+                                                <div className='flex flex-col gap-0.5 min-w-0'>
+                                                    <Link
+                                                        to={groupPath(group)}
+                                                        onClick={(e) =>
+                                                            e.stopPropagation()
+                                                        }
+                                                        className='font-medium text-ink hover:underline truncate'
+                                                    >
+                                                        {group.title ||
+                                                            'Untitled group'}
+                                                    </Link>
+                                                    <span className='text-[12.5px] text-muted truncate'>
+                                                        {group.info ||
+                                                            'No description'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </Td>
+                                        <Td className='max-w-[200px]'>
+                                            {group.domain ? (
+                                                <DomainChip>
+                                                    {group.domain}
+                                                </DomainChip>
+                                            ) : (
+                                                <span className='text-muted'>
+                                                    —
+                                                </span>
+                                            )}
+                                        </Td>
+                                        <Td>
+                                            <div className='flex flex-col items-start gap-1'>
+                                                {badges(group)}
+                                                {clicksOf(group) > 0 && (
+                                                    <span className='text-xs text-muted'>
+                                                        {formatNumber(
+                                                            clicksOf(group),
+                                                        )}{' '}
+                                                        link clicks
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </Td>
+                                        <Td className='whitespace-nowrap'>
+                                            {formatShortDate(group.createdAt)}
+                                        </Td>
+                                        <Td align='right'>
+                                            <div className='flex justify-end gap-1'>
+                                                {rowActions(group)}
+                                            </div>
+                                        </Td>
+                                    </Tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                    {sorted.length > 0 && (
+                        <div className='px-4 py-3 border-t border-line-soft'>
+                            {pagination}
+                        </div>
+                    )}
+                </div>
+            ) : current.length === 0 ? (
+                <div className='bg-sheet border border-line rounded-xl'>
+                    {empty}
+                </div>
+            ) : (
+                <div className='flex flex-col gap-4'>
+                    {selection.count > 0 && (
+                        <div className='rounded-xl overflow-hidden'>
+                            {bulkBar}
+                        </div>
+                    )}
+                    <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
+                        {current.map((group) => {
+                            const selected = selection.isSelected(group._id);
+                            const title = group.title || 'Untitled group';
+                            return (
+                                <article
+                                    key={group._id}
+                                    onClick={() => openGroup(group)}
+                                    className={`flex flex-col gap-3 p-4 bg-sheet border rounded-xl cursor-pointer transition-colors ${
+                                        selected
+                                            ? 'border-brand ring-1 ring-brand'
+                                            : 'border-line hover:border-line-strong'
+                                    }`}
+                                >
+                                    <div className='flex items-start gap-3'>
+                                        <GroupIcon />
+                                        <div className='flex-1 min-w-0 flex flex-col gap-0.5'>
+                                            <Link
+                                                to={groupPath(group)}
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
+                                                }
+                                                className='font-medium text-ink hover:underline truncate'
+                                            >
+                                                {title}
+                                            </Link>
+                                            <span className='text-[12.5px] text-muted line-clamp-2'>
+                                                {group.info || 'No description'}
+                                            </span>
+                                        </div>
+                                        <input
+                                            type='checkbox'
+                                            aria-label={`Select ${title}`}
+                                            checked={selected}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onChange={(e) =>
+                                                selection.toggle(
+                                                    group._id,
+                                                    e.target.checked,
+                                                )
+                                            }
+                                            className='mt-1 w-4 h-4 accent-brand cursor-pointer shrink-0'
+                                        />
+                                    </div>
+                                    <div className='flex flex-wrap items-center gap-1.5'>
+                                        {badges(group)}
+                                        {group.domain && (
+                                            <DomainChip>
+                                                {group.domain}
+                                            </DomainChip>
+                                        )}
+                                    </div>
+                                    <div className='flex items-center gap-2 pt-3 mt-auto border-t border-line-soft'>
+                                        <span className='flex-1 min-w-0 text-xs text-muted truncate'>
+                                            {formatShortDate(group.createdAt)}
+                                            {clicksOf(group) > 0 &&
+                                                ` · ${formatNumber(clicksOf(group))} link clicks`}
+                                        </span>
+                                        {rowActions(group)}
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                    <div className='bg-sheet border border-line rounded-xl px-4 py-3'>
+                        {pagination}
+                    </div>
+                </div>
+            )}
+
             <GroupEditModal
-                isOpen={showModal}
-                onClose={handleModalClose}
+                isOpen={Boolean(editingGroup)}
+                onClose={() => setEditingGroup(null)}
                 group={editingGroup}
-                onSuccess={handleModalSuccess}
+                onSuccess={fetchGroups}
+            />
+
+            <ConfirmModal
+                isOpen={Boolean(confirm)}
+                onClose={() => setConfirm(null)}
+                onConfirm={() => confirm?.onConfirm()}
+                title={confirm?.title}
+                message={confirm?.message}
+                confirmText={confirm?.confirmText}
+                variant='danger'
+            />
+
+            <RejectDialog
+                open={Boolean(rejecting)}
+                onClose={() => setRejecting(null)}
+                title={
+                    rejecting?.length > 1
+                        ? `Reject ${formatNumber(rejecting.length)} groups?`
+                        : 'Reject this group?'
+                }
+                description={
+                    rejecting?.length > 1
+                        ? 'Every student who shared one gets the same reason, so keep it general.'
+                        : 'The student who shared it sees your reason, so say what to fix.'
+                }
+                onSubmit={(reason) => reject(rejecting, reason)}
             />
         </div>
     );

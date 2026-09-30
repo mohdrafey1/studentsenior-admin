@@ -1,891 +1,787 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
-import api from '../../utils/api';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
-    Edit2,
-    Trash2,
-    Eye,
-    Calendar,
-    User,
-    MapPin,
-    CheckCircle,
-    XCircle,
-    Phone,
-    Clock,
+    Check,
+    CheckCheck,
+    Download,
+    ImageIcon,
     Package,
+    Pencil,
+    Trash2,
+    X,
 } from 'lucide-react';
+import api from '../../utils/api';
+import { useColleges } from '../../context/CollegeContext';
+import { useSelection } from '../../hooks/useSelection';
+import { downloadCsv } from '../../utils/csv';
+import {
+    formatDate,
+    formatDateTime,
+    formatNumber,
+    formatShortDate,
+    formatShortDateTime,
+} from '../../utils/format';
+import FilterBar from '../../components/Common/FilterBar';
+import { filterByTime } from '../../components/Common/timeFilterUtils';
+import Loader from '../../components/Common/Loader';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
+import RejectDialog from '../../components/RejectDialog';
 import LostFoundEditModal from '../../components/LostFoundEditModal';
-import FilterBar from '../../components/Common/FilterBar';
-import BackButton from '../../components/Common/BackButton';
-import Loader from '../../components/Common/Loader';
 import {
-    filterByTime,
-    getTimeFilterLabel,
-} from '../../components/Common/timeFilterUtils';
+    Alert,
+    BulkBar,
+    BulkButton,
+    Button,
+    EmptyState,
+    PageHeader,
+    SelectCell,
+    StatusBadge,
+    Table,
+    Tabs,
+    Td,
+    Th,
+    Tr,
+} from '../../components/ui';
+
+const STATUS_TABS = [
+    ['', 'All'],
+    ['pending', 'Pending'],
+    ['approved', 'Approved'],
+    ['rejected', 'Rejected'],
+];
+
+const EMPTY_FILTERS = {
+    submissionStatus: '',
+    type: '',
+    currentStatus: '',
+    deleted: '',
+};
+
+// The model stores `clickCount`; older records may still use `clickCounts`.
+const viewsOf = (item) => item.clickCount ?? item.clickCounts ?? 0;
+
+const typeLabel = (type) => (type === 'found' ? 'Found' : 'Lost');
+
+/** "Lost" has an outline, "Found" a filled chip; the word carries the meaning. */
+const TypeChip = ({ type }) => (
+    <span
+        className={`inline-flex items-center h-6 px-2 rounded-md border text-[12.5px] font-medium text-ink whitespace-nowrap ${
+            type === 'found'
+                ? 'bg-ground border-transparent'
+                : 'bg-sheet border-line-strong'
+        }`}
+    >
+        {typeLabel(type)}
+    </span>
+);
+
+const Thumb = ({ src, size = 'w-11 h-11' }) =>
+    src ? (
+        <img
+            src={src}
+            alt=''
+            className={`${size} rounded-lg object-cover bg-sunken shrink-0`}
+        />
+    ) : (
+        <span
+            aria-hidden='true'
+            className={`${size} rounded-lg bg-ground text-muted flex items-center justify-center shrink-0`}
+        >
+            <ImageIcon className='w-[18px] h-[18px]' />
+        </span>
+    );
 
 const LostFoundList = () => {
     const location = useLocation();
-    const { collegeslug } = useParams();
     const navigate = useNavigate();
+    const { collegeslug } = useParams();
+    const { currentCollege } = useColleges();
 
-    // Read URL params
+    // Filters live in the URL so a filtered list can be shared or reloaded.
     const params = new URLSearchParams(location.search);
-    const initialSearch = params.get('search') || '';
-    const initialTimeFilter = params.get('time') || '';
-    const initialPage = parseInt(params.get('page')) || 1;
-    const initialSubmissionStatus = params.get('submissionStatus') || '';
-    const initialDeleted = params.get('deleted') || '';
-    const initialType = params.get('type') || '';
-    const initialCurrentStatus = params.get('currentStatus') || '';
-
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [search, setSearch] = useState(initialSearch);
-    const [page, setPage] = useState(initialPage);
+    const [search, setSearch] = useState(params.get('search') || '');
+    const [page, setPage] = useState(parseInt(params.get('page')) || 1);
     const [pageSize, setPageSize] = useState(12);
-    const [timeFilter, setTimeFilter] = useState(initialTimeFilter);
-    const [showModal, setShowModal] = useState(false);
-    const [editingItem, setEditingItem] = useState(null);
-    const { mainContentMargin } = useSidebarLayout();
-
-    // View mode - responsive default (small screens = grid, large screens = table)
-    const [viewMode, setViewMode] = useState(() => {
-        return window.innerWidth >= 1024 ? 'table' : 'grid';
-    });
-
-    // Filters state
-    const [filters, setFilters] = useState({
-        submissionStatus: initialSubmissionStatus,
-        deleted: initialDeleted,
-        type: initialType,
-        currentStatus: initialCurrentStatus,
-    });
+    const [timeFilter, setTimeFilter] = useState(params.get('time') || 'all');
+    const [filters, setFilters] = useState(() =>
+        Object.fromEntries(
+            Object.keys(EMPTY_FILTERS).map((key) => [
+                key,
+                params.get(key) || '',
+            ]),
+        ),
+    );
     const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState('desc');
+    const [viewMode, setViewMode] = useState(() =>
+        window.innerWidth >= 1024 ? 'table' : 'grid',
+    );
 
-    // Responsive view mode - always auto-switch based on screen size
-    useEffect(() => {
-        const handleResize = () => {
-            const newMode = window.innerWidth >= 1024 ? 'table' : 'grid';
-            setViewMode(newMode);
-        };
+    const [editing, setEditing] = useState(null);
+    const [confirm, setConfirm] = useState(null);
+    const [rejecting, setRejecting] = useState(null); // array of ids
+    const [bulkBusy, setBulkBusy] = useState(false);
 
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    // Confirmation modal state
-    const [confirmModal, setConfirmModal] = useState({
-        isOpen: false,
-        title: '',
-        message: '',
-        onConfirm: null,
-        variant: 'danger',
-    });
-
-    const showConfirm = (config) => {
-        return new Promise((resolve) => {
-            setConfirmModal({
-                isOpen: true,
-                title: config.title || 'Confirm Action',
-                message: config.message,
-                variant: config.variant || 'danger',
-                onConfirm: () => {
-                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-                    resolve(true);
-                },
-            });
-        });
-    };
-
-    const handleCloseConfirm = () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+    const fetchItems = async () => {
+        try {
+            setError(null);
+            const response = await api.get(`/lostandfound/all/${collegeslug}`);
+            setItems(response.data.data || []);
+        } catch {
+            setError(
+                'Couldn’t load lost and found items. Check your connection and try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
         fetchItems();
     }, [collegeslug]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Persist filters in URL
     useEffect(() => {
-        const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (timeFilter) params.set('time', timeFilter);
-        if (filters.submissionStatus)
-            params.set('submissionStatus', filters.submissionStatus);
-        if (filters.deleted) params.set('deleted', filters.deleted);
-        if (filters.type) params.set('type', filters.type);
-        if (filters.currentStatus)
-            params.set('currentStatus', filters.currentStatus);
-        if (page > 1) params.set('page', page.toString());
-        navigate({ search: params.toString() }, { replace: true });
+        const next = new URLSearchParams();
+        if (search) next.set('search', search);
+        if (timeFilter && timeFilter !== 'all') next.set('time', timeFilter);
+        Object.entries(filters).forEach(
+            ([key, value]) => value && next.set(key, value),
+        );
+        if (page > 1) next.set('page', String(page));
+        navigate({ search: next.toString() }, { replace: true });
     }, [search, timeFilter, filters, page, navigate]);
 
-    const fetchItems = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get(`/lostandfound/all/${collegeslug}`);
-            setItems(response.data.data || []);
-            setError(null);
-        } catch (error) {
-            console.error('Error fetching lost & found items:', error);
-            setError('Failed to fetch lost & found items');
-            toast.error('Failed to fetch lost & found items');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleEdit = (item) => {
-        setEditingItem(item);
-        setShowModal(true);
-    };
-
-    const handleDelete = async (item) => {
-        const confirmed = await showConfirm({
-            title: 'Delete Item',
-            message: `Are you sure you want to delete "${item.title}"? This action cannot be undone.`,
-            variant: 'danger',
-        });
-
-        if (confirmed) {
-            try {
-                await api.delete(`/lostandfound/delete/${item._id}`);
-                toast.success('Item deleted successfully');
-                fetchItems();
-            } catch (error) {
-                console.error('Error deleting item:', error);
-                toast.error('Failed to delete item');
-            }
-        }
-    };
-
-    const handleView = (item) => {
-        navigate(`/${collegeslug}/lost-found/${item._id}`);
-    };
-
-    const handleModalClose = () => {
-        setShowModal(false);
-        setEditingItem(null);
-    };
-
-    const handleModalSuccess = () => {
-        fetchItems();
-        handleModalClose();
-    };
-
-    const getTypeColor = (type) => {
-        return type === 'lost'
-            ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-            : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-    };
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'approved':
-                return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-            case 'pending':
-                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
-            case 'rejected':
-                return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-            default:
-                return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
-        }
-    };
-
-    const getCurrentStatusColor = (status) => {
-        return status === 'open'
-            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-            : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
-    };
-
-    const getStatusIcon = (status) => {
-        switch (status) {
-            case 'approved':
-                return <CheckCircle className='h-4 w-4' />;
-            case 'pending':
-                return <Clock className='h-4 w-4' />;
-            case 'rejected':
-                return <XCircle className='h-4 w-4' />;
-            default:
-                return <Clock className='h-4 w-4' />;
-        }
-    };
-
-    // Filter, sort, and paginate
-    const filtered = items.filter((item) => {
-        const matchesSearch =
-            item.title?.toLowerCase().includes(search.toLowerCase()) ||
-            item.description?.toLowerCase().includes(search.toLowerCase()) ||
-            item.location?.toLowerCase().includes(search.toLowerCase()) ||
-            item.owner?.username?.toLowerCase().includes(search.toLowerCase());
-
-        const matchesSubmissionStatus =
-            !filters.submissionStatus ||
-            item.submissionStatus === filters.submissionStatus;
-        const matchesDeleted =
-            !filters.deleted || item.deleted?.toString() === filters.deleted;
-        const matchesType = !filters.type || item.type === filters.type;
-        const matchesCurrentStatus =
-            !filters.currentStatus ||
-            item.currentStatus === filters.currentStatus;
-
-        // Time filter
-        const matchesTime = filterByTime(item, timeFilter);
-
-        return (
-            matchesSearch &&
-            matchesSubmissionStatus &&
-            matchesDeleted &&
-            matchesType &&
-            matchesCurrentStatus &&
-            matchesTime
-        );
-    });
-
-    const sorted = [...filtered].sort((a, b) => {
-        const aValue = a[sortBy];
-        const bValue = b[sortBy];
-
-        if (sortBy === 'createdAt') {
-            const aDate = new Date(aValue);
-            const bDate = new Date(bValue);
-            return sortOrder === 'asc' ? aDate - bDate : bDate - aDate;
-        }
-
-        if (sortBy === 'clickCounts') {
-            const aCount = Number(aValue) || 0;
-            const bCount = Number(bValue) || 0;
-            return sortOrder === 'asc' ? aCount - bCount : bCount - aCount;
-        }
-
-        return 0;
-    });
-
-    const totalItems = sorted.length;
-    const totalPages = Math.ceil(totalItems / pageSize);
-    const current = sorted.slice((page - 1) * pageSize, page * pageSize);
-
-    const uniqueStatuses = [
-        ...new Set(items.map((item) => item.submissionStatus)),
-    ].filter(Boolean);
-    const uniqueTypes = [...new Set(items.map((item) => item.type))].filter(
-        Boolean,
-    );
-    const uniqueCurrentStatuses = [
-        ...new Set(items.map((item) => item.currentStatus)),
-    ].filter(Boolean);
-
-    const clearAllFilters = () => {
-        setSearch('');
-        setTimeFilter('');
-        setFilters({
-            submissionStatus: '',
-            deleted: '',
-            type: '',
-            currentStatus: '',
-        });
+    const setFilter = (key, value) => {
+        setFilters((prev) => ({ ...prev, [key]: value }));
         setPage(1);
     };
 
-    const activeFiltersCount =
-        (filters.submissionStatus ? 1 : 0) +
-        (filters.deleted ? 1 : 0) +
-        (filters.type ? 1 : 0) +
-        (filters.currentStatus ? 1 : 0);
-
-    if (loading) {
-        return <Loader />;
-    }
-
-    if (error) {
+    // Everything except the status tab, so tab counts reflect the other filters.
+    const matchesFilters = (item) => {
+        const q = search.trim().toLowerCase();
+        const matchesSearch =
+            !q ||
+            item.title?.toLowerCase().includes(q) ||
+            item.description?.toLowerCase().includes(q) ||
+            item.location?.toLowerCase().includes(q) ||
+            item.owner?.username?.toLowerCase().includes(q);
         return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <div
-                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${mainContentMargin} transition-all duration-300`}
-                >
-                    <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-8 text-center'>
-                        <div className='text-red-600 dark:text-red-400 text-lg font-medium mb-2'>
-                            Error Loading Items
-                        </div>
-                        <p className='text-red-500 dark:text-red-300 mb-4'>
-                            {error}
-                        </p>
-                        <button
-                            onClick={fetchItems}
-                            className='bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors'
-                        >
-                            Try Again
-                        </button>
-                    </div>
-                </div>
-            </div>
+            matchesSearch &&
+            (!filters.type || item.type === filters.type) &&
+            (!filters.currentStatus ||
+                item.currentStatus === filters.currentStatus) &&
+            (!filters.deleted ||
+                String(Boolean(item.deleted)) === filters.deleted) &&
+            filterByTime(item, timeFilter)
         );
-    }
+    };
+
+    const base = items.filter(matchesFilters);
+    const counts = base.reduce(
+        (acc, item) => {
+            const status = item.submissionStatus || 'pending';
+            acc[status] = (acc[status] || 0) + 1;
+            return acc;
+        },
+        { '': base.length },
+    );
+    const filtered = base.filter(
+        (item) =>
+            !filters.submissionStatus ||
+            (item.submissionStatus || 'pending') === filters.submissionStatus,
+    );
+    const sorted = [...filtered].sort((a, b) => {
+        const diff =
+            sortBy === 'clickCounts'
+                ? viewsOf(a) - viewsOf(b)
+                : new Date(a.createdAt) - new Date(b.createdAt);
+        return sortOrder === 'desc' ? -diff : diff;
+    });
+    const current = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+    const selection = useSelection(
+        useMemo(() => current.map((item) => item._id), [current]),
+    );
+
+    const activeFilters = Object.entries(filters).filter(
+        ([key, value]) => key !== 'submissionStatus' && value,
+    ).length;
+    const clearAll = () => {
+        setSearch('');
+        setTimeFilter('all');
+        setFilters((prev) => ({
+            ...EMPTY_FILTERS,
+            submissionStatus: prev.submissionStatus,
+        }));
+        setSortBy('createdAt');
+        setSortOrder('desc');
+        setPage(1);
+    };
+
+    const updateLocal = (ids, patch) =>
+        setItems((prev) =>
+            prev.map((item) =>
+                ids.includes(item._id) ? { ...item, ...patch } : item,
+            ),
+        );
+
+    // Runs one request per item and reports how many went through.
+    const runBulk = async (ids, request, verb) => {
+        setBulkBusy(true);
+        const results = await Promise.allSettled(ids.map(request));
+        setBulkBusy(false);
+        const done = ids.filter((_, i) => results[i].status === 'fulfilled');
+        const failed = ids.length - done.length;
+        if (done.length)
+            toast.success(
+                `${formatNumber(done.length)} item${done.length === 1 ? '' : 's'} ${verb}`,
+            );
+        if (failed)
+            toast.error(
+                `${formatNumber(failed)} couldn’t be ${verb}. Try those again.`,
+            );
+        return done;
+    };
+
+    const edit = (id, body) => api.put(`/lostandfound/edit/${id}`, body);
+
+    const approve = async (ids) => {
+        const patch = { submissionStatus: 'approved', rejectionReason: '' };
+        const done = await runBulk(ids, (id) => edit(id, patch), 'approved');
+        updateLocal(done, patch);
+        selection.clear();
+    };
+
+    const reject = async (ids, reason) => {
+        const patch = { submissionStatus: 'rejected', rejectionReason: reason };
+        const done = await runBulk(ids, (id) => edit(id, patch), 'rejected');
+        updateLocal(done, patch);
+        selection.clear();
+        setRejecting(null);
+    };
+
+    const close = async (ids) => {
+        const patch = { currentStatus: 'closed' };
+        const done = await runBulk(ids, (id) => edit(id, patch), 'closed');
+        updateLocal(done, patch);
+        selection.clear();
+    };
+
+    const remove = (ids) =>
+        setConfirm({
+            title:
+                ids.length === 1
+                    ? 'Delete this item?'
+                    : `Delete ${formatNumber(ids.length)} items?`,
+            message:
+                'The post disappears for students straight away, along with its photo and contact number. This can’t be undone.',
+            onConfirm: async () => {
+                const done = await runBulk(
+                    ids,
+                    (id) => api.delete(`/lostandfound/delete/${id}`),
+                    'deleted',
+                );
+                setItems((prev) =>
+                    prev.filter((item) => !done.includes(item._id)),
+                );
+                selection.clear();
+            },
+        });
+
+    const exportCsv = () =>
+        downloadCsv(
+            `lost-and-found-${collegeslug}`,
+            [
+                { label: 'Title', value: (i) => i.title },
+                { label: 'Description', value: (i) => i.description },
+                { label: 'Type', value: (i) => typeLabel(i.type) },
+                { label: 'State', value: (i) => i.currentStatus || 'open' },
+                { label: 'Location', value: (i) => i.location },
+                { label: 'Date', value: (i) => formatDate(i.date) },
+                {
+                    label: 'Status',
+                    value: (i) => i.submissionStatus || 'pending',
+                },
+                { label: 'Rejection reason', value: (i) => i.rejectionReason },
+                { label: 'Views', value: viewsOf },
+                { label: 'Posted by', value: (i) => i.owner?.username },
+                { label: 'Posted', value: (i) => formatDateTime(i.createdAt) },
+                { label: 'Deleted', value: (i) => (i.deleted ? 'yes' : 'no') },
+            ],
+            sorted,
+        );
+
+    if (loading) return <Loader />;
+
+    const selectedIds = [...selection.selected];
+    const detailPath = (item) => `/${collegeslug}/lost-found/${item._id}`;
+    const stop = (fn) => (event) => {
+        event.stopPropagation();
+        fn();
+    };
+    const isClosed = (item) => item.currentStatus === 'closed';
+
+    const rowActions = (item) =>
+        (item.submissionStatus || 'pending') === 'pending' ? (
+            <>
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={X}
+                    aria-label={`Reject ${item.title}`}
+                    className='text-bad-ink hover:text-bad-ink'
+                    onClick={stop(() => setRejecting([item._id]))}
+                />
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={Check}
+                    aria-label={`Approve ${item.title}`}
+                    className='text-ok-ink hover:text-ok-ink'
+                    onClick={stop(() => approve([item._id]))}
+                />
+            </>
+        ) : (
+            <>
+                {!isClosed(item) && (
+                    <Button
+                        size='sm'
+                        icon={Check}
+                        disabled={bulkBusy}
+                        aria-label={`Close ${item.title}`}
+                        onClick={stop(() => close([item._id]))}
+                    >
+                        Close
+                    </Button>
+                )}
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={Pencil}
+                    aria-label={`Edit ${item.title}`}
+                    onClick={stop(() => setEditing(item))}
+                />
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    iconOnly
+                    icon={Trash2}
+                    aria-label={`Delete ${item.title}`}
+                    className='text-bad-ink hover:text-bad-ink'
+                    onClick={stop(() => remove([item._id]))}
+                />
+            </>
+        );
+
+    const badges = (item) => (
+        <div className='flex flex-wrap gap-1'>
+            <StatusBadge status={item.submissionStatus} />
+            {isClosed(item) && <StatusBadge status='closed' />}
+            {item.deleted && <StatusBadge tone='outline'>Deleted</StatusBadge>}
+        </div>
+    );
+
+    const pagination = (
+        <Pagination
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={sorted.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+            }}
+        />
+    );
+
+    const reviewQueue =
+        filters.submissionStatus === 'pending' && !activeFilters && !search;
+    const empty = (
+        <EmptyState
+            icon={Package}
+            tone={reviewQueue ? 'done' : 'neutral'}
+            title={
+                items.length === 0
+                    ? 'No lost or found items yet'
+                    : reviewQueue
+                      ? 'Nothing waiting for review'
+                      : 'No items match'
+            }
+            description={
+                items.length === 0 || reviewQueue
+                    ? 'Items students report as lost or found on campus appear here.'
+                    : 'Try another search or clear the filters.'
+            }
+            action={
+                activeFilters || search || timeFilter !== 'all' ? (
+                    <Button onClick={clearAll}>Clear filters</Button>
+                ) : undefined
+            }
+        />
+    );
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
-            <main className='pt-6 pb-12'>
-                <div
-                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentMargin} transition-all duration-300`}
-                >
-                    {/* Header */}
-                    <BackButton
-                        title={`Lost & Found for ${collegeslug}`}
-                        TitleIcon={Package}
-                    />
-
-                    <div className='bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 mb-3 space-y-3'>
-                        <div className='flex items-center justify-between px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 rounded text-xs'>
-                            <span className='text-gray-600 dark:text-gray-400'>
-                                Total ({getTimeFilterLabel(timeFilter)}):
-                            </span>
-                            <span className='font-semibold text-gray-900 dark:text-white'>
-                                {totalItems}
-                            </span>
-                        </div>
-
-                        {/* FilterBar */}
-                        <FilterBar
-                            search={search}
-                            onSearch={(v) => {
-                                setSearch(v);
-                                setPage(1);
-                            }}
-                            searchPlaceholder='Search items...'
-                            filters={[
-                                {
-                                    label: 'Status',
-                                    value: filters.submissionStatus,
-                                    onChange: (v) =>
-                                        setFilters({
-                                            ...filters,
-                                            submissionStatus: v,
-                                        }),
-                                    options: [
-                                        { value: '', label: 'All Statuses' },
-                                        ...uniqueStatuses.map((s) => ({
-                                            value: s,
-                                            label:
-                                                s.charAt(0).toUpperCase() +
-                                                s.slice(1),
-                                        })),
-                                    ],
-                                },
-                                {
-                                    label: 'Deleted',
-                                    value: filters.deleted,
-                                    onChange: (v) =>
-                                        setFilters({ ...filters, deleted: v }),
-                                    options: [
-                                        { value: '', label: 'All (Deleted)' },
-                                        { value: 'true', label: 'Deleted' },
-                                        {
-                                            value: 'false',
-                                            label: 'Not Deleted',
-                                        },
-                                    ],
-                                },
-                                {
-                                    label: 'Type',
-                                    value: filters.type,
-                                    onChange: (v) =>
-                                        setFilters({ ...filters, type: v }),
-                                    options: [
-                                        { value: '', label: 'All Types' },
-                                        ...uniqueTypes.map((type) => ({
-                                            value: type,
-                                            label:
-                                                type === 'lost'
-                                                    ? 'Lost Items'
-                                                    : 'Found Items',
-                                        })),
-                                    ],
-                                },
-                                {
-                                    label: 'Current Status',
-                                    value: filters.currentStatus,
-                                    onChange: (v) =>
-                                        setFilters({
-                                            ...filters,
-                                            currentStatus: v,
-                                        }),
-                                    options: [
-                                        {
-                                            value: '',
-                                            label: 'All Current Statuses',
-                                        },
-                                        ...uniqueCurrentStatuses.map((s) => ({
-                                            value: s,
-                                            label:
-                                                s.charAt(0).toUpperCase() +
-                                                s.slice(1),
-                                        })),
-                                    ],
-                                },
-                            ]}
-                            timeFilter={{
-                                value: timeFilter,
-                                onChange: (v) => {
-                                    setTimeFilter(v);
-                                    setPage(1);
-                                },
-                            }}
-                            sortBy={{
-                                value: sortBy,
-                                onChange: setSortBy,
-                                options: [
-                                    {
-                                        value: 'createdAt',
-                                        label: 'Sort by Date',
-                                    },
-                                    {
-                                        value: 'clickCounts',
-                                        label: 'Sort by Views',
-                                    },
-                                ],
-                            }}
-                            sortOrder={{
-                                value: sortOrder,
-                                onToggle: () =>
-                                    setSortOrder(
-                                        sortOrder === 'asc' ? 'desc' : 'asc',
-                                    ),
-                            }}
-                            viewMode={{
-                                value: viewMode,
-                                onChange: setViewMode,
-                            }}
-                            onClear={clearAllFilters}
-                            showClear={
-                                !!(
-                                    search ||
-                                    timeFilter ||
-                                    activeFiltersCount > 0
-                                )
-                            }
-                        />
-                    </div>
-
-                    {error && (
-                        <div className='bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg mb-8'>
-                            {error}
-                        </div>
-                    )}
-
-                    {/* Empty State */}
-                    {current.length === 0 ? (
-                        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center'>
-                            <Package className='h-16 w-16 text-gray-400 mx-auto mb-4' />
-                            <h3 className='text-lg font-medium text-gray-900 dark:text-gray-100 mb-2'>
-                                No items found
-                            </h3>
-                            <p className='text-gray-600 dark:text-gray-400'>
-                                {search || activeFiltersCount > 0
-                                    ? 'Try adjusting your search or filters'
-                                    : 'No lost & found items have been submitted yet'}
-                            </p>
-                        </div>
-                    ) : (
-                        <>
-                            {/* Table View */}
-                            {viewMode === 'table' && (
-                                <div className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                                    <div className='overflow-x-auto'>
-                                        <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-                                            <thead className='bg-gray-50 dark:bg-gray-700'>
-                                                <tr>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Item
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Type
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Submission Status
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Current Status
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Location / Posted By
-                                                    </th>
-                                                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Views / Date
-                                                    </th>
-                                                    <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider'>
-                                                        Actions
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className='bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700'>
-                                                {current.map((item) => (
-                                                    <tr
-                                                        key={item._id}
-                                                        className='hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors'
-                                                        onClick={() =>
-                                                            handleView(item)
-                                                        }
-                                                    >
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <div className='flex items-center'>
-                                                                <div className='flex-shrink-0 h-12 w-12'>
-                                                                    {item.imageUrl ? (
-                                                                        <img
-                                                                            src={
-                                                                                item.imageUrl
-                                                                            }
-                                                                            alt={
-                                                                                item.title
-                                                                            }
-                                                                            className='h-12 w-12 rounded-lg object-cover'
-                                                                        />
-                                                                    ) : (
-                                                                        <div className='h-12 w-12 rounded-lg bg-gradient-to-r from-purple-400 to-indigo-400 flex items-center justify-center'>
-                                                                            <Package className='h-6 w-6 text-white' />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div className='ml-4'>
-                                                                    <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
-                                                                        {
-                                                                            item.title
-                                                                        }
-                                                                    </div>
-                                                                    <div className='text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs'>
-                                                                        {item.description ||
-                                                                            'No description'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <span
-                                                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(
-                                                                    item.type,
-                                                                )}`}
-                                                            >
-                                                                {item.type ===
-                                                                'lost'
-                                                                    ? 'Lost'
-                                                                    : 'Found'}
-                                                            </span>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <span
-                                                                className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                                                                    item.submissionStatus,
-                                                                )}`}
-                                                            >
-                                                                {getStatusIcon(
-                                                                    item.submissionStatus,
-                                                                )}
-                                                                <span className='capitalize'>
-                                                                    {
-                                                                        item.submissionStatus
-                                                                    }
-                                                                </span>
-                                                            </span>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <span
-                                                                className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getCurrentStatusColor(
-                                                                    item.currentStatus,
-                                                                )}`}
-                                                            >
-                                                                {item.currentStatus ===
-                                                                'open' ? (
-                                                                    <Clock className='h-4 w-4' />
-                                                                ) : (
-                                                                    <CheckCircle className='h-4 w-4' />
-                                                                )}
-                                                                <span className='capitalize'>
-                                                                    {
-                                                                        item.currentStatus
-                                                                    }
-                                                                </span>
-                                                            </span>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <div className='space-y-1'>
-                                                                <div className='flex items-center text-sm text-gray-900 dark:text-gray-100'>
-                                                                    <MapPin className='h-4 w-4 text-blue-500 mr-2' />
-                                                                    <span className='truncate max-w-xs'>
-                                                                        {item.location ||
-                                                                            'Not specified'}
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                                    <User className='h-4 w-4 mr-2' />
-                                                                    {item.owner
-                                                                        ?.username ||
-                                                                        'Unknown'}
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap'>
-                                                            <div className='space-y-1'>
-                                                                <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                                    <Eye className='h-4 w-4 mr-2' />
-                                                                    {item.clickCounts ||
-                                                                        0}{' '}
-                                                                    views
-                                                                </div>
-                                                                <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                                    <Calendar className='h-4 w-4 mr-2' />
-                                                                    {new Date(
-                                                                        item.createdAt,
-                                                                    ).toLocaleDateString()}
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
-                                                            <div className='flex items-center justify-end space-x-2'>
-                                                                <button
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        handleEdit(
-                                                                            item,
-                                                                        );
-                                                                    }}
-                                                                    className='text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 transition-colors p-1 rounded'
-                                                                    title='Edit Item'
-                                                                >
-                                                                    <Edit2 className='h-4 w-4' />
-                                                                </button>
-                                                                <button
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        handleDelete(
-                                                                            item,
-                                                                        );
-                                                                    }}
-                                                                    className='text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded'
-                                                                    title='Delete Item'
-                                                                >
-                                                                    <Trash2 className='h-4 w-4' />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Grid View */}
-                            {viewMode === 'grid' && (
-                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-                                    {current.map((item) => (
-                                        <div
-                                            key={item._id}
-                                            className='bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow cursor-pointer overflow-hidden'
-                                            onClick={() => handleView(item)}
-                                        >
-                                            {/* Header with gradient */}
-                                            <div className='bg-gradient-to-r from-purple-500 to-indigo-500 p-4'>
-                                                <div className='flex items-start justify-between'>
-                                                    <div className='flex items-center gap-3'>
-                                                        <div className='p-2 bg-white/20 backdrop-blur-sm rounded-lg'>
-                                                            <Package className='h-6 w-6 text-white' />
-                                                        </div>
-                                                        <div>
-                                                            <h3 className='text-white font-medium line-clamp-1'>
-                                                                {item.title}
-                                                            </h3>
-                                                            <div className='flex items-center gap-2 mt-1'>
-                                                                <span
-                                                                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${getTypeColor(
-                                                                        item.type,
-                                                                    )}`}
-                                                                >
-                                                                    {item.type ===
-                                                                    'lost'
-                                                                        ? 'Lost'
-                                                                        : 'Found'}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Image or fallback */}
-                                            {item.imageUrl && (
-                                                <div className='w-full h-48 overflow-hidden bg-gray-100 dark:bg-gray-700'>
-                                                    <img
-                                                        src={item.imageUrl}
-                                                        alt={item.title}
-                                                        className='w-full h-full object-cover'
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {/* Content */}
-                                            <div className='p-4 space-y-3'>
-                                                {item.description && (
-                                                    <p className='text-sm text-gray-600 dark:text-gray-400 line-clamp-2'>
-                                                        {item.description}
-                                                    </p>
-                                                )}
-
-                                                <div className='space-y-2'>
-                                                    <div className='flex items-center justify-between'>
-                                                        <span
-                                                            className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                                                                item.submissionStatus,
-                                                            )}`}
-                                                        >
-                                                            {getStatusIcon(
-                                                                item.submissionStatus,
-                                                            )}
-                                                            <span className='capitalize'>
-                                                                {
-                                                                    item.submissionStatus
-                                                                }
-                                                            </span>
-                                                        </span>
-                                                        <span
-                                                            className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getCurrentStatusColor(
-                                                                item.currentStatus,
-                                                            )}`}
-                                                        >
-                                                            {item.currentStatus ===
-                                                            'open' ? (
-                                                                <Clock className='h-4 w-4' />
-                                                            ) : (
-                                                                <CheckCircle className='h-4 w-4' />
-                                                            )}
-                                                            <span className='capitalize'>
-                                                                {
-                                                                    item.currentStatus
-                                                                }
-                                                            </span>
-                                                        </span>
-                                                    </div>
-
-                                                    {item.location && (
-                                                        <div className='flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
-                                                            <MapPin className='h-4 w-4 text-blue-500' />
-                                                            <span className='truncate'>
-                                                                {item.location}
-                                                            </span>
-                                                        </div>
-                                                    )}
-
-                                                    {item.whatsapp && (
-                                                        <div className='flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
-                                                            <Phone className='h-4 w-4 text-green-500' />
-                                                            <span>
-                                                                {item.whatsapp}
-                                                            </span>
-                                                        </div>
-                                                    )}
-
-                                                    <div className='flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
-                                                        <User className='h-4 w-4' />
-                                                        <span>
-                                                            {item.owner
-                                                                ?.username ||
-                                                                'Unknown'}
-                                                        </span>
-                                                    </div>
-
-                                                    <div className='flex items-center justify-between text-xs text-gray-500 dark:text-gray-400'>
-                                                        <div className='flex items-center gap-1'>
-                                                            <Eye className='h-3 w-3' />
-                                                            {item.clickCounts ||
-                                                                0}{' '}
-                                                            views
-                                                        </div>
-                                                        <div className='flex items-center gap-1'>
-                                                            <Calendar className='h-3 w-3' />
-                                                            {new Date(
-                                                                item.createdAt,
-                                                            ).toLocaleDateString()}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Actions */}
-                                                <div className='flex items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700'>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleEdit(item);
-                                                        }}
-                                                        className='flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-lg transition-colors'
-                                                    >
-                                                        <Edit2 className='h-4 w-4' />
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDelete(item);
-                                                        }}
-                                                        className='flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors'
-                                                    >
-                                                        <Trash2 className='h-4 w-4' />
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Pagination */}
-                            {totalPages > 1 && (
-                                <div className='mt-6'>
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={totalPages}
-                                        onPageChange={setPage}
-                                        pageSize={pageSize}
-                                        onPageSizeChange={setPageSize}
-                                        totalItems={totalItems}
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-            </main>
-
-            {/* Modals */}
-            <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={handleCloseConfirm}
-                onConfirm={confirmModal.onConfirm}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                variant={confirmModal.variant}
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                title='Lost & found'
+                description={`Items students have lost or found at ${currentCollege?.name || collegeslug}. Close them once they are back with their owner.`}
+                actions={
+                    <Button
+                        icon={Download}
+                        onClick={exportCsv}
+                        disabled={!sorted.length}
+                    >
+                        Export CSV
+                    </Button>
+                }
             />
 
+            <Tabs
+                label='Review status'
+                className='mb-4'
+                value={filters.submissionStatus}
+                onChange={(value) => {
+                    setFilter('submissionStatus', value);
+                    selection.clear();
+                }}
+                items={STATUS_TABS.map(([value, label]) => ({
+                    value,
+                    label,
+                    count: counts[value] || 0,
+                    attention: value === 'pending' && counts.pending > 0,
+                }))}
+            />
+
+            <FilterBar
+                className='mb-4'
+                search={search}
+                onSearch={(value) => {
+                    setSearch(value);
+                    setPage(1);
+                }}
+                searchPlaceholder='Search by item, description, place or who posted it'
+                filters={[
+                    {
+                        label: 'Type',
+                        value: filters.type,
+                        onChange: (v) => setFilter('type', v),
+                        options: [
+                            { value: '', label: 'Lost and found' },
+                            { value: 'lost', label: 'Lost' },
+                            { value: 'found', label: 'Found' },
+                        ],
+                    },
+                    {
+                        label: 'Item state',
+                        value: filters.currentStatus,
+                        onChange: (v) => setFilter('currentStatus', v),
+                        options: [
+                            { value: '', label: 'Open or closed' },
+                            { value: 'open', label: 'Open' },
+                            { value: 'closed', label: 'Closed' },
+                        ],
+                    },
+                    {
+                        label: 'Deleted',
+                        value: filters.deleted,
+                        onChange: (v) => setFilter('deleted', v),
+                        options: [
+                            { value: '', label: 'Include deleted' },
+                            { value: 'false', label: 'Hide deleted' },
+                            { value: 'true', label: 'Only deleted' },
+                        ],
+                    },
+                ]}
+                timeFilter={{
+                    value: timeFilter,
+                    onChange: (v) => {
+                        setTimeFilter(v);
+                        setPage(1);
+                    },
+                }}
+                sortBy={{
+                    value: sortBy,
+                    onChange: setSortBy,
+                    options: [
+                        { value: 'createdAt', label: 'Newest first' },
+                        { value: 'clickCounts', label: 'Most viewed' },
+                    ],
+                }}
+                sortOrder={{
+                    value: sortOrder,
+                    onToggle: () =>
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                }}
+                viewMode={{ value: viewMode, onChange: setViewMode }}
+                onClear={clearAll}
+                showClear={Boolean(
+                    search || timeFilter !== 'all' || activeFilters,
+                )}
+            />
+
+            {error && (
+                <Alert
+                    tone='bad'
+                    className='mb-4'
+                    action={
+                        <Button size='sm' onClick={fetchItems}>
+                            Try again
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
+
+            {viewMode === 'table' ? (
+                <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
+                    <BulkBar count={selection.count} onClear={selection.clear}>
+                        <BulkButton
+                            primary
+                            icon={Check}
+                            disabled={bulkBusy}
+                            onClick={() => approve(selectedIds)}
+                        >
+                            Approve
+                        </BulkButton>
+                        <BulkButton
+                            icon={X}
+                            disabled={bulkBusy}
+                            onClick={() => setRejecting(selectedIds)}
+                        >
+                            Reject…
+                        </BulkButton>
+                        <BulkButton
+                            icon={CheckCheck}
+                            disabled={bulkBusy}
+                            onClick={() => close(selectedIds)}
+                        >
+                            Close
+                        </BulkButton>
+                        <BulkButton
+                            icon={Trash2}
+                            disabled={bulkBusy}
+                            onClick={() => remove(selectedIds)}
+                        >
+                            Delete
+                        </BulkButton>
+                    </BulkBar>
+                    {current.length === 0 ? (
+                        empty
+                    ) : (
+                        <Table minWidth={1080}>
+                            <thead>
+                                <tr>
+                                    <SelectCell
+                                        header
+                                        label='Select all items on this page'
+                                        checked={selection.allVisible}
+                                        indeterminate={selection.someVisible}
+                                        onChange={selection.toggleAllVisible}
+                                    />
+                                    <Th>Item</Th>
+                                    <Th>Type</Th>
+                                    <Th>Where · when</Th>
+                                    <Th>Status</Th>
+                                    <Th>Posted</Th>
+                                    <Th>
+                                        <span className='sr-only'>Actions</span>
+                                    </Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {current.map((item) => (
+                                    <Tr
+                                        key={item._id}
+                                        selected={selection.isSelected(
+                                            item._id,
+                                        )}
+                                        onClick={() =>
+                                            navigate(detailPath(item))
+                                        }
+                                    >
+                                        <SelectCell
+                                            label={`Select ${item.title}`}
+                                            checked={selection.isSelected(
+                                                item._id,
+                                            )}
+                                            onChange={(on) =>
+                                                selection.toggle(item._id, on)
+                                            }
+                                        />
+                                        <Td className='max-w-[360px]'>
+                                            <div className='flex items-center gap-3 min-w-0'>
+                                                <Thumb src={item.imageUrl} />
+                                                <div className='flex flex-col gap-0.5 min-w-0'>
+                                                    <Link
+                                                        to={detailPath(item)}
+                                                        onClick={(e) =>
+                                                            e.stopPropagation()
+                                                        }
+                                                        className={`font-medium hover:underline truncate ${
+                                                            isClosed(item)
+                                                                ? 'text-ink-2'
+                                                                : 'text-ink'
+                                                        }`}
+                                                    >
+                                                        {item.title ||
+                                                            'Untitled item'}
+                                                    </Link>
+                                                    <span className='text-[12.5px] text-muted truncate'>
+                                                        {item.description ||
+                                                            'No description'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </Td>
+                                        <Td>
+                                            <TypeChip type={item.type} />
+                                        </Td>
+                                        <Td className='max-w-[220px]'>
+                                            <div className='flex flex-col gap-0.5 min-w-0'>
+                                                <span className='truncate'>
+                                                    {item.location ||
+                                                        'Place not given'}
+                                                </span>
+                                                <span className='text-[12.5px] text-muted'>
+                                                    {item.date
+                                                        ? `${typeLabel(item.type)} on ${formatShortDate(item.date)}`
+                                                        : 'Date not given'}
+                                                </span>
+                                            </div>
+                                        </Td>
+                                        <Td>{badges(item)}</Td>
+                                        <Td>
+                                            <div className='flex flex-col gap-0.5'>
+                                                <span className='whitespace-nowrap'>
+                                                    {formatShortDateTime(
+                                                        item.createdAt,
+                                                    )}
+                                                </span>
+                                                <span className='text-[12.5px] text-muted whitespace-nowrap'>
+                                                    {item.owner?.username
+                                                        ? `@${item.owner.username}`
+                                                        : 'Unknown poster'}
+                                                    {` · ${formatNumber(viewsOf(item))} views`}
+                                                </span>
+                                            </div>
+                                        </Td>
+                                        <Td align='right'>
+                                            <div className='flex justify-end items-center gap-1'>
+                                                {rowActions(item)}
+                                            </div>
+                                        </Td>
+                                    </Tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                    {sorted.length > 0 && (
+                        <div className='px-4 py-3 border-t border-line-soft'>
+                            {pagination}
+                        </div>
+                    )}
+                </div>
+            ) : current.length === 0 ? (
+                <div className='bg-sheet border border-line rounded-xl'>
+                    {empty}
+                </div>
+            ) : (
+                <div className='flex flex-col gap-4'>
+                    <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
+                        {current.map((item) => (
+                            <article
+                                key={item._id}
+                                onClick={() => navigate(detailPath(item))}
+                                className='flex flex-col gap-3 p-4 bg-sheet border border-line rounded-xl hover:border-line-strong cursor-pointer transition-colors'
+                            >
+                                <div className='flex items-start gap-3'>
+                                    <Thumb src={item.imageUrl} />
+                                    <div className='flex-1 min-w-0 flex flex-col gap-0.5'>
+                                        <Link
+                                            to={detailPath(item)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className='font-medium text-ink hover:underline line-clamp-2'
+                                        >
+                                            {item.title || 'Untitled item'}
+                                        </Link>
+                                        <span className='text-[12.5px] text-muted truncate'>
+                                            {[
+                                                item.location,
+                                                item.date &&
+                                                    formatShortDate(item.date),
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' · ')}
+                                        </span>
+                                    </div>
+                                    <TypeChip type={item.type} />
+                                </div>
+                                {item.description && (
+                                    <p className='text-[13px] text-ink-2 line-clamp-2'>
+                                        {item.description}
+                                    </p>
+                                )}
+                                {badges(item)}
+                                <div className='flex items-center gap-2 pt-3 mt-auto border-t border-line-soft'>
+                                    <span className='flex-1 text-xs text-muted truncate'>
+                                        {formatShortDateTime(item.createdAt)}
+                                        {item.owner?.username &&
+                                            ` · @${item.owner.username}`}
+                                    </span>
+                                    {rowActions(item)}
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                    <div className='bg-sheet border border-line rounded-xl px-4 py-3'>
+                        {pagination}
+                    </div>
+                </div>
+            )}
+
             <LostFoundEditModal
-                isOpen={showModal}
-                onClose={handleModalClose}
-                item={editingItem}
-                onSuccess={handleModalSuccess}
+                isOpen={Boolean(editing)}
+                onClose={() => setEditing(null)}
+                item={editing}
+                onSuccess={() => {
+                    fetchItems();
+                    setEditing(null);
+                }}
+            />
+
+            <ConfirmModal
+                isOpen={Boolean(confirm)}
+                onClose={() => setConfirm(null)}
+                onConfirm={() => confirm?.onConfirm()}
+                title={confirm?.title}
+                message={confirm?.message}
+                confirmText='Delete'
+                variant='danger'
+            />
+
+            <RejectDialog
+                open={Boolean(rejecting)}
+                onClose={() => setRejecting(null)}
+                title={
+                    rejecting?.length > 1
+                        ? `Reject ${formatNumber(rejecting.length)} items?`
+                        : 'Reject this item?'
+                }
+                description={
+                    rejecting?.length > 1
+                        ? 'Every poster gets the same reason, so keep it general.'
+                        : 'The poster sees your reason, so say what to fix.'
+                }
+                onSubmit={(reason) => reject(rejecting, reason)}
             />
         </div>
     );

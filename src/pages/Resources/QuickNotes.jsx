@@ -1,31 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSidebarLayout } from '../../hooks/useSidebarLayout';
+import { Link, useParams } from 'react-router-dom';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import BackButton from '../../components/Common/BackButton';
-import Loader from '../../components/Common/Loader';
 import ReactMarkdown from 'react-markdown';
-import { BookOpen, Sparkles, Send, Edit, Save, X, Key, Cpu, Eye, EyeOff, RefreshCw, Loader2 } from 'lucide-react';
+import {
+    BookOpen,
+    Eye,
+    EyeOff,
+    KeyRound,
+    Loader2,
+    Pencil,
+    RefreshCw,
+    Save,
+    Send,
+    Sparkles,
+} from 'lucide-react';
+import Loader from '../../components/Common/Loader';
+import { formatShortDateTime } from '../../utils/format';
+import {
+    Button,
+    Dialog,
+    EmptyState,
+    Field,
+    Input,
+    PageHeader,
+    Textarea,
+} from '../../components/ui';
+import { PROSE_CLASS } from './catalogUtils';
 
 const DEFAULT_MODELS = [
     { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
     { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash' },
     { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
     { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
-    { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' }
+    { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' },
 ];
 
-const QuickNotes = () => {
-    const { subjectId } = useParams();
-    const { mainContentMargin } = useSidebarLayout();
-
-    const SUGGESTED_PROMPTS = [
-        {
-            label: '✨ Exam Polish',
-            text: `Rewrite this content to be strictly exam-oriented.
+const SUGGESTED_PROMPTS = [
+    {
+        label: 'Exam polish',
+        text: `Rewrite this content to be strictly exam-oriented.
 
 - Reduce unnecessary explanation
 - Emphasize definitions, keywords, and important points
@@ -37,59 +51,64 @@ Identify places where a diagram would help understanding.
 Add clear figure placeholders with short explanations.
 
 Do not remove important syllabus content.`,
-        },
-        {
-            label: '🎯 Simplify Language',
-            text: `Simplify the language so an average student can understand it quickly.
+    },
+    {
+        label: 'Simplify language',
+        text: `Simplify the language so an average student can understand it quickly.
 
 - Use short, clear sentences
 - Avoid complex wording
 - Do not remove definitions or key points
 - Keep the structure intact`,
-        },
-        {
-            label: '🧠 Highlight Key Points',
-            text: `Identify the most important exam-relevant points.
+    },
+    {
+        label: 'Highlight key points',
+        text: `Identify the most important exam-relevant points.
 
 - Highlight them using **bold**
 - Convert long paragraphs into bullet points where possible
 - Do not add new content
 - Do not increase overall length`,
-        },
-        {
-            label: '🖼️ Add Diagrams',
-            text: `Identify places where a diagram or figure would help understanding.
+    },
+    {
+        label: 'Add diagrams',
+        text: `Identify places where a diagram or figure would help understanding.
 
 - Insert placeholders in this format:
   **[Figure: <clear diagram name>]**
 - Add a short 2–3 line explanation below each figure
 - Do NOT draw diagrams or use ASCII art`,
-        },
-        {
-            label: '🧪 Add Example',
-            text: `Add 1 short, exam-relevant example where it improves understanding.
+    },
+    {
+        label: 'Add example',
+        text: `Add 1 short, exam-relevant example where it improves understanding.
 
 - Keep it concise
 - Do not add examples everywhere
 - Do not increase content length too much`,
-        },
-        {
-            label: '🧩 Make Answer-Friendly',
-            text: `Rewrite the content so it can be directly written in exams.
+    },
+    {
+        label: 'Make answer-friendly',
+        text: `Rewrite the content so it can be directly written in exams.
 
 - Use clear headings
 - Prefer bullet points and numbered lists
 - Add short introductory lines where needed
 - Avoid long paragraphs`,
-        },
-    ];
+    },
+];
+
+const QuickNotes = () => {
+    const { subjectId } = useParams();
 
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
     const [syllabus, setSyllabus] = useState(null);
     const [notes, setNotes] = useState([]);
     const [selectedUnit, setSelectedUnit] = useState(null);
     const [generating, setGenerating] = useState(false);
     const [updating, setUpdating] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [chatInput, setChatInput] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState('');
@@ -99,7 +118,9 @@ Do not remove important syllabus content.`,
 
     const [selectedModel, setSelectedModel] = useState(() => {
         const saved = localStorage.getItem('quicknotes_gemini_model');
-        return saved && saved !== 'gemini-3.8-flash' ? saved : 'gemini-3.8-flash';
+        return saved && saved !== 'gemini-3.8-flash'
+            ? saved
+            : 'gemini-3.8-flash';
     });
     const [apiKey, setApiKey] = useState(() => {
         return localStorage.getItem('quicknotes_gemini_api_key') || '';
@@ -107,6 +128,9 @@ Do not remove important syllabus content.`,
     const [tempKey, setTempKey] = useState(apiKey);
     const [showKeyModal, setShowKeyModal] = useState(false);
     const [showApiKeyText, setShowApiKeyText] = useState(false);
+
+    const modelName =
+        modelsList.find((m) => m.id === selectedModel)?.name || selectedModel;
 
     const handleModelChange = (model) => {
         setSelectedModel(model);
@@ -124,15 +148,24 @@ Do not remove important syllabus content.`,
                 config.params = { apiKey: trimmedKey };
             }
             const res = await api.get('/quicknotes/models', config);
-            if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+            if (
+                res.data?.success &&
+                Array.isArray(res.data.data) &&
+                res.data.data.length > 0
+            ) {
                 const fetched = res.data.data;
                 setModelsList(fetched);
                 // If currently stored selectedModel is invalid or gemini-3.8-flash, sync to first valid model
-                const isCurrentValid = fetched.some((m) => m.id === selectedModel);
+                const isCurrentValid = fetched.some(
+                    (m) => m.id === selectedModel,
+                );
                 if (!isCurrentValid || selectedModel === 'gemini-3.8-flash') {
                     const fallbackModel = fetched[0].id;
                     setSelectedModel(fallbackModel);
-                    localStorage.setItem('quicknotes_gemini_model', fallbackModel);
+                    localStorage.setItem(
+                        'quicknotes_gemini_model',
+                        fallbackModel,
+                    );
                 }
             }
         } catch (error) {
@@ -149,9 +182,9 @@ Do not remove important syllabus content.`,
         setShowKeyModal(false);
         fetchModels(trimmed);
         if (trimmed) {
-            toast.success('Custom API Key saved!');
+            toast.success('API key saved');
         } else {
-            toast.success('Using default server API Key');
+            toast.success('Using the server’s API key');
         }
     };
 
@@ -161,7 +194,7 @@ Do not remove important syllabus content.`,
         localStorage.removeItem('quicknotes_gemini_api_key');
         setShowKeyModal(false);
         fetchModels('');
-        toast.success('Custom API Key cleared. Using default server key.');
+        toast.success('Custom key cleared. Using the server’s key.');
     };
 
     useEffect(() => {
@@ -177,15 +210,13 @@ Do not remove important syllabus content.`,
     const fetchData = async () => {
         try {
             setLoading(true);
+            setLoadError(null);
             const [syllabusRes, notesRes] = await Promise.all([
                 api.get(`/syllabus/subject/${subjectId}`),
                 api.get(`/quicknotes/${subjectId}`),
             ]);
 
-            // Syllabus API might return list, assuming we get the one for this subject
-            // If the API returns a list, find the one matching subjectId or assume query param filters it.
-            // Based on Syllabus.ts, it has subject field.
-            // Let's assume response structure. If it's a list, take first.
+            // The endpoint returns one syllabus; take the first if it ever sends a list.
             const syllabusData = Array.isArray(syllabusRes.data.data)
                 ? syllabusRes.data.data[0]
                 : syllabusRes.data.data;
@@ -212,8 +243,13 @@ Do not remove important syllabus content.`,
                 }
             }
         } catch (error) {
-            console.error('Fetch error:', error);
-            toast.error('Failed to load data');
+            // A 404 means the subject has no syllabus yet; that has its own screen.
+            if (error.response?.status !== 404) {
+                console.error('Fetch error:', error);
+                setLoadError(
+                    'Couldn’t load this subject’s notes. Check your connection and try again.',
+                );
+            }
         } finally {
             setLoading(false);
         }
@@ -238,11 +274,13 @@ Do not remove important syllabus content.`,
             }
 
             const res = await api.post('/quicknotes/generate', payload, {
-                headers: apiKey.trim() ? { 'x-gemini-api-key': apiKey.trim() } : {},
+                headers: apiKey.trim()
+                    ? { 'x-gemini-api-key': apiKey.trim() }
+                    : {},
             });
 
             if (res.data.success) {
-                toast.success('Note generated successfully!');
+                toast.success('Note generated');
                 // Update notes list
                 const newNote = res.data.data;
                 setNotes((prev) => {
@@ -259,7 +297,10 @@ Do not remove important syllabus content.`,
             }
         } catch (error) {
             console.error(error);
-            toast.error(error.response?.data?.message || 'Failed to generate note');
+            toast.error(
+                error.response?.data?.message ||
+                    'Couldn’t generate the note. Try again.',
+            );
         } finally {
             setGenerating(false);
         }
@@ -282,11 +323,13 @@ Do not remove important syllabus content.`,
             }
 
             const res = await api.put('/quicknotes/update', payload, {
-                headers: apiKey.trim() ? { 'x-gemini-api-key': apiKey.trim() } : {},
+                headers: apiKey.trim()
+                    ? { 'x-gemini-api-key': apiKey.trim() }
+                    : {},
             });
 
             if (res.data.success) {
-                toast.success('Content generated. Please review and save.');
+                toast.success('Draft ready. Check it, then save.');
                 setChatInput('');
                 const { generatedContent } = res.data.data;
 
@@ -296,7 +339,10 @@ Do not remove important syllabus content.`,
             }
         } catch (error) {
             console.error(error);
-            toast.error(error.response?.data?.message || 'Failed to generate update');
+            toast.error(
+                error.response?.data?.message ||
+                    'Couldn’t rewrite the note. Try again.',
+            );
         } finally {
             setUpdating(false);
         }
@@ -306,13 +352,14 @@ Do not remove important syllabus content.`,
         const currentNote = getNoteForUnit(selectedUnit?.unitNumber);
         if (!currentNote) return;
 
+        setSaving(true);
         try {
             const res = await api.put('/quicknotes/save', {
                 noteId: currentNote._id,
                 content: editContent,
             });
             if (res.data.success) {
-                toast.success('Note saved successfully!');
+                toast.success('Note saved');
                 setIsEditing(false);
                 const updatedNote = res.data.data;
                 setNotes((prev) =>
@@ -323,7 +370,9 @@ Do not remove important syllabus content.`,
             }
         } catch (error) {
             console.error(error);
-            toast.error('Failed to save note manually');
+            toast.error('Couldn’t save the note. Try again.');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -342,20 +391,34 @@ Do not remove important syllabus content.`,
 
     if (loading) return <Loader />;
 
-    if (!syllabus) {
+    if (loadError || !syllabus) {
         return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-                <Header />
-                <Sidebar />
-                <main className={`py-4 ${mainContentMargin}`}>
-                    <div className='max-w-7xl mx-auto px-4'>
-                        <BackButton title='Quick Notes' TitleIcon={BookOpen} />
-                        <div className='text-center py-10 text-gray-500'>
-                            Syllabus not found for this subject. Please add
-                            syllabus first.
-                        </div>
-                    </div>
-                </main>
+            <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+                <PageHeader title='Quick notes' />
+                <div className='bg-sheet border border-line rounded-xl'>
+                    <EmptyState
+                        icon={BookOpen}
+                        tone={loadError ? 'error' : 'neutral'}
+                        title={
+                            loadError
+                                ? 'Couldn’t load the notes'
+                                : 'This subject has no syllabus yet'
+                        }
+                        description={
+                            loadError ||
+                            'Quick notes are written from the syllabus units. Add a syllabus to the subject first.'
+                        }
+                        action={
+                            loadError ? (
+                                <Button onClick={fetchData}>Try again</Button>
+                            ) : (
+                                <Button to='/reports/subjects?syllabus=missing'>
+                                    Subjects without a syllabus
+                                </Button>
+                            )
+                        }
+                    />
+                </div>
             </div>
         );
     }
@@ -363,409 +426,389 @@ Do not remove important syllabus content.`,
     const currentNote = selectedUnit
         ? getNoteForUnit(selectedUnit.unitNumber)
         : null;
+    const units = syllabus.units || [];
+    const readyCount = units.filter((u) => getNoteForUnit(u.unitNumber)).length;
+    const subject = syllabus.subject;
+    const syllabusLink = syllabus.college?.slug
+        ? `/${syllabus.college.slug}/syllabus/${syllabus._id}`
+        : null;
+    const usingCustomKey = Boolean(apiKey.trim());
 
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900'>
-            <Header />
-            <Sidebar />
-            <main
-                className={`py-4 ${mainContentMargin} transition-all duration-300`}
-            >
-                <div className='max-w-7xl mx-auto px-4 sm:px-6 h-[calc(100vh-100px)] flex flex-col'>
-                    <div className='flex flex-wrap items-center justify-between gap-3 mb-4'>
-                        <BackButton
-                            title={`Quick Notes: ${syllabus.slug || 'Subject'}`}
-                            TitleIcon={BookOpen}
-                            className='mb-0'
-                        />
-
-                        {/* AI Config Bar (Model Selector & Custom API Key Settings) */}
-                        <div className='flex items-center gap-3 bg-white dark:bg-gray-800 p-1.5 px-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm'>
-                            <div className='flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300 font-medium'>
-                                <Cpu size={15} className='text-indigo-500' />
-                                <span className='hidden sm:inline'>Model:</span>
-                                <div className='flex items-center gap-1.5'>
-                                    <select
-                                        value={selectedModel}
-                                        onChange={(e) => handleModelChange(e.target.value)}
-                                        disabled={fetchingModels}
-                                        className='bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-xs rounded-md px-2 py-1 focus:ring-1 focus:ring-indigo-500 outline-none font-sans cursor-pointer disabled:opacity-50'
-                                    >
-                                        {modelsList.map((m) => (
-                                            <option key={m.id} value={m.id}>
-                                                {m.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <button
-                                        type='button'
-                                        onClick={() => fetchModels(apiKey)}
-                                        disabled={fetchingModels}
-                                        className='p-1 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors disabled:opacity-50'
-                                        title='Fetch latest Gemini models list'
-                                    >
-                                        <RefreshCw
-                                            size={13}
-                                            className={fetchingModels ? 'animate-spin text-indigo-500' : ''}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className='h-4 w-px bg-gray-200 dark:bg-gray-700'></div>
-
-                            <button
-                                onClick={() => {
-                                    setTempKey(apiKey);
-                                    setShowKeyModal(true);
-                                }}
-                                className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md transition-colors ${
-                                    apiKey.trim()
-                                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700 font-medium'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                                }`}
-                                title="Configure Custom Gemini API Key"
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                eyebrow={['Quick notes', subject?.subjectCode]
+                    .filter(Boolean)
+                    .join(' · ')}
+                title={subject?.subjectName || syllabus.slug || 'Subject'}
+                description={
+                    <>
+                        Exam-ready summaries for each syllabus unit
+                        {syllabusLink && (
+                            <>
+                                {' · '}
+                                <Link
+                                    to={syllabusLink}
+                                    className='text-link hover:underline'
+                                >
+                                    View syllabus
+                                </Link>
+                            </>
+                        )}
+                    </>
+                }
+                actions={
+                    <>
+                        <label className='inline-flex items-center gap-2 h-9 pl-3 pr-1 rounded-lg border border-line-strong bg-sheet text-[13px] text-muted focus-within:ring-2 focus-within:ring-brand/30'>
+                            Model
+                            <select
+                                value={selectedModel}
+                                onChange={(e) =>
+                                    handleModelChange(e.target.value)
+                                }
+                                disabled={fetchingModels}
+                                className='h-[30px] max-w-[190px] bg-transparent text-[13px] font-medium text-ink outline-none cursor-pointer disabled:opacity-50'
                             >
-                                <Key size={14} className={apiKey.trim() ? 'text-amber-500' : 'text-gray-400'} />
-                                <span>{apiKey.trim() ? 'Custom Key' : 'Default Key'}</span>
+                                {modelsList.map((m) => (
+                                    <option key={m.id} value={m.id}>
+                                        {m.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        <Button
+                            iconOnly
+                            icon={RefreshCw}
+                            aria-label='Refresh the model list'
+                            title='Refresh the model list'
+                            onClick={() => fetchModels(apiKey)}
+                            disabled={fetchingModels}
+                            className={
+                                fetchingModels ? '[&>svg]:animate-spin' : ''
+                            }
+                        />
+                        <Button
+                            icon={KeyRound}
+                            onClick={() => {
+                                setTempKey(apiKey);
+                                setShowKeyModal(true);
+                            }}
+                        >
+                            {usingCustomKey && (
+                                <span
+                                    className='w-[7px] h-[7px] rounded-full bg-warn'
+                                    aria-hidden='true'
+                                />
+                            )}
+                            {usingCustomKey
+                                ? 'Your API key'
+                                : 'Default API key'}
+                        </Button>
+                    </>
+                }
+            />
+
+            <div
+                className={`grid grid-cols-1 lg:grid-cols-[230px_minmax(0,1fr)] gap-5 items-start ${
+                    currentNote
+                        ? 'xl:grid-cols-[240px_minmax(0,1fr)_280px]'
+                        : 'xl:grid-cols-[240px_minmax(0,1fr)]'
+                }`}
+            >
+                {/* Units */}
+                <nav
+                    aria-label='Units'
+                    className='bg-sunken border border-line rounded-xl p-2 flex flex-col gap-0.5'
+                >
+                    <span className='eyebrow px-2.5 pt-2 pb-1.5'>
+                        {units.length} unit{units.length === 1 ? '' : 's'} ·{' '}
+                        {readyCount} ready
+                    </span>
+                    {units.map((unit) => {
+                        const hasNote = !!getNoteForUnit(unit.unitNumber);
+                        const selected =
+                            selectedUnit?.unitNumber === unit.unitNumber;
+                        return (
+                            <button
+                                key={unit.unitNumber}
+                                type='button'
+                                aria-current={selected ? 'true' : undefined}
+                                onClick={() => {
+                                    setSelectedUnit(unit);
+                                    setIsEditing(false);
+                                }}
+                                className={`flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-left cursor-pointer transition-colors ${
+                                    selected
+                                        ? 'bg-sheet ring-1 ring-line-strong shadow-[0_1px_2px_rgba(28,27,24,0.06)]'
+                                        : 'hover:bg-line-soft'
+                                }`}
+                            >
+                                <span
+                                    className={`w-2 h-2 mt-[5px] rounded-full shrink-0 ${
+                                        hasNote ? 'bg-brand' : 'bg-line-strong'
+                                    }`}
+                                    aria-hidden='true'
+                                />
+                                <span className='flex-1 min-w-0 flex flex-col gap-0.5'>
+                                    <span className='text-[12px] text-muted'>
+                                        Unit {unit.unitNumber}
+                                        <span className='sr-only'>
+                                            {hasNote
+                                                ? ', has notes'
+                                                : ', no notes yet'}
+                                        </span>
+                                    </span>
+                                    <span
+                                        className={`text-[13.5px] text-ink ${selected ? 'font-medium' : ''}`}
+                                    >
+                                        {unit.title}
+                                    </span>
+                                </span>
                             </button>
-                        </div>
-                    </div>
+                        );
+                    })}
+                </nav>
 
-                    <div className='flex flex-1 gap-4 overflow-hidden'>
-                        {/* Unit List Sidebar */}
-                        <div className='w-64 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 overflow-y-auto'>
-                            <div className='p-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200'>
-                                Units
-                            </div>
-                            <ul>
-                                {syllabus.units.map((unit) => {
-                                    const hasNote = !!getNoteForUnit(
-                                        unit.unitNumber,
-                                    );
-                                    return (
-                                        <li
-                                            key={unit.unitNumber}
-                                            onClick={() => {
-                                                setSelectedUnit(unit);
-                                                setIsEditing(false);
-                                            }}
-                                            className={`p-3 cursor-pointer border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                                                selectedUnit?.unitNumber ===
-                                                unit.unitNumber
-                                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 border-l-4 border-l-indigo-600'
-                                                    : ''
-                                            }`}
-                                        >
-                                            <div className='flex justify-between items-start'>
-                                                <div className='text-sm font-medium text-gray-900 dark:text-white'>
-                                                    Unit {unit.unitNumber}
-                                                </div>
-                                                {hasNote && (
-                                                    <div className='h-2 w-2 rounded-full bg-green-500 mt-1'></div>
+                {/* Notes for the selected unit */}
+                <section
+                    aria-labelledby='unit-title'
+                    className='min-w-0 bg-sheet border border-line rounded-xl overflow-hidden'
+                >
+                    {selectedUnit ? (
+                        <>
+                            <div className='flex flex-wrap items-center gap-2.5 min-h-[52px] px-5 py-2.5 border-b border-line-soft'>
+                                <h2
+                                    id='unit-title'
+                                    className='flex-1 min-w-[200px] text-[15px] font-semibold text-ink'
+                                >
+                                    Unit {selectedUnit.unitNumber} ·{' '}
+                                    {selectedUnit.title}
+                                </h2>
+                                {currentNote &&
+                                    (isEditing ? (
+                                        <>
+                                            <Button
+                                                size='sm'
+                                                variant='ghost'
+                                                onClick={toggleEditMode}
+                                                disabled={saving}
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                                size='sm'
+                                                variant='primary'
+                                                icon={saving ? Loader2 : Save}
+                                                onClick={handleSaveManual}
+                                                disabled={saving}
+                                                className={
+                                                    saving
+                                                        ? '[&>svg]:animate-spin'
+                                                        : ''
+                                                }
+                                            >
+                                                {saving
+                                                    ? 'Saving…'
+                                                    : 'Save note'}
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className='text-[12.5px] text-muted'>
+                                                Updated{' '}
+                                                {formatShortDateTime(
+                                                    currentNote.lastUpdated,
                                                 )}
-                                            </div>
-                                            <div className='text-xs text-gray-500 dark:text-gray-400 truncate'>
-                                                {unit.title}
-                                            </div>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        </div>
+                                            </span>
+                                            <Button
+                                                size='sm'
+                                                icon={Pencil}
+                                                onClick={toggleEditMode}
+                                            >
+                                                Edit
+                                            </Button>
+                                        </>
+                                    ))}
+                            </div>
 
-                        {/* Main Content Area */}
-                        <div className='flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                            {selectedUnit ? (
-                                <>
-                                    <div className='p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50'>
-                                        <div>
-                                            <h2 className='text-lg font-bold text-gray-900 dark:text-white'>
-                                                Unit {selectedUnit.unitNumber}:{' '}
-                                                {selectedUnit.title}
-                                            </h2>
-                                        </div>
-                                        <div>
-                                            {!currentNote ? (
-                                                <button
-                                                    onClick={handleGenerate}
-                                                    disabled={generating}
-                                                    className='inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50'
-                                                >
-                                                    {generating ? (
-                                                        <span className='flex items-center gap-2'>
-                                                            <Loader2
-                                                                size={16}
-                                                                className='animate-spin'
-                                                            />{' '}
-                                                            Generating...
-                                                        </span>
-                                                    ) : (
-                                                        <>
-                                                            <Sparkles
-                                                                size={16}
-                                                            />{' '}
-                                                            Generate with AI
-                                                        </>
-                                                    )}
-                                                </button>
-                                            ) : (
-                                                <div className='flex items-center gap-2'>
-                                                    {isEditing ? (
-                                                        <>
-                                                            <button
-                                                                onClick={
-                                                                    toggleEditMode
-                                                                }
-                                                                className='p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                                                                title='Cancel'
-                                                            >
-                                                                <X size={20} />
-                                                            </button>
-                                                            <button
-                                                                onClick={
-                                                                    handleSaveManual
-                                                                }
-                                                                className='inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm'
-                                                            >
-                                                                <Save
-                                                                    size={16}
-                                                                />
-                                                                Save
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <div className='text-xs text-gray-500 hidden sm:block mr-2'>
-                                                                Last updated:{' '}
-                                                                {new Date(
-                                                                    currentNote.lastUpdated,
-                                                                ).toLocaleString()}
-                                                            </div>
-                                                            <button
-                                                                onClick={
-                                                                    toggleEditMode
-                                                                }
-                                                                className='p-2 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400'
-                                                                title='Edit Note'
-                                                            >
-                                                                <Edit
-                                                                    size={18}
-                                                                />
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
+                            {currentNote ? (
+                                isEditing ? (
+                                    <div className='p-4'>
+                                        <Textarea
+                                            aria-label={`Notes for unit ${selectedUnit.unitNumber}, in Markdown`}
+                                            value={editContent}
+                                            onChange={(e) =>
+                                                setEditContent(e.target.value)
+                                            }
+                                            rows={24}
+                                            className='min-h-[500px] font-mono text-[13px] bg-sunken'
+                                        />
                                     </div>
-
-                                    <div className='flex-1 overflow-hidden flex flex-col md:flex-row'>
-                                        {/* Markdown Preview */}
-                                        <div
-                                            className={`flex-1 overflow-y-auto p-6 prose dark:prose-invert max-w-none ${currentNote ? '' : 'flex items-center justify-center'}`}
-                                        >
-                                            {currentNote ? (
-                                                isEditing ? (
-                                                    <textarea
-                                                        value={editContent}
-                                                        onChange={(e) =>
-                                                            setEditContent(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className='w-full h-full min-h-[500px] p-4 font-mono text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none text-gray-900 dark:text-gray-100'
-                                                    />
-                                                ) : (
-                                                    <ReactMarkdown>
-                                                        {currentNote.content}
-                                                    </ReactMarkdown>
-                                                )
-                                            ) : (
-                                                <div className='text-center text-gray-400'>
-                                                    <BookOpen
-                                                        size={48}
-                                                        className='mx-auto mb-2 opacity-50'
-                                                    />
-                                                    <p>
-                                                        No notes generated for
-                                                        this unit yet.
-                                                    </p>
-                                                    <p className='text-sm'>
-                                                        Click "Generate with AI"
-                                                        to create notes.
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* AI Chat / Edit Panel */}
-                                        {currentNote && (
-                                            <div className='w-full md:w-80 border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-900/30'>
-                                                <div className='p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center'>
-                                                    <span className='font-semibold text-xs uppercase tracking-wider text-gray-500'>
-                                                        Refine Content
-                                                    </span>
-                                                    <span className='text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded font-mono truncate max-w-[120px]'>
-                                                        {selectedModel}
-                                                    </span>
-                                                </div>
-                                                <div className='flex-1 p-4 overflow-y-auto'>
-                                                    <p className='text-sm text-gray-600 dark:text-gray-400 mb-4'>
-                                                        Want to change
-                                                        something? Ask AI to
-                                                        rewrite sections, add
-                                                        examples, or simplify
-                                                        the text.
-                                                    </p>
-                                                    <div className='flex flex-wrap gap-2'>
-                                                        {SUGGESTED_PROMPTS.map(
-                                                            (prompt) => (
-                                                                <button
-                                                                    key={
-                                                                        prompt.label
-                                                                    }
-                                                                    onClick={() =>
-                                                                        setChatInput(
-                                                                            prompt.text,
-                                                                        )
-                                                                    }
-                                                                    className='px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors'
-                                                                >
-                                                                    {
-                                                                        prompt.label
-                                                                    }
-                                                                </button>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className='p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'>
-                                                    <div className='relative'>
-                                                        <textarea
-                                                            value={chatInput}
-                                                            onChange={(e) =>
-                                                                setChatInput(
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            placeholder="e.g., 'Make the definition of X simpler'"
-                                                            className='w-full p-2 pr-10 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none'
-                                                            rows={3}
-                                                        />
-                                                        <button
-                                                            onClick={
-                                                                handleUpdate
-                                                            }
-                                                            disabled={
-                                                                updating ||
-                                                                !chatInput.trim()
-                                                            }
-                                                            className='absolute bottom-2 right-2 p-1.5 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 disabled:opacity-50'
-                                                        >
-                                                            <Send size={14} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </>
+                                ) : (
+                                    <article
+                                        className={`px-5 sm:px-8 py-6 ${PROSE_CLASS}`}
+                                    >
+                                        <ReactMarkdown>
+                                            {currentNote.content}
+                                        </ReactMarkdown>
+                                    </article>
+                                )
                             ) : (
-                                <div className='flex-1 flex items-center justify-center text-gray-400'>
-                                    Select a unit to view notes
+                                <div className='flex flex-col items-center gap-2.5 px-6 sm:px-8 py-16 text-center'>
+                                    <span className='w-11 h-11 rounded-xl bg-brand-soft text-brand-ink flex items-center justify-center'>
+                                        <Sparkles
+                                            className='w-5 h-5'
+                                            aria-hidden='true'
+                                        />
+                                    </span>
+                                    <span className='text-[15px] font-semibold text-ink'>
+                                        No notes for this unit yet
+                                    </span>
+                                    <span className='max-w-[420px] text-[13.5px] text-ink-2 line-clamp-4'>
+                                        {selectedUnit.content
+                                            ? `Generates a summary from the unit’s syllabus topics: ${selectedUnit.content}`
+                                            : 'Generates a summary from the unit’s syllabus topics.'}
+                                    </span>
+                                    <Button
+                                        variant='primary'
+                                        size='lg'
+                                        className={`mt-1.5 ${generating ? '[&>svg]:animate-spin' : ''}`}
+                                        icon={generating ? Loader2 : Sparkles}
+                                        onClick={handleGenerate}
+                                        disabled={generating}
+                                    >
+                                        {generating
+                                            ? 'Generating…'
+                                            : `Generate with ${modelName}`}
+                                    </Button>
                                 </div>
                             )}
+                        </>
+                    ) : (
+                        <p className='px-6 py-16 text-center text-[13.5px] text-ink-2'>
+                            {units.length
+                                ? 'Pick a unit to see its notes.'
+                                : 'This syllabus has no units yet. Add them to the syllabus first.'}
+                        </p>
+                    )}
+                </section>
+
+                {/* Ask AI to rewrite the note */}
+                {currentNote && (
+                    <aside
+                        aria-labelledby='refine-title'
+                        className='lg:col-start-2 xl:col-start-auto bg-sheet border border-line rounded-xl px-[18px] py-4 flex flex-col gap-3'
+                    >
+                        <h2
+                            id='refine-title'
+                            className='text-[15px] font-semibold text-ink'
+                        >
+                            Refine this unit
+                        </h2>
+                        <div className='flex flex-wrap gap-1.5'>
+                            {SUGGESTED_PROMPTS.map((prompt) => (
+                                <button
+                                    key={prompt.label}
+                                    type='button'
+                                    onClick={() => setChatInput(prompt.text)}
+                                    className='h-7 px-2.5 rounded-full border border-line-strong bg-sheet text-[12.5px] text-ink-2 hover:border-brand hover:text-brand-ink cursor-pointer transition-colors'
+                                >
+                                    {prompt.label}
+                                </button>
+                            ))}
                         </div>
-                    </div>
-                </div>
-
-                {/* Custom API Key Modal */}
-                {showKeyModal && (
-                    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4'>
-                        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 relative'>
-                            <button
-                                onClick={() => setShowKeyModal(false)}
-                                className='absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
-                            >
-                                <X size={20} />
-                            </button>
-                            <div className='flex items-center gap-3 mb-4'>
-                                <div className='p-2.5 bg-indigo-100 dark:bg-indigo-900/40 rounded-lg text-indigo-600 dark:text-indigo-400'>
-                                    <Key size={22} />
-                                </div>
-                                <div>
-                                    <h3 className='text-lg font-bold text-gray-900 dark:text-white'>
-                                        Custom Gemini API Key
-                                    </h3>
-                                    <p className='text-xs text-gray-500 dark:text-gray-400'>
-                                        Provide your own API Key for AI generation
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className='space-y-4'>
-                                <div>
-                                    <label className='block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1'>
-                                        Gemini API Key
-                                    </label>
-                                    <div className='relative'>
-                                        <input
-                                            type={showApiKeyText ? 'text' : 'password'}
-                                            value={tempKey}
-                                            onChange={(e) => setTempKey(e.target.value)}
-                                            placeholder='AIzaSy...'
-                                            className='w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none'
-                                        />
-                                        <button
-                                            type='button'
-                                            onClick={() => setShowApiKeyText(!showApiKeyText)}
-                                            className='absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
-                                        >
-                                            {showApiKeyText ? <EyeOff size={16} /> : <Eye size={16} />}
-                                        </button>
-                                    </div>
-                                    <p className='text-xs text-gray-500 dark:text-gray-400 mt-2 leading-relaxed'>
-                                        Saved securely in your browser's local storage. Leave empty to use default server API key.
-                                    </p>
-                                </div>
-
-                                <div className='flex items-center justify-between gap-3 pt-2 border-t border-gray-100 dark:border-gray-700'>
-                                    {apiKey ? (
-                                        <button
-                                            type='button'
-                                            onClick={handleClearKey}
-                                            className='px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors'
-                                        >
-                                            Clear Custom Key
-                                        </button>
-                                    ) : (
-                                        <div></div>
-                                    )}
-                                    <div className='flex items-center gap-2'>
-                                        <button
-                                            type='button'
-                                            onClick={() => setShowKeyModal(false)}
-                                            className='px-4 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors'
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type='button'
-                                            onClick={handleSaveKey}
-                                            className='px-4 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors flex items-center gap-1.5'
-                                        >
-                                            <Save size={14} />
-                                            Save Key
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                        <Field label='Or describe the change' className='mt-1'>
+                            <Textarea
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                                placeholder='e.g. Add a worked example of merge sort on 8 numbers'
+                                rows={5}
+                            />
+                        </Field>
+                        <Button
+                            variant='dark'
+                            size='lg'
+                            onClick={handleUpdate}
+                            disabled={updating || !chatInput.trim()}
+                            icon={updating ? Loader2 : Send}
+                            className={`w-full ${updating ? '[&>svg]:animate-spin' : ''}`}
+                        >
+                            {updating ? 'Writing…' : 'Send to Gemini'}
+                        </Button>
+                        <span className='text-[12px] leading-snug text-muted'>
+                            Uses {modelName} with{' '}
+                            {usingCustomKey
+                                ? 'your API key'
+                                : 'the default API key'}
+                            . The rewrite opens in the editor so you can check
+                            it before saving.
+                        </span>
+                    </aside>
                 )}
-            </main>
+            </div>
+
+            {/* Custom API key */}
+            <Dialog
+                open={showKeyModal}
+                onClose={() => setShowKeyModal(false)}
+                size='sm'
+                title='Gemini API key'
+                description='Use your own key for AI generation. Leave it empty to use the server’s key.'
+                footer={
+                    <>
+                        {apiKey && (
+                            <Button
+                                variant='danger'
+                                className='mr-auto'
+                                onClick={handleClearKey}
+                            >
+                                Clear custom key
+                            </Button>
+                        )}
+                        <Button onClick={() => setShowKeyModal(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant='primary'
+                            icon={Save}
+                            onClick={handleSaveKey}
+                        >
+                            Save key
+                        </Button>
+                    </>
+                }
+            >
+                <div className='relative'>
+                    <Field
+                        label='API key'
+                        hint='Kept in this browser’s local storage only.'
+                    >
+                        <Input
+                            type={showApiKeyText ? 'text' : 'password'}
+                            value={tempKey}
+                            onChange={(e) => setTempKey(e.target.value)}
+                            placeholder='AIzaSy…'
+                            autoComplete='off'
+                            className='pr-10 font-mono text-[13px]'
+                        />
+                    </Field>
+                    <button
+                        type='button'
+                        onClick={() => setShowApiKeyText(!showApiKeyText)}
+                        aria-label={
+                            showApiKeyText ? 'Hide the key' : 'Show the key'
+                        }
+                        aria-pressed={showApiKeyText}
+                        className='absolute right-0.5 top-[27px] w-8 h-8 rounded-md flex items-center justify-center text-muted hover:text-ink cursor-pointer'
+                    >
+                        {showApiKeyText ? (
+                            <EyeOff className='w-4 h-4' aria-hidden='true' />
+                        ) : (
+                            <Eye className='w-4 h-4' aria-hidden='true' />
+                        )}
+                    </button>
+                </div>
+            </Dialog>
         </div>
     );
 };

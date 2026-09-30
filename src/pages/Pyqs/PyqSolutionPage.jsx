@@ -1,71 +1,126 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import Sidebar from '../../components/Sidebar';
-import Header from '../../components/Header';
-import api from '../../utils/api';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
-    ArrowLeft,
-    Bot,
+    ArrowRight,
+    FileQuestion,
+    Loader2,
+    Pencil,
     Sparkles,
-    Zap,
-    Loader,
-    Save,
-    Edit2,
-    X,
-    Send,
-    CheckCircle,
+    Upload,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import api from '../../utils/api';
+import { formatDateTime, formatNumber } from '../../utils/format';
+import { examTypeLabel } from '../../utils/labels';
+import { relativeTime } from '../../utils/relativeTime';
 import { SOLUTION_PROMPTS } from '../../constants/prompts';
 import ManualPyqSolutionModal from '../../components/ManualPyqSolutionModal';
+import Loader from '../../components/Common/Loader';
+import {
+    Alert,
+    Button,
+    EmptyState,
+    MetaList,
+    PageHeader,
+    Panel,
+    Segmented,
+    StatusBadge,
+    Textarea,
+} from '../../components/ui';
+
+const VERSIONS = [
+    ['concise', 'Concise'],
+    ['expert', 'Expert'],
+];
+
+const MODELS = [
+    ['gemini-2.5-flash-lite', 'Gemini 2.5 Flash Lite'],
+    ['gemini-2.5-pro', 'Gemini 2.5 Pro'],
+];
+
+// Full-paper prompts are long; one-line edits are short. Split them so the
+// panel shows "Prompt style" and "Quick edits" as separate groups.
+const PROMPT_STYLES = SOLUTION_PROMPTS.filter((p) => p.prompt.length > 200);
+const QUICK_EDITS = SOLUTION_PROMPTS.filter((p) => p.prompt.length <= 200);
+
+// Markdown styles in the console's palette (light and dark via tokens).
+const PROSE = [
+    'prose max-w-none text-[14.5px] leading-relaxed',
+    '[--tw-prose-body:var(--ss-ink-2)] [--tw-prose-headings:var(--ss-ink)] [--tw-prose-bold:var(--ss-ink)]',
+    '[--tw-prose-links:var(--ss-link)] [--tw-prose-code:var(--ss-ink)] [--tw-prose-pre-code:var(--ss-ink)]',
+    '[--tw-prose-pre-bg:var(--ss-sunken)] [--tw-prose-bullets:var(--ss-muted)] [--tw-prose-counters:var(--ss-muted)]',
+    '[--tw-prose-hr:var(--ss-line)] [--tw-prose-quotes:var(--ss-ink-2)] [--tw-prose-quote-borders:var(--ss-line-strong)]',
+    '[--tw-prose-th-borders:var(--ss-line)] [--tw-prose-td-borders:var(--ss-line-soft)] [--tw-prose-captions:var(--ss-muted)]',
+    'prose-h2:font-serif prose-h2:text-xl prose-h3:text-[15px]',
+    'prose-code:before:content-none prose-code:after:content-none prose-code:font-normal prose-code:text-[13px] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:bg-ground',
+    'prose-pre:border prose-pre:border-line-soft prose-pre:rounded-[10px] prose-pre:text-[12.5px]',
+].join(' ');
+
+const countWords = (text = '') =>
+    text.trim().split(/\s+/).filter(Boolean).length;
+
+const chipClass = (on) =>
+    `h-7 px-2.5 rounded-full border text-[12.5px] cursor-pointer transition-colors ${
+        on
+            ? 'border-brand bg-brand-soft text-brand-ink'
+            : 'border-line-strong bg-sheet text-ink-2 hover:text-ink'
+    }`;
 
 const PyqSolutionPage = () => {
     const { collegeslug, pyqid } = useParams();
-    const navigate = useNavigate();
 
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
+    const [notFound, setNotFound] = useState(false);
     const [solution, setSolution] = useState(null);
     const [activeTab, setActiveTab] = useState('concise');
     const [aiLoading, setAiLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState('');
+    const [mode, setMode] = useState('markdown'); // while editing
+    const [saving, setSaving] = useState(false);
     const [chatInput, setChatInput] = useState('');
     const [solutionUpdating, setSolutionUpdating] = useState(false);
     const [pyqDetails, setPyqDetails] = useState(null);
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+    const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash-lite');
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [pyqRes, solRes] = await Promise.all([
-                    api.get(`/pyq/${pyqid}`),
-                    api.get(`/pyq-solution/${pyqid}`),
-                ]);
+    const fetchData = useCallback(async () => {
+        try {
+            setLoadError(null);
+            const [pyqRes, solRes] = await Promise.all([
+                api.get(`/pyq/${pyqid}`),
+                api.get(`/pyq-solution/${pyqid}`),
+            ]);
 
-                if (pyqRes.data.success) {
-                    setPyqDetails(pyqRes.data.data);
-                }
-
-                if (solRes.data.success && solRes.data.data) {
-                    setSolution(solRes.data.data);
-                }
-            } catch (error) {
-                console.error('Failed to load data:', error);
-                toast.error('Failed to load solution data');
-            } finally {
-                setLoading(false);
+            if (pyqRes.data.success) {
+                setPyqDetails(pyqRes.data.data);
             }
-        };
 
-        fetchData();
+            if (solRes.data.success && solRes.data.data) {
+                setSolution(solRes.data.data);
+            }
+        } catch (error) {
+            console.error('Failed to load data:', error);
+            setNotFound(error.response?.status === 404);
+            setLoadError(
+                error.response?.status === 404
+                    ? 'This PYQ doesn’t exist or was deleted.'
+                    : 'Couldn’t load this PYQ’s solutions. Check your connection and try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
     }, [pyqid]);
 
-    const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash-lite');
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     const handleGenerate = async () => {
         if (!pyqDetails?.fileUrl) {
-            toast.error('No PDF available for this PYQ');
+            toast.error('This PYQ has no PDF to read');
             return;
         }
 
@@ -77,12 +132,12 @@ const PyqSolutionPage = () => {
             });
 
             if (res.data.success) {
-                toast.success('Solutions generated successfully!');
+                toast.success('Solutions generated');
                 setSolution(res.data.data);
             }
         } catch (error) {
             console.error('Generation Error:', error);
-            toast.error('Failed to generate solutions');
+            toast.error('Couldn’t generate solutions. Try again.');
         } finally {
             setAiLoading(false);
         }
@@ -100,14 +155,15 @@ const PyqSolutionPage = () => {
             });
 
             if (res.data.success) {
-                toast.success('Content refined by AI');
+                toast.success('Rewrite ready to check');
                 setChatInput('');
                 setEditContent(res.data.data.generatedContent);
                 setIsEditing(true);
+                setMode('preview');
             }
         } catch (error) {
             console.error(error);
-            toast.error('Failed to refine content');
+            toast.error('Couldn’t refine the solution. Try again.');
         } finally {
             setSolutionUpdating(false);
         }
@@ -115,6 +171,7 @@ const PyqSolutionPage = () => {
 
     const handleSave = async () => {
         try {
+            setSaving(true);
             const payload = {
                 type: activeTab,
                 content: editContent,
@@ -129,13 +186,17 @@ const PyqSolutionPage = () => {
             const res = await api.put('/pyq-solution/save', payload);
 
             if (res.data.success) {
-                toast.success('Saved successfully');
+                toast.success(
+                    `${activeTab === 'concise' ? 'Concise' : 'Expert'} solution saved`,
+                );
                 setIsEditing(false);
                 setSolution(res.data.data);
             }
         } catch (error) {
             console.error(error);
-            toast.error('Failed to save');
+            toast.error('Couldn’t save the solution. Try again.');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -157,279 +218,448 @@ const PyqSolutionPage = () => {
             const res = await api.put('/pyq-solution/save', payload);
 
             if (res.data.success) {
-                toast.success('Solutions imported and saved successfully!');
+                toast.success('Solutions imported');
                 setSolution(res.data.data);
                 setIsManualModalOpen(false);
             }
         } catch (error) {
             console.error(error);
-            toast.error('Failed to save imported solution');
+            toast.error('Couldn’t save the imported solutions. Try again.');
         } finally {
             setAiLoading(false);
         }
     };
+
+    const getCurrentContent = () =>
+        activeTab === 'concise'
+            ? solution?.conciseContent
+            : solution?.expertContent;
 
     const toggleEdit = () => {
         if (isEditing) {
             setIsEditing(false);
             setEditContent('');
         } else {
-            const content =
-                activeTab === 'concise'
-                    ? solution?.conciseContent
-                    : solution?.expertContent;
+            const content = getCurrentContent();
             if (content) {
                 setEditContent(content);
                 setIsEditing(true);
+                setMode('markdown');
             }
         }
     };
 
-    const getCurrentContent = () => {
-        return activeTab === 'concise'
-            ? solution?.conciseContent
-            : solution?.expertContent;
+    const writeByHand = () => {
+        setIsEditing(true);
+        setMode('markdown');
     };
 
-    if (loading) {
+    if (loading) return <Loader />;
+
+    if (loadError || !pyqDetails) {
         return (
-            <div className='min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center'>
-                <Loader className='h-8 w-8 animate-spin text-indigo-600' />
+            <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+                <div className='bg-sheet border border-line rounded-xl'>
+                    <EmptyState
+                        icon={FileQuestion}
+                        tone='error'
+                        title='Couldn’t open the solution editor'
+                        description={
+                            loadError ||
+                            'This PYQ doesn’t exist or was deleted.'
+                        }
+                        action={
+                            <div className='flex flex-wrap justify-center gap-2'>
+                                {!notFound && (
+                                    <Button
+                                        onClick={() => {
+                                            setLoading(true);
+                                            fetchData();
+                                        }}
+                                    >
+                                        Try again
+                                    </Button>
+                                )}
+                                <Button to={`/${collegeslug}/pyqs`}>
+                                    Back to PYQs
+                                </Button>
+                            </div>
+                        }
+                    />
+                </div>
             </div>
         );
     }
 
+    const subject = pyqDetails.subject || {};
+    const title = [
+        subject.subjectName || 'Untitled subject',
+        [examTypeLabel(pyqDetails.examType), pyqDetails.year]
+            .filter(Boolean)
+            .join(' '),
+    ]
+        .filter(Boolean)
+        .join(' — ');
+    const content = getCurrentContent();
+    const versionName = activeTab === 'concise' ? 'concise' : 'expert';
+    const shownText = isEditing ? editContent : content || '';
+    const requests = pyqDetails.solutionRequestCount || 0;
+    const generating = aiLoading && !isManualModalOpen;
+
     return (
-        <div className='min-h-screen bg-gray-50 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-100'>
-            <Header />
-            <Sidebar />
-            <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-                {/* Header Actions */}
-                <div className='flex items-center justify-between mb-8'>
-                    <div className='flex items-center gap-4'>
-                        <button
-                            onClick={() =>
-                                navigate(`/${collegeslug}/pyqs/${pyqid}`)
-                            }
-                            className='p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors'
-                        >
-                            <ArrowLeft className='h-5 w-5' />
-                        </button>
-                        <div>
-                            <h1 className='text-2xl font-bold flex items-center gap-2'>
-                                <Bot className='h-8 w-8 text-indigo-500' />
-                                Manage AI Solutions
-                            </h1>
-                            <p className='text-sm text-gray-500 dark:text-gray-400'>
-                                {pyqDetails?.subject?.subjectName} (
-                                {pyqDetails?.year})
-                            </p>
-                        </div>
-                    </div>
-                    {solution ? (
-                        <div className='flex items-center gap-2 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-4 py-2 rounded-lg border border-green-200 dark:border-green-800'>
-                            <CheckCircle className='h-5 w-5' />
-                            <span className='font-medium'>
-                                Solutions Generated
-                            </span>
-                        </div>
+        <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
+            <PageHeader
+                eyebrow={['AI solutions', subject.subjectCode]
+                    .filter(Boolean)
+                    .join(' · ')}
+                badge={
+                    solution ? (
+                        <>
+                            <StatusBadge tone='ok'>Saved</StatusBadge>
+                            {solution.lastUpdated && (
+                                <span className='text-[13px] text-muted'>
+                                    Updated {relativeTime(solution.lastUpdated)}
+                                </span>
+                            )}
+                        </>
                     ) : (
-                        <div className='flex items-center gap-3'>
-                            <button
+                        <StatusBadge tone='neutral'>
+                            No solution yet
+                        </StatusBadge>
+                    )
+                }
+                title={title}
+                actions={
+                    !solution && (
+                        <>
+                            <label className='inline-flex items-center gap-1 h-9 pl-3 pr-1 rounded-lg border border-line-strong bg-sheet text-[13px] text-muted'>
+                                Model
+                                <select
+                                    value={selectedModel}
+                                    onChange={(e) =>
+                                        setSelectedModel(e.target.value)
+                                    }
+                                    disabled={aiLoading}
+                                    className='h-8 pl-1 pr-1 bg-transparent text-[13px] font-medium text-ink rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/30'
+                                >
+                                    {MODELS.map(([value, label]) => (
+                                        <option key={value} value={value}>
+                                            {label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <Button
+                                icon={Upload}
                                 onClick={() => setIsManualModalOpen(true)}
-                                className='px-4 py-2.5 text-indigo-600 bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg font-medium transition-all shadow-sm'
+                                disabled={aiLoading}
                             >
-                                Manual Import
-                            </button>
-                            <select
-                                value={selectedModel}
-                                onChange={(e) =>
-                                    setSelectedModel(e.target.value)
+                                Manual import
+                            </Button>
+                            <Button
+                                variant='primary'
+                                icon={generating ? Loader2 : Sparkles}
+                                className={
+                                    generating ? '[&>svg]:animate-spin' : ''
                                 }
-                                className='px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none'
-                            >
-                                <option value='gemini-2.5-flash-lite'>
-                                    Gemini 2.5 Flash Lite
-                                </option>
-                                <option value='gemini-2.5-pro'>
-                                    Gemini 2.5 Pro
-                                </option>
-                            </select>
-                            <button
                                 onClick={handleGenerate}
                                 disabled={aiLoading}
-                                className='flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50'
                             >
-                                {aiLoading ? (
-                                    <Loader className='animate-spin h-5 w-5' />
-                                ) : (
-                                    <Zap className='h-5 w-5' />
-                                )}
-                                {aiLoading
-                                    ? 'Generating...'
-                                    : 'Generate AI Solutions'}
-                            </button>
-                        </div>
-                    )}
-                </div>
+                                {generating
+                                    ? 'Generating…'
+                                    : 'Generate solutions'}
+                            </Button>
+                        </>
+                    )
+                }
+            />
 
-                {/* Main Interaction Area */}
-                <div className='bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col lg:flex-row min-h-[600px]'>
-                    {/* Content Area */}
-                    <div className='flex-1 flex flex-col border-r border-gray-200 dark:border-gray-700'>
-                        {/* Tabs */}
-                        <div className='flex border-b border-gray-200 dark:border-gray-700'>
-                            {['concise', 'expert'].map((tab) => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
-                                    className={`flex-1 py-4 text-sm font-medium text-center border-b-2 transition-colors ${
-                                        activeTab === tab
-                                            ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10'
-                                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                                    }`}
-                                >
-                                    {tab.charAt(0).toUpperCase() + tab.slice(1)}{' '}
-                                    Solution
-                                </button>
-                            ))}
-                        </div>
+            {generating && (
+                <Alert tone='info' className='mb-5'>
+                    Reading the PDF and writing both versions. This can take a
+                    minute; keep this page open.
+                </Alert>
+            )}
 
-                        {/* Content */}
-                        <div className='flex-1 p-6 relative'>
-                            {getCurrentContent() || isEditing ? (
-                                isEditing ? (
-                                    <textarea
-                                        value={editContent}
-                                        onChange={(e) =>
-                                            setEditContent(e.target.value)
-                                        }
-                                        className='w-full h-full p-4 font-mono text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none'
-                                        placeholder={`Type your ${activeTab} solution here in Markdown format...`}
-                                    />
-                                ) : (
-                                    <div className='prose dark:prose-invert max-w-none'>
-                                        <ReactMarkdown>
-                                            {getCurrentContent()}
-                                        </ReactMarkdown>
-                                    </div>
-                                )
-                            ) : (
-                                <div className='absolute inset-0 flex flex-col items-center justify-center text-center p-8'>
-                                    <div className='w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4'>
-                                        <Sparkles className='h-10 w-10 text-gray-400' />
-                                    </div>
-                                    <h3 className='text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2'>
-                                        No {activeTab} solution yet
-                                    </h3>
-                                    <p className='text-gray-500 max-w-sm mb-6'>
-                                        Click the "Generate AI Solutions" button
-                                        above to create both concise and expert
-                                        versions, or write one manually.
-                                    </p>
+            <div className='grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start'>
+                <section
+                    aria-label='Solution'
+                    className='min-w-0 bg-sheet border border-line rounded-xl overflow-hidden'
+                >
+                    <div className='flex flex-wrap items-center gap-x-3 gap-y-2 pl-5 pr-3 border-b border-line-soft'>
+                        <div
+                            role='tablist'
+                            aria-label='Solution version'
+                            className='flex gap-5 flex-1 min-w-[160px]'
+                        >
+                            {VERSIONS.map(([value, label]) => {
+                                const selected = value === activeTab;
+                                const locked = isEditing && !selected;
+                                return (
                                     <button
-                                        onClick={() => setIsEditing(true)}
-                                        className='px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'
+                                        key={value}
+                                        type='button'
+                                        role='tab'
+                                        aria-selected={selected}
+                                        disabled={locked}
+                                        title={
+                                            locked
+                                                ? 'Save or discard your changes first'
+                                                : undefined
+                                        }
+                                        onClick={() => setActiveTab(value)}
+                                        className={`h-[46px] px-0.5 -mb-px border-b-2 text-[13.5px] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 transition-colors ${
+                                            selected
+                                                ? 'border-ink text-ink font-medium'
+                                                : 'border-transparent text-muted hover:text-ink'
+                                        }`}
                                     >
-                                        Write Manually
+                                        {label}
                                     </button>
-                                </div>
-                            )}
+                                );
+                            })}
                         </div>
+                        {shownText && (
+                            <span className='text-[12.5px] text-muted'>
+                                {formatNumber(countWords(shownText))} words
+                            </span>
+                        )}
+                        {(content || isEditing) && (
+                            <Segmented
+                                label='View'
+                                className='my-2'
+                                value={isEditing ? mode : 'preview'}
+                                onChange={(value) => {
+                                    if (isEditing) setMode(value);
+                                    else if (value === 'markdown') toggleEdit();
+                                }}
+                                options={[
+                                    { value: 'preview', label: 'Preview' },
+                                    { value: 'markdown', label: 'Markdown' },
+                                ]}
+                            />
+                        )}
                     </div>
 
-                    {/* Sidebar / Tools */}
-                    {(getCurrentContent() || isEditing) && (
-                        <div className='w-full lg:w-96 bg-gray-50 dark:bg-gray-900/30 flex flex-col'>
-                            <div className='p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800'>
-                                <span className='font-semibold text-sm uppercase tracking-wide text-gray-500'>
-                                    Tools & Refinement
-                                </span>
-                                {isEditing ? (
-                                    <div className='flex gap-2'>
-                                        <button
-                                            onClick={toggleEdit}
-                                            className='p-1.5 text-gray-500 hover:text-gray-700'
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                        <button
-                                            onClick={handleSave}
-                                            className='p-1.5 text-green-600 hover:text-green-700 bg-green-100 rounded'
-                                        >
-                                            <Save size={18} />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <button
-                                        onClick={toggleEdit}
-                                        className='text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-full'
-                                    >
-                                        <Edit2 className='h-3 w-3' /> Edit
-                                        Solution
-                                    </button>
-                                )}
-                            </div>
-
-                            <div className='flex-1 p-4 flex flex-col overflow-hidden'>
-                                <div className='bg-blue-50 dark:bg-blue-900/10 p-4 rounded-lg border border-blue-100 dark:border-blue-800 mb-4'>
-                                    <h4 className='flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2'>
-                                        <Bot className='h-4 w-4' />
-                                        AI Refinement
-                                    </h4>
-                                    <p className='text-xs text-blue-600 dark:text-blue-400'>
-                                        Select a prompt or type your own to
-                                        refine the <strong>{activeTab}</strong>{' '}
-                                        solution.
-                                    </p>
-                                </div>
-
-                                <div className='flex-1 overflow-y-auto space-y-2 mb-4'>
-                                    {SOLUTION_PROMPTS.map((item) => (
-                                        <button
-                                            key={item.label}
-                                            onClick={() =>
-                                                setChatInput(item.prompt)
-                                            }
-                                            className='w-full text-left px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:border-indigo-400 hover:shadow-sm transition-all'
-                                        >
-                                            {item.label}
-                                        </button>
-                                    ))}
-                                </div>
-
-                                <div className='relative mt-auto'>
-                                    <textarea
-                                        value={chatInput}
-                                        onChange={(e) =>
-                                            setChatInput(e.target.value)
-                                        }
-                                        placeholder='Type instructions...'
-                                        className='w-full p-3 pr-10 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none shadow-sm'
-                                        rows={3}
-                                    />
-                                    <button
-                                        onClick={handleUpdate}
-                                        disabled={
-                                            solutionUpdating ||
-                                            !chatInput.trim()
-                                        }
-                                        className='absolute bottom-2 right-2 p-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors'
-                                    >
-                                        {solutionUpdating ? (
-                                            <Loader
-                                                size={16}
-                                                className='animate-spin'
-                                            />
-                                        ) : (
-                                            <Send size={16} />
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
+                    {isEditing && (
+                        <div className='flex flex-wrap items-center gap-2 px-5 py-2.5 bg-warn-soft text-warn-ink border-b border-line-soft'>
+                            <span className='flex-1 min-w-[180px] text-[13px]'>
+                                Unsaved changes to the {versionName} solution.
+                            </span>
+                            <Button
+                                size='sm'
+                                variant='ghost'
+                                onClick={toggleEdit}
+                                disabled={saving}
+                                className='text-warn-ink hover:text-warn-ink'
+                            >
+                                Discard
+                            </Button>
+                            <Button
+                                size='sm'
+                                variant='primary'
+                                onClick={handleSave}
+                                disabled={saving}
+                                icon={saving ? Loader2 : undefined}
+                                className={saving ? '[&>svg]:animate-spin' : ''}
+                            >
+                                {saving ? 'Saving…' : `Save ${versionName}`}
+                            </Button>
                         </div>
                     )}
-                </div>
+
+                    {content || isEditing ? (
+                        isEditing && mode === 'markdown' ? (
+                            <div className='p-4'>
+                                <Textarea
+                                    aria-label={`${versionName} solution in Markdown`}
+                                    value={editContent}
+                                    onChange={(e) =>
+                                        setEditContent(e.target.value)
+                                    }
+                                    rows={24}
+                                    className='font-mono text-[13px] leading-relaxed min-h-[520px]'
+                                    placeholder={`Write the ${versionName} solution in Markdown…`}
+                                />
+                            </div>
+                        ) : (
+                            <article className={`px-5 sm:px-10 py-7 ${PROSE}`}>
+                                {shownText ? (
+                                    <ReactMarkdown>{shownText}</ReactMarkdown>
+                                ) : (
+                                    <p className='text-muted'>
+                                        Nothing written yet. Switch to Markdown
+                                        to write the solution.
+                                    </p>
+                                )}
+                            </article>
+                        )
+                    ) : (
+                        <EmptyState
+                            icon={Sparkles}
+                            className='min-h-[420px]'
+                            title={`No ${versionName} solution yet`}
+                            description={
+                                solution
+                                    ? `Only the other version was saved. Write the ${versionName} one by hand.`
+                                    : 'Generate both versions with AI or import them with the buttons above, or write this one by hand.'
+                            }
+                            action={
+                                <Button icon={Pencil} onClick={writeByHand}>
+                                    Write by hand
+                                </Button>
+                            }
+                        />
+                    )}
+                </section>
+
+                <aside
+                    aria-label='Tools'
+                    className='flex flex-col gap-4 min-w-0'
+                >
+                    {solution && (
+                        <Panel
+                            title='Refine with AI'
+                            titleId='refine-title'
+                            action={
+                                !isEditing &&
+                                content && (
+                                    <Button
+                                        size='sm'
+                                        icon={Pencil}
+                                        onClick={toggleEdit}
+                                    >
+                                        Edit by hand
+                                    </Button>
+                                )
+                            }
+                            bodyClassName='px-5 py-4 flex flex-col gap-3.5'
+                        >
+                            {[
+                                ['Prompt style', PROMPT_STYLES],
+                                ['Quick edits', QUICK_EDITS],
+                            ].map(
+                                ([heading, prompts]) =>
+                                    prompts.length > 0 && (
+                                        <div
+                                            key={heading}
+                                            className='flex flex-col gap-1.5'
+                                        >
+                                            <span className='eyebrow'>
+                                                {heading}
+                                            </span>
+                                            <div className='flex flex-wrap gap-1.5'>
+                                                {prompts.map((item) => (
+                                                    <button
+                                                        key={item.label}
+                                                        type='button'
+                                                        aria-pressed={
+                                                            chatInput ===
+                                                            item.prompt
+                                                        }
+                                                        onClick={() =>
+                                                            setChatInput(
+                                                                item.prompt,
+                                                            )
+                                                        }
+                                                        className={chipClass(
+                                                            chatInput ===
+                                                                item.prompt,
+                                                        )}
+                                                    >
+                                                        {item.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ),
+                            )}
+                            <label
+                                htmlFor='refine-instructions'
+                                className='mt-1 text-[13px] font-medium text-ink'
+                            >
+                                Your instructions
+                            </label>
+                            <Textarea
+                                id='refine-instructions'
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                                rows={4}
+                                placeholder='Add a worked example for question 2'
+                                aria-describedby='refine-hint'
+                            />
+                            <Button
+                                variant='dark'
+                                onClick={handleUpdate}
+                                disabled={solutionUpdating || !chatInput.trim()}
+                                className={`w-full ${solutionUpdating ? '[&>svg]:animate-spin' : ''}`}
+                                icon={solutionUpdating ? Loader2 : undefined}
+                            >
+                                {solutionUpdating
+                                    ? 'Rewriting…'
+                                    : `Apply to ${versionName}`}
+                                {!solutionUpdating && (
+                                    <ArrowRight
+                                        className='w-[15px] h-[15px]'
+                                        aria-hidden='true'
+                                    />
+                                )}
+                            </Button>
+                            <p
+                                id='refine-hint'
+                                className='text-[12.5px] text-muted'
+                            >
+                                The rewrite opens here unsaved, so you can check
+                                it before saving.
+                            </p>
+                        </Panel>
+                    )}
+
+                    <Panel
+                        title='This PYQ'
+                        titleId='pyq-title'
+                        bodyClassName='px-5 py-4 flex flex-col gap-3'
+                    >
+                        {requests > 0 && (
+                            <p className='text-[13px] text-warn-ink'>
+                                {formatNumber(requests)} student
+                                {requests === 1 ? ' has' : 's have'} asked for a
+                                solution.
+                            </p>
+                        )}
+                        <MetaList
+                            labelWidth={88}
+                            items={[
+                                {
+                                    label: 'Subject',
+                                    value: subject.subjectName,
+                                },
+                                {
+                                    label: 'Code',
+                                    value: subject.subjectCode,
+                                    mono: true,
+                                },
+                                { label: 'Year', value: pyqDetails.year },
+                                {
+                                    label: 'Exam',
+                                    value: examTypeLabel(pyqDetails.examType),
+                                },
+                                solution && {
+                                    label: 'Saved',
+                                    value: formatDateTime(solution.lastUpdated),
+                                },
+                            ]}
+                        />
+                        <Button
+                            variant='link'
+                            size='sm'
+                            to={`/${collegeslug}/pyqs/${pyqid}`}
+                            className='self-start'
+                        >
+                            Back to the PYQ
+                        </Button>
+                    </Panel>
+                </aside>
             </div>
 
             <ManualPyqSolutionModal

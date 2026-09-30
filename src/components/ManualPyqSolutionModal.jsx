@@ -1,37 +1,54 @@
 import React, { useState } from 'react';
-import {
-    X,
-    Copy,
-    Check,
-    AlertCircle,
-    FileJson,
-    Loader,
-    Download,
-} from 'lucide-react';
+import { Check, Copy, Loader2, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { SOLUTION_PROMPTS } from '../constants/prompts';
+import { Button, Dialog, Field, Textarea } from './ui';
+
+const Step = ({ number, title, children }) => (
+    <li className='grid grid-cols-[28px_minmax(0,1fr)] gap-x-3 gap-y-2'>
+        <span
+            aria-hidden='true'
+            className='w-7 h-7 rounded-full bg-brand-soft text-brand-ink flex items-center justify-center font-mono text-xs font-medium'
+        >
+            {number}
+        </span>
+        <h3 className='self-center text-[14px] font-semibold text-ink'>
+            {title}
+        </h3>
+        <div className='col-start-2 flex flex-col gap-2.5 text-[13.5px] leading-relaxed text-ink-2'>
+            {children}
+        </div>
+    </li>
+);
 
 const ManualPyqSolutionModal = ({ isOpen, onClose, onImport, loading }) => {
     const [jsonInput, setJsonInput] = useState('');
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState('');
 
-    if (!isOpen) return null;
+    const initialPrompt =
+        SOLUTION_PROMPTS.find((p) => p.label === 'Initial Prompt')?.prompt ||
+        '';
 
     const handleCopyPrompt = () => {
-        const initialPrompt =
-            SOLUTION_PROMPTS.find((p) => p.label === 'Initial Prompt')
-                ?.prompt || '';
-        navigator.clipboard.writeText(initialPrompt);
-        setCopied(true);
-        toast.success('Prompt copied to clipboard!');
-        setTimeout(() => setCopied(false), 2000);
+        navigator.clipboard
+            .writeText(initialPrompt)
+            .then(() => {
+                setCopied(true);
+                toast.success('Prompt copied');
+                setTimeout(() => setCopied(false), 2000);
+            })
+            .catch(() =>
+                toast.error(
+                    'Couldn’t copy the prompt. Open it below and copy it by hand.',
+                ),
+            );
     };
 
     const handleImport = () => {
         setError('');
         if (!jsonInput.trim()) {
-            setError('Please paste the JSON content.');
+            setError('Paste the JSON from the AI’s reply first');
             return;
         }
 
@@ -56,138 +73,87 @@ const ManualPyqSolutionModal = ({ isOpen, onClose, onImport, loading }) => {
             onImport(parsed);
         } catch {
             setError(
-                'Invalid JSON format. Please ensure you copied only the JSON object.',
+                'That isn’t valid solution JSON. Copy only the JSON block with "concise" and "expert" from the AI’s reply.',
             );
         }
     };
 
     return (
-        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm'>
-            <div className='bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col'>
-                {/* Header */}
-                <div className='flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700'>
-                    <div>
-                        <h2 className='text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2'>
-                            <FileJson className='w-6 h-6 text-indigo-500' />
-                            Manual AI Import
-                        </h2>
-                        <p className='text-sm text-gray-500 dark:text-gray-400 mt-1'>
-                            Generate solution externally and paste result here.
-                        </p>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className='text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors'
-                    >
-                        <X size={24} />
-                    </button>
-                </div>
-
-                {/* Body */}
-                <div className='p-6 overflow-y-auto space-y-8'>
-                    {/* Step 1 */}
-                    <div className='space-y-4'>
-                        <div className='flex items-center gap-3'>
-                            <div className='w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm'>
-                                1
-                            </div>
-                            <h3 className='font-semibold text-gray-900 dark:text-white'>
-                                Copy Prompt
-                            </h3>
-                        </div>
-                        <div className='pl-11'>
-                            <p className='text-sm text-gray-600 dark:text-gray-300 mb-3'>
-                                Copy the system prompt below and paste it into
-                                your AI tool (ChatGPT, Gemini, Claude).
-                            </p>
-                            <button
-                                onClick={handleCopyPrompt}
-                                className='flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors border border-gray-200 dark:border-gray-600 w-full justify-center sm:w-auto'
-                            >
-                                {copied ? (
-                                    <Check
-                                        size={18}
-                                        className='text-green-500'
-                                    />
-                                ) : (
-                                    <Copy size={18} />
-                                )}
-                                {copied ? 'Copied!' : 'Copy System Prompt'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Step 2 */}
-                    <div className='space-y-4'>
-                        <div className='flex items-center gap-3'>
-                            <div className='w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm'>
-                                2
-                            </div>
-                            <h3 className='font-semibold text-gray-900 dark:text-white'>
-                                Generate Solution
-                            </h3>
-                        </div>
-                        <div className='pl-11'>
-                            <p className='text-sm text-gray-600 dark:text-gray-300'>
-                                1. Open your AI chat. <br />
-                                2. Upload the Question Paper PDF. <br />
-                                3. Paste the copied prompt and send. <br />
-                                4. Wait for the JSON code block response. <br />
-                                5. Copy the code block content properly.
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Step 3 */}
-                    <div className='space-y-4'>
-                        <div className='flex items-center gap-3'>
-                            <div className='w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm'>
-                                3
-                            </div>
-                            <h3 className='font-semibold text-gray-900 dark:text-white'>
-                                Paste JSON
-                            </h3>
-                        </div>
-                        <div className='pl-11'>
-                            <textarea
-                                value={jsonInput}
-                                onChange={(e) => setJsonInput(e.target.value)}
-                                placeholder='Paste the JSON response here (e.g., { "concise": "...", "expert": "..." })'
-                                className='w-full h-40 p-4 font-mono text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none'
-                            />
-                            {error && (
-                                <div className='mt-2 flex items-center gap-2 text-red-500 text-sm'>
-                                    <AlertCircle size={16} />
-                                    {error}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Footer */}
-                <div className='p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-b-xl flex justify-end gap-3'>
-                    <button
-                        onClick={onClose}
-                        className='px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors'
-                    >
+        <Dialog
+            open={isOpen}
+            onClose={onClose}
+            busy={loading}
+            size='lg'
+            title='Import solutions'
+            description='Generate the solutions in another AI tool, then paste its reply here.'
+            footer={
+                <>
+                    <Button onClick={onClose} disabled={loading}>
                         Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant='primary'
                         onClick={handleImport}
                         disabled={loading}
-                        className='flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50'
+                        icon={loading ? Loader2 : Upload}
+                        className={loading ? '[&>svg]:animate-spin' : ''}
                     >
-                        {loading ? (
-                            <Loader className='animate-spin h-5 w-5' />
-                        ) : (
-                            <Download className='h-5 w-5' />
-                        )}
-                        {loading ? 'Importing...' : 'Import Solution'}
-                    </button>
-                </div>
-            </div>
-        </div>
+                        {loading ? 'Importing…' : 'Import solutions'}
+                    </Button>
+                </>
+            }
+        >
+            <ol className='flex flex-col gap-6'>
+                <Step number={1} title='Copy the prompt'>
+                    <p>
+                        It asks for a concise and an expert version, returned as
+                        JSON.
+                    </p>
+                    <div className='flex flex-wrap items-center gap-3'>
+                        <Button
+                            size='sm'
+                            icon={copied ? Check : Copy}
+                            onClick={handleCopyPrompt}
+                        >
+                            {copied ? 'Copied' : 'Copy prompt'}
+                        </Button>
+                        <details className='text-[13px]'>
+                            <summary className='cursor-pointer text-link hover:underline'>
+                                Show the prompt
+                            </summary>
+                            <pre className='mt-2 max-h-56 overflow-auto p-3 rounded-lg bg-sunken font-mono text-[11.5px] leading-relaxed text-ink-2 whitespace-pre-wrap'>
+                                {initialPrompt}
+                            </pre>
+                        </details>
+                    </div>
+                </Step>
+
+                <Step number={2} title='Run it with the question paper'>
+                    <ol className='list-decimal pl-5 flex flex-col gap-1'>
+                        <li>Open ChatGPT, Gemini or Claude.</li>
+                        <li>Upload the question paper PDF.</li>
+                        <li>Paste the prompt and send it.</li>
+                        <li>Copy the JSON code block from the reply.</li>
+                    </ol>
+                </Step>
+
+                <Step number={3} title='Paste the JSON'>
+                    <Field error={error}>
+                        <Textarea
+                            aria-label='JSON from the AI’s reply'
+                            value={jsonInput}
+                            onChange={(e) => {
+                                setJsonInput(e.target.value);
+                                if (error) setError('');
+                            }}
+                            rows={8}
+                            placeholder='{ "concise": "…", "expert": "…" }'
+                            className='font-mono text-[12.5px]'
+                        />
+                    </Field>
+                </Step>
+            </ol>
+        </Dialog>
     );
 };
 

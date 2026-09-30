@@ -1,26 +1,44 @@
-import { PieChart } from 'lucide-react';
+import { formatNumber } from '../../utils/format';
+import { Panel } from '../ui';
 import ContentCard from './ContentCard';
+import { CONTENT_TYPES } from './analyticsData';
 
-function ContentDistribution({ analyticsCards, totalContent }) {
+/** How the content added in the range splits across types. */
+function ContentDistribution({ totals }) {
+    const total = totals?.totalContent || 0;
+    const rows = CONTENT_TYPES.map((type) => ({
+        label: type.label,
+        value: totals?.[type.total] || 0,
+    })).sort((a, b) => b.value - a.value);
+    const max = rows[0]?.value || 0;
+
     return (
-        <div className='bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6 mb-6 md:mb-8'>
-            <div className='flex items-center justify-between mb-4 md:mb-6'>
-                <h2 className='text-lg md:text-xl font-semibold text-gray-900 dark:text-white'>
-                    Content Distribution
-                </h2>
-                <PieChart className='w-4 h-4 md:w-5 md:h-5 text-gray-400' />
-            </div>
-
-            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6'>
-                {analyticsCards.map((card) => (
+        <Panel
+            title='Content by type'
+            titleId='distribution-title'
+            action={
+                <span className='font-mono text-xs text-muted'>
+                    {formatNumber(total)}
+                </span>
+            }
+            bodyClassName='px-5 py-4'
+        >
+            <ul className='flex flex-col gap-3'>
+                {rows.map((row) => (
                     <ContentCard
-                        key={card.id}
-                        card={card}
-                        totalContent={totalContent}
+                        key={row.label}
+                        label={row.label}
+                        value={formatNumber(row.value)}
+                        share={
+                            total
+                                ? `${Math.round((row.value / total) * 100)}%`
+                                : '—'
+                        }
+                        pct={max ? (row.value / max) * 100 : 0}
                     />
                 ))}
-            </div>
-        </div>
+            </ul>
+        </Panel>
     );
 }
 
