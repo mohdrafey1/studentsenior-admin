@@ -39,7 +39,7 @@ import {
     monthTick,
     monthYearTick,
 } from '../../components/Analytics/analyticsData';
-import { blogEndpoints } from './blogApi';
+import { blogEndpoints, blogPostUrl } from './blogApi';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_NAMES = [
@@ -507,7 +507,7 @@ function AnalyticsOverview() {
                                             className='border-b border-line-soft last:border-b-0'
                                         >
                                             <a
-                                                href={`https://blog.studentsenior.com/blog/post/${b.slug}`}
+                                                href={blogPostUrl(b.slug)}
                                                 target='_blank'
                                                 rel='noreferrer'
                                                 className='group flex items-center gap-3.5 px-5 py-3 hover:bg-sunken transition-colors'

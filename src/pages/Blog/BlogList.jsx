@@ -27,7 +27,7 @@ import {
     StatusBadge,
     Tabs,
 } from '../../components/ui';
-import { blogEndpoints, blogRoutes } from './blogApi';
+import { blogEndpoints, blogRoutes, blogPostUrl } from './blogApi';
 
 const POSTS_PER_PAGE = 6;
 
@@ -37,7 +37,7 @@ const STATUS_TABS = [
     { value: 'draft', label: 'Drafts' },
 ];
 
-const publicUrl = (slug) => `https://blog.studentsenior.com/${slug}`;
+const publicUrl = blogPostUrl;
 
 function Banner({ src, className }) {
     if (!src) {
