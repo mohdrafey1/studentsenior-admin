@@ -24,3 +24,7 @@ export const blogRoutes = {
     edit: (slug) => `/blog/edit/${slug}`,
     analytics: '/blog/analytics',
 };
+
+/** The public blog. Posts live at the root: blog.studentsenior.com/<slug>. */
+export const BLOG_ORIGIN = 'https://blog.studentsenior.com';
+export const blogPostUrl = (slug) => `${BLOG_ORIGIN}/${slug}`;
