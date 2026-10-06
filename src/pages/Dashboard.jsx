@@ -77,7 +77,7 @@ function useHomeData() {
                     },
                 }),
             ),
-            settle(api.get('/stats/contact-us')),
+            settle(api.get('/support/tickets/counts')),
             settle(
                 api.get('/community-chat/reports', {
                     params: { status: 'open' },
@@ -121,11 +121,7 @@ function useHomeData() {
                               rupees: redemptions.totals?.rupees || 0,
                           }
                         : null,
-                    contacts: Array.isArray(contacts)
-                        ? contacts.filter(
-                              (c) => (c.status || 'pending') === 'pending',
-                          ).length
-                        : null,
+                    contacts: contacts ? contacts.pending || 0 : null,
                     reports: reports ? (reports.reports || []).length : null,
                     payments: payments
                         ? {
@@ -315,7 +311,7 @@ const Dashboard = () => {
                     attention={attention > 0}
                     loading={home.loading}
                     value={num(attention)}
-                    note='Refunds, payouts, messages and reports'
+                    note='Refunds, payouts, tickets and reports'
                 />
                 <Stat
                     label='Captured, last 7 days'
@@ -377,9 +373,9 @@ const Dashboard = () => {
                             )}
                             {home.contacts !== null && (
                                 <AttentionRow
-                                    to='/reports/contacts'
-                                    label='Contact requests'
-                                    note='Messages from the website contact form'
+                                    to='/support?status=pending'
+                                    label='Support tickets'
+                                    note='Students waiting for a reply'
                                     value={home.contacts}
                                 />
                             )}

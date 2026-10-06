@@ -24,6 +24,7 @@ const RESERVED_SEGMENTS = new Set([
     'reports',
     'community',
     'users',
+    'support',
     'login',
     'signup',
 ]);

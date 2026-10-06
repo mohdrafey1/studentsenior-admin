@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 const INTRO = [
     ['01', 'Review', 'PYQs, notes, seniors and store listings'],
     ['02', 'Settle', 'Payments, refunds and UPI redemptions'],
-    ['03', 'Support', 'Users, contact requests and community'],
+    ['03', 'Support', 'Users, support tickets and community'],
 ];
 
 const Login = () => {

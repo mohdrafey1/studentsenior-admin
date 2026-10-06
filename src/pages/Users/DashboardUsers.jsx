@@ -32,7 +32,7 @@ const ROLES = [
     {
         role: 'Moderator',
         plural: 'Moderators',
-        can: 'Review, edit and delete content, and handle reports, contact requests and payouts. Can’t block students or give points.',
+        can: 'Review, edit and delete content, and handle reports, support tickets and payouts. Can’t block students or give points.',
     },
     {
         role: 'Visitor',

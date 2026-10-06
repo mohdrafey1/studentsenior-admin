@@ -66,9 +66,9 @@ const GROUPS = [
                 statKey: 'totalClient',
             },
             {
-                label: 'Contact requests',
-                desc: 'Messages sent from the website',
-                href: '/reports/contacts',
+                label: 'Support tickets',
+                desc: 'Conversations with students and guests',
+                href: '/support?status=all',
                 statKey: 'totalContactUs',
             },
             {
@@ -143,7 +143,7 @@ function useWaitingCounts() {
                     },
                 }),
             ),
-            settle(api.get('/stats/contact-us')),
+            settle(api.get('/support/tickets/counts')),
             settle(
                 api.get('/community-chat/reports', {
                     params: { status: 'open' },
@@ -176,15 +176,15 @@ function useWaitingCounts() {
                     href: '/reports/redemptions',
                 });
             }
-            if (Array.isArray(contacts)) {
-                const count = contacts.filter(
-                    (c) => (c.status || 'pending') === 'pending',
-                ).length;
+            if (contacts) {
+                const count = contacts.pending || 0;
                 tiles.push({
-                    label: 'Contact requests',
+                    label: 'Support tickets',
                     value: count,
-                    note: count ? 'Not answered yet' : 'Every message answered',
-                    href: '/reports/contacts',
+                    note: count
+                        ? 'Waiting for a reply'
+                        : 'Every ticket answered',
+                    href: '/support?status=pending',
                 });
             }
             if (reports) {

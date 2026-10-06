@@ -69,7 +69,7 @@ export const NAV_GROUPS = [
         icon: Users,
         items: [
             { label: 'Users', to: '/users' },
-            { label: 'Contact requests', to: '/reports/contacts' },
+            { label: 'Support tickets', to: '/support' },
             { label: 'Community', to: '/community' },
             { label: 'Admin team', to: '/reports/dashboard-users' },
         ],

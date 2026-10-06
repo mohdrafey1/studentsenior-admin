@@ -38,7 +38,7 @@ const ContentPurchases = lazy(
 );
 
 // Users
-const Contacts = lazy(() => import('./pages/Users/Contacts'));
+const SupportInbox = lazy(() => import('./pages/Support/SupportInbox'));
 const Users = lazy(() => import('./pages/Users/Users'));
 const UserDetail = lazy(() => import('./pages/Users/UserDetail'));
 const DashboardUsers = lazy(() => import('./pages/Users/DashboardUsers'));
@@ -262,8 +262,22 @@ function App() {
                                             element={<PaymentDetail />}
                                         />
                                         <Route
+                                            path='/support'
+                                            element={<SupportInbox />}
+                                        />
+                                        <Route
+                                            path='/support/:ticketId'
+                                            element={<SupportInbox />}
+                                        />
+                                        {/* Contact requests became support tickets */}
+                                        <Route
                                             path='/reports/contacts'
-                                            element={<Contacts />}
+                                            element={
+                                                <Navigate
+                                                    to='/support'
+                                                    replace
+                                                />
+                                            }
                                         />
                                         <Route
                                             path='/reports/redemptions'

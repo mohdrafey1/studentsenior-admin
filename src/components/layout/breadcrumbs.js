@@ -48,9 +48,10 @@ const ROUTES = [
         ['reports', 'content-purchases'],
         [['Money', '/reports'], ['Content purchases']],
     ],
+    [['support'], [['People'], ['Support tickets']]],
     [
-        ['reports', 'contacts'],
-        [['People'], ['Contact requests']],
+        ['support', ':id'],
+        [['People'], ['Support tickets', '/support'], ['Ticket']],
     ],
     [
         ['reports', 'clients'],
