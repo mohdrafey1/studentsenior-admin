@@ -5,6 +5,8 @@ import {
     filterSearch,
     readFilters,
     reportParams,
+    validFilterRequest,
+    settledFilterRequest,
 } from '../components/Analytics/v2/data';
 
 export default function useAnalyticsFilters(
@@ -17,9 +19,14 @@ export default function useAnalyticsFilters(
         revenue,
     });
     const { from, to } = filters;
-    const serialized = JSON.stringify(filters);
+    const serialized = validFilterRequest(
+        filters,
+        error,
+        revenue ? 'revenue' : 'period',
+    );
     const [settled, setSettled] = useState(serialized);
     useEffect(() => {
+        if (serialized === null) return;
         const commit = debounceTask(setSettled);
         commit(serialized);
         return commit.cancel;
@@ -33,11 +40,12 @@ export default function useAnalyticsFilters(
         setSearch((previous) => filterSearch(previous, changes), {
             replace: true,
         });
-    const requestFilters = JSON.parse(settled);
+    const { ready, requestFilters } = settledFilterRequest(serialized, settled);
     return {
         filters,
         requestFilters,
         error,
+        ready,
         update,
         params: reportParams(requestFilters, revenue ? 'revenue' : 'period'),
         maxDays,

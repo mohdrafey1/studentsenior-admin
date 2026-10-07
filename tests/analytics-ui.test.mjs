@@ -5,7 +5,8 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { contentCsvColumns } from '../src/components/Analytics/v2/contentCsv.js';
-import { downloadCsv } from '../src/utils/csv.js';
+import { downloadCsv, escapeCsvCell } from '../src/utils/csv.js';
+import Papa from 'papaparse';
 
 // Compile the real JSX components with Vite's existing esbuild dependency.
 // Only app contexts are fixtures; all rendered controls/charts/tables are real.
@@ -25,8 +26,9 @@ const bundle = await build({
         import ContentTable from './src/components/Analytics/v2/ContentTable.jsx';
         import AnalyticsAccess from './src/components/Analytics/v2/AnalyticsAccess.jsx';
         import ContentTypeBreakdown from './src/components/Analytics/v2/ContentTypeBreakdown.jsx';
+        import Chatbot from './src/pages/Analytics/Chatbot.jsx';
         export { visibleNavGroups } from './src/components/layout/navConfig.js';
-        const components = { ChartTooltip, StatCard, QueryPanel, DateRangeBar, ContentTable, AnalyticsAccess, ContentTypeBreakdown };
+        const components = { ChartTooltip, StatCard, QueryPanel, DateRangeBar, ContentTable, AnalyticsAccess, ContentTypeBreakdown, Chatbot };
         export const render = (name, props, path = '/analytics') => renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: [path] }, React.createElement(components[name], props)));
     `,
         resolveDir: process.cwd(),
@@ -42,6 +44,17 @@ const bundle = await build({
         {
             name: 'context-fixtures',
             setup(builder) {
+                builder.onResolve(
+                    { filter: /hooks\/useAnalyticsQuery$/ },
+                    ({ path }) => ({ path, namespace: 'query-fixture' }),
+                );
+                builder.onLoad(
+                    { filter: /.*/, namespace: 'query-fixture' },
+                    () => ({
+                        contents: `export default () => ({ loading: false, error: null, data: { totalUsers: 10, totalSessions: 20, dailyUsers: [], resourceStats: [] } });`,
+                        loader: 'js',
+                    }),
+                );
                 builder.onResolve(
                     { filter: /context\/(AuthContext|CollegeContext)$/ },
                     ({ path }) => ({ path, namespace: 'fixture' }),
@@ -227,4 +240,39 @@ test('content CSV uses the shared exporter and retains quoted titles, counts and
         URL.createObjectURL = oldCreate;
         URL.revokeObjectURL = oldRevoke;
     }
+});
+
+test('chatbot hides filters and renders one Study assistant heading', () => {
+    const html = render('Chatbot', {}, '/analytics/chatbot');
+    assert.doesNotMatch(
+        html,
+        /aria-label="From date"|aria-label="To date"|aria-label="Platform filter"/,
+    );
+    assert.equal((html.match(/Study assistant/g) || []).length, 1);
+    assert.match(html, /<h1[^>]*>Chatbot<\/h1>/);
+});
+
+test('CSV formula prefixes are escaped before RFC quoting without corrupting normal cells', () => {
+    const risky = [
+        '=1+1',
+        '+SUM(A1)',
+        '-10',
+        '@SUM(A1)',
+        '\t=1+1',
+        '\r=1+1',
+        '=HYPERLINK("https://example.test","go")',
+    ];
+    for (const value of risky) {
+        const parsed = Papa.parse(escapeCsvCell(value), { delimiter: ',' })
+            .data[0][0];
+        assert.equal(parsed, "'" + value);
+    }
+    assert.equal(escapeCsvCell(0), '0');
+    assert.equal(escapeCsvCell(null), '');
+    assert.equal(escapeCsvCell("'already text"), "'already text");
+    assert.equal(
+        Papa.parse(escapeCsvCell('Ordinary, "title"'), { delimiter: ',' })
+            .data[0][0],
+        'Ordinary, "title"',
+    );
 });

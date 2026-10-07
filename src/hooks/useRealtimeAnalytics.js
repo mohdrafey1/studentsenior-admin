@@ -9,7 +9,7 @@ export default function useRealtimeAnalytics(controls) {
     const params = reportParams(controls.requestFilters, 'realtime');
     const key = stableParams(params);
     const [failedKey, setFailedKey] = useState(null);
-    const enabled = visible && !controls.error;
+    const enabled = visible && controls.ready;
     const query = useAnalyticsQuery('/analytics/v2/realtime', params, {
         enabled: enabled && failedKey !== key,
         ttl: 0,

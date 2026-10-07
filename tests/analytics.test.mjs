@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     CONTENT_TYPES,
+    CATALOG_CACHE_TTL,
+    validFilterRequest,
+    settledFilterRequest,
     QueryCache,
     dayKey,
     hasValues,
@@ -275,11 +278,18 @@ test('reset clears custom range and filters without dropping unrelated query sta
     assert.equal(original.get('range'), 'custom');
 });
 
-test('realtime rejects server/invalid filters while revenue ignores platform', () => {
-    assert.ok(
-        readFilters(new URLSearchParams('platform=server'), 366, today, {
-            realtime: true,
-        }).error,
+test('realtime treats server as all platforms while rejecting other invalid filters', () => {
+    const realtime = readFilters(
+        new URLSearchParams('platform=server'),
+        366,
+        today,
+        { realtime: true },
+    );
+    assert.equal(realtime.error, '');
+    assert.equal(realtime.filters.platform, '');
+    assert.equal(
+        reportParams(realtime.filters, 'realtime').platform,
+        undefined,
     );
     assert.ok(
         readFilters(new URLSearchParams('college=bad slug'), 366, today, {
@@ -296,13 +306,23 @@ test('realtime rejects server/invalid filters while revenue ignores platform', (
     assert.equal(reportParams(revenue.filters, 'revenue').platform, undefined);
 });
 
-test('catalog cache can persist for the admin session but clears on identity change', () => {
+test('academic label cache expires at ten minutes and clears on identity change', () => {
     const cache = new QueryCache(8);
     cache.scope('first-admin');
-    cache.set('subjects', [{ name: 'Maths' }], 1);
-    assert.equal(cache.get('subjects', Infinity, 86400000)[0].name, 'Maths');
+    cache.set('subjects', [{ name: 'Maths' }], 0);
+    assert.equal(CATALOG_CACHE_TTL, 600000);
+    assert.equal(
+        cache.get('subjects', CATALOG_CACHE_TTL, 599999)[0].name,
+        'Maths',
+    );
+    assert.equal(cache.get('subjects', CATALOG_CACHE_TTL, 600000), undefined);
+    cache.set('subjects', [{ name: 'New subject' }], 600001);
+    assert.equal(
+        cache.get('subjects', CATALOG_CACHE_TTL, 600002)[0].name,
+        'New subject',
+    );
     cache.scope('second-admin');
-    assert.equal(cache.get('subjects', Infinity, 86400000), undefined);
+    assert.equal(cache.get('subjects', CATALOG_CACHE_TTL, 600002), undefined);
 });
 
 test('overview content types use both aggregate periods without mixing their values', () => {
@@ -335,7 +355,7 @@ test('refund increases are bad while captured revenue increases are good', () =>
     assert.equal(deltaTone(20), 'text-ok-ink');
 });
 
-test('analytics navigation preserves the entire query and table labels avoid raw IDs', () => {
+test('analytics navigation preserves approved filters and table labels avoid raw IDs', () => {
     const query =
         '?from=2026-10-01&to=2026-10-07&college=sample&platform=web&compare=false&range=custom';
     assert.equal(
@@ -355,4 +375,81 @@ test('only Admin and Moderator can access analytics', () => {
     for (const role of ['Visitor', 'Student', '', undefined])
         assert.equal(canAccessAnalytics({ role }), false);
     assert.equal(canAccessAnalytics(null), false);
+});
+
+test('analytics links carry only allowlisted filters and only from an analytics route', () => {
+    const query =
+        '?from=2026-10-01&to=2026-10-07&college=sample&platform=web&compare=false&range=custom&search=private&page=4&unit=2';
+    for (const pathname of [
+        '/analytics',
+        '/analytics/audience',
+        '/analytics/content/pyq',
+    ]) {
+        const url = analyticsLink('/analytics/realtime', query, pathname);
+        const next = new URLSearchParams(url.split('?')[1]);
+        assert.deepEqual(
+            [...next.keys()],
+            ['from', 'to', 'college', 'platform', 'compare', 'range'],
+        );
+        assert.equal(next.get('college'), 'sample');
+        assert.equal(next.get('search'), null);
+    }
+    for (const pathname of [
+        '/reports/subjects',
+        '/users/id',
+        '/analytics-other',
+    ]) {
+        assert.equal(
+            analyticsLink(
+                '/analytics',
+                '?college=507f1f77bcf86cd799439011',
+                pathname,
+            ),
+            '/analytics',
+        );
+    }
+    assert.equal(
+        analyticsLink(
+            '/analytics/chatbot',
+            '?unit=3',
+            '/analytics/content/quicknote',
+        ),
+        '/analytics/chatbot',
+    );
+});
+
+test('invalid dates never enter request state, including initial invalid visits and correction', () => {
+    const invalid = read('from=2026-10-07&to=2026-10-01');
+    const rejected = validFilterRequest(invalid.filters, invalid.error);
+    assert.equal(rejected, null);
+    assert.equal(settledFilterRequest(rejected, null).ready, false);
+    const before = read('from=2026-09-01&to=2026-09-30');
+    const lastValid = validFilterRequest(before.filters, before.error);
+    assert.equal(settledFilterRequest(rejected, lastValid).ready, false);
+    const corrected = read('from=2026-10-01&to=2026-10-07');
+    const candidate = validFilterRequest(corrected.filters, corrected.error);
+    assert.equal(settledFilterRequest(candidate, null).ready, false);
+    assert.equal(settledFilterRequest(candidate, lastValid).ready, false);
+    const ready = settledFilterRequest(candidate, candidate);
+    assert.equal(ready.ready, true);
+    assert.deepEqual(reportParams(ready.requestFilters), {
+        from: '2026-10-01',
+        to: '2026-10-07',
+    });
+    assert.ok(ready.requestFilters.from <= ready.requestFilters.to);
+});
+
+test('comparison and custom-mode UI changes do not pause or refetch valid reports', () => {
+    const first = read('compare=false&range=custom');
+    const next = read('compare=true');
+    assert.equal(
+        validFilterRequest(first.filters, first.error),
+        validFilterRequest(next.filters, next.error),
+    );
+});
+
+test('zero deltas always have a neutral tone', () => {
+    assert.equal(deltaTone(0), 'text-ink-2');
+    assert.equal(deltaTone(0, true), 'text-ink-2');
+    assert.equal(deltaTone(-0, true), 'text-ink-2');
 });

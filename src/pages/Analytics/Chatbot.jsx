@@ -1,17 +1,15 @@
-import useAnalyticsFilters from '../../hooks/useAnalyticsFilters';
 import useAnalyticsQuery from '../../hooks/useAnalyticsQuery';
 import ChatbotAnalytics from '../../components/Analytics/ChatbotAnalytics';
 import ReportLayout from '../../components/Analytics/v2/ReportLayout';
 import QueryPanel from '../../components/Analytics/v2/QueryPanel';
 
 export default function Chatbot() {
-    const controls = useAnalyticsFilters();
     const query = useAnalyticsQuery('/analytics/chatbot');
     return (
         <ReportLayout
             title='Chatbot'
             description='Usage of the in-app study assistant across all colleges and platforms.'
-            controls={{ ...controls, error: null }}
+            controls={{ error: null }}
             filtersVisible={false}
         >
             <p className='text-sm text-muted'>
@@ -20,7 +18,6 @@ export default function Chatbot() {
                 Analytics tabs do not apply.
             </p>
             <QueryPanel
-                title='Study assistant activity'
                 query={query}
                 empty={!query.data?.totalUsers && !query.data?.totalSessions}
             >

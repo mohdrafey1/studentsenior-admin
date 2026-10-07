@@ -11,6 +11,7 @@ import BreakdownBars from '../../components/Analytics/v2/BreakdownBars';
 import ContentTypeBreakdown from '../../components/Analytics/v2/ContentTypeBreakdown';
 import ContentTable from '../../components/Analytics/v2/ContentTable';
 import {
+    analyticsLink,
     duration,
     hasValues,
     number,
@@ -19,9 +20,9 @@ import {
 
 export default function Analytics() {
     const controls = useAnalyticsFilters();
-    const { search } = useLocation();
-    const { params, filters, error } = controls;
-    const options = { enabled: !error };
+    const { search, pathname } = useLocation();
+    const { params, filters } = controls;
+    const options = { enabled: controls.ready };
     const overview = useAnalyticsQuery(
         '/analytics/v2/overview',
         params,
@@ -128,7 +129,11 @@ export default function Analytics() {
                     empty={!realtime.data?.activeActors}
                     action={
                         <Link
-                            to={`/analytics/realtime${search}`}
+                            to={analyticsLink(
+                                '/analytics/realtime',
+                                search,
+                                pathname,
+                            )}
                             className='text-sm text-link'
                         >
                             Open realtime

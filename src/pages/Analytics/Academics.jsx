@@ -31,7 +31,7 @@ export default function Academics() {
             level: 'college',
             page: 1,
         },
-        { enabled: !controls.error },
+        { enabled: controls.ready },
     );
     const names = {
         college: Object.fromEntries(

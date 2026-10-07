@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import api, { apiErrorMessage } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
-import { QueryCache, stableParams } from '../components/Analytics/v2/data';
+import {
+    CATALOG_CACHE_TTL,
+    QueryCache,
+    stableParams,
+} from '../components/Analytics/v2/data';
 
 const cache = new QueryCache();
 const catalogCache = new QueryCache(8);
@@ -30,7 +34,7 @@ export default function useAnalyticsQuery(
         store.scope(token);
         const cached =
             revision === 0
-                ? store.get(key, sessionCache ? Infinity : ttl)
+                ? store.get(key, sessionCache ? CATALOG_CACHE_TTL : ttl)
                 : undefined;
         if (cached !== undefined) {
             setState({

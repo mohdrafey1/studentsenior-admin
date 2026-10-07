@@ -37,7 +37,11 @@ export default function ReportLayout({
                 {pages.map(([path, label]) => (
                     <NavLink
                         key={path}
-                        to={analyticsLink(`/analytics${path}`, search)}
+                        to={analyticsLink(
+                            `/analytics${path}`,
+                            search,
+                            pathname,
+                        )}
                         end={!path}
                         className={({ isActive }) =>
                             `text-sm whitespace-nowrap pb-1 ${isActive || (path.startsWith('/content') && pathname.startsWith('/analytics/content')) ? 'font-semibold text-ink' : 'text-muted hover:text-link'}`

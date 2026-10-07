@@ -26,7 +26,7 @@ const buckets = {
 export default function Audience() {
     const controls = useAnalyticsFilters();
     const query = useAnalyticsQuery('/analytics/v2/audience', controls.params, {
-        enabled: !controls.error,
+        enabled: controls.ready,
     });
     const data = query.data;
     const retention = retentionCurve(data?.retention, controls.filters.to);

@@ -1,3 +1,4 @@
+import { analyticsLink } from '../Analytics/v2/data';
 import { Fragment } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, Moon, Search, Sun } from 'lucide-react';
@@ -42,7 +43,11 @@ export default function TopBar({ onOpenMenu, onOpenSearch }) {
                             <Link
                                 to={
                                     crumb.to.startsWith('/analytics')
-                                        ? `${crumb.to}${search}`
+                                        ? analyticsLink(
+                                              crumb.to,
+                                              search,
+                                              pathname,
+                                          )
                                         : crumb.to
                                 }
                                 className='truncate hover:text-ink transition-colors'

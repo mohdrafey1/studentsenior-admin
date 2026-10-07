@@ -6,7 +6,7 @@ import { analyticsLink, contentTitle, number, typeLabel } from './data';
 import { contentCsvColumns } from './contentCsv';
 
 export default function ContentTable({ rows = [], realtime = false }) {
-    const { search } = useLocation();
+    const { search, pathname } = useLocation();
     return (
         <>
             {!realtime && (
@@ -53,6 +53,7 @@ export default function ContentTable({ rows = [], realtime = false }) {
                                     to={analyticsLink(
                                         `/analytics/open/${row._id.type}/${row._id.id}`,
                                         search,
+                                        pathname,
                                     )}
                                 >
                                     {contentTitle(row)}

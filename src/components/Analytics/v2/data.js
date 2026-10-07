@@ -14,6 +14,8 @@ export const CONTENT_TYPES = [
     ['affiliate', 'Affiliates'],
 ].map(([value, label]) => ({ value, label }));
 
+export const CATALOG_CACHE_TTL = 10 * 60 * 1000;
+
 export const CHART_COLORS = Array.from(
     { length: 6 },
     (_, i) => `var(--ss-chart-${i + 1})`,
@@ -41,7 +43,10 @@ export function readFilters(
         from: search.get('from') || shiftDay(today, -27),
         to: search.get('to') || today,
         college: search.get('college') || '',
-        platform: search.get('platform') || '',
+        platform:
+            realtime && search.get('platform') === 'server'
+                ? ''
+                : search.get('platform') || '',
         compare: search.get('compare') !== 'false',
         custom: search.get('range') === 'custom',
     };
@@ -224,13 +229,42 @@ export function debounceTask(
 
 export const canAccessAnalytics = (user) =>
     ['Admin', 'Moderator'].includes(user?.role);
-export const analyticsLink = (path, search = '') => `${path}${search}`;
+const ANALYTICS_FILTER_KEYS = [
+    'from',
+    'to',
+    'college',
+    'platform',
+    'compare',
+    'range',
+];
+export function analyticsLink(path, search = '', pathname = '/analytics') {
+    if (pathname !== '/analytics' && !pathname.startsWith('/analytics/'))
+        return path;
+    const source = new URLSearchParams(search);
+    const query = new URLSearchParams();
+    for (const key of ANALYTICS_FILTER_KEYS)
+        if (source.has(key)) query.set(key, source.get(key));
+    return query.size ? `${path}?${query}` : path;
+}
+
+// A malformed filter must never be cached as the next request. Readiness also
+// prevents a stale/default request between correcting the URL and settling it.
+export const validFilterRequest = (filters, error, kind = 'period') =>
+    error ? null : stableParams(reportParams(filters, kind));
+export const settledFilterRequest = (serialized, settled) => ({
+    ready: serialized !== null && serialized === settled,
+    requestFilters: JSON.parse(settled || '{}'),
+});
 export const percent = (value) =>
     value == null || !Number.isFinite(Number(value))
         ? '—'
         : `${number(value)}%`;
 export const deltaTone = (delta, increaseIsBad = false) =>
-    delta > 0 !== increaseIsBad ? 'text-ok-ink' : 'text-bad-ink';
+    delta === 0
+        ? 'text-ink-2'
+        : delta > 0 !== increaseIsBad
+          ? 'text-ok-ink'
+          : 'text-bad-ink';
 export const contentTitle = (row) =>
     row.title || `${typeLabel(row._id.type)} item`;
 export function typeBreakdown(values = {}) {

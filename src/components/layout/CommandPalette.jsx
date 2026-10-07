@@ -1,3 +1,4 @@
+import { analyticsLink } from '../Analytics/v2/data';
 import { useAuth } from '../../context/AuthContext';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -12,7 +13,7 @@ import { COLLEGE_ITEMS, visibleNavGroups, WORKSPACE_ITEMS } from './navConfig';
  */
 export default function CommandPalette({ open, onClose }) {
     const navigate = useNavigate();
-    const { search } = useLocation();
+    const { search, pathname } = useLocation();
     const { user } = useAuth();
     const { colleges, currentCollege, currentSlug } = useColleges();
     const [query, setQuery] = useState('');
@@ -44,7 +45,7 @@ export default function CommandPalette({ open, onClose }) {
                     hint: '',
                     to:
                         group.id === 'analytics'
-                            ? `${item.to}${search}`
+                            ? analyticsLink(item.to, search, pathname)
                             : item.to,
                 }),
             ),
@@ -58,7 +59,7 @@ export default function CommandPalette({ open, onClose }) {
             }),
         );
         return list;
-    }, [colleges, currentCollege, currentSlug, user, search]);
+    }, [colleges, currentCollege, currentSlug, user, search, pathname]);
 
     const results = useMemo(() => {
         const q = query.trim().toLowerCase();

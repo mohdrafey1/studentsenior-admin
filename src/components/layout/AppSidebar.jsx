@@ -1,3 +1,4 @@
+import { analyticsLink } from '../Analytics/v2/data';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronRight, LogOut } from 'lucide-react';
@@ -227,7 +228,11 @@ export default function AppSidebar({ onNavigate }) {
                                             key={item.to}
                                             to={
                                                 group.id === 'analytics'
-                                                    ? `${item.to}${search}`
+                                                    ? analyticsLink(
+                                                          item.to,
+                                                          search,
+                                                          pathname,
+                                                      )
                                                     : item.to
                                             }
                                             label={item.label}

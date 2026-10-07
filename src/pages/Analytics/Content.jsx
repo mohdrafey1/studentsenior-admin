@@ -8,11 +8,15 @@ import KpiStrip from '../../components/Analytics/v2/KpiStrip';
 import TimeSeriesChart from '../../components/Analytics/v2/TimeSeriesChart';
 import BreakdownBars from '../../components/Analytics/v2/BreakdownBars';
 import ContentTable from '../../components/Analytics/v2/ContentTable';
-import { CONTENT_TYPES, hasValues } from '../../components/Analytics/v2/data';
+import {
+    CONTENT_TYPES,
+    hasValues,
+    analyticsLink,
+} from '../../components/Analytics/v2/data';
 
 export default function Content() {
     const { type = 'all' } = useParams();
-    const { search } = useLocation();
+    const { search, pathname } = useLocation();
     const navigate = useNavigate();
     const controls = useAnalyticsFilters();
     const validType =
@@ -20,7 +24,7 @@ export default function Content() {
     const query = useAnalyticsQuery(
         '/analytics/v2/content',
         { ...controls.params, ...(type !== 'all' ? { type } : {}) },
-        { enabled: !controls.error && validType },
+        { enabled: controls.ready && validType },
     );
     const data = query.data;
     return (
@@ -37,7 +41,13 @@ export default function Content() {
                     ...CONTENT_TYPES,
                 ]}
                 onChange={(value) =>
-                    navigate(`/analytics/content/${value}${search}`)
+                    navigate(
+                        analyticsLink(
+                            `/analytics/content/${value}`,
+                            search,
+                            pathname,
+                        ),
+                    )
                 }
             />
             {!validType ? (

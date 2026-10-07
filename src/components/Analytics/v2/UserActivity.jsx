@@ -11,7 +11,7 @@ export default function UserActivity({ userId }) {
     const query = useAnalyticsQuery(
         `/analytics/v2/users/${userId}/activity`,
         controls.params,
-        { enabled: !controls.error },
+        { enabled: controls.ready },
     );
     const data = query.data;
     return (

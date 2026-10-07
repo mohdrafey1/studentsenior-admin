@@ -8,12 +8,13 @@ import {
     Panel,
     SkeletonRows,
 } from '../../components/ui';
+import { analyticsLink } from '../../components/Analytics/v2/data';
 import { contentDestination } from '../../components/Analytics/v2/contentDestination';
 
 export default function OpenContent() {
     const { type, id } = useParams();
     const navigate = useNavigate();
-    const { search } = useLocation();
+    const { search, pathname } = useLocation();
     const [error, setError] = useState(null);
     const [attempt, setAttempt] = useState(0);
     useEffect(() => {
@@ -54,7 +55,13 @@ export default function OpenContent() {
                                 <Button onClick={() => setAttempt(attempt + 1)}>
                                     Try again
                                 </Button>
-                                <Button to={`/analytics/content/all${search}`}>
+                                <Button
+                                    to={analyticsLink(
+                                        '/analytics/content/all',
+                                        search,
+                                        pathname,
+                                    )}
+                                >
                                     Back to content
                                 </Button>
                             </div>
@@ -64,7 +71,13 @@ export default function OpenContent() {
                     <>
                         <SkeletonRows rows={3} />
                         <div className='p-5'>
-                            <Button to={`/analytics/content/all${search}`}>
+                            <Button
+                                to={analyticsLink(
+                                    '/analytics/content/all',
+                                    search,
+                                    pathname,
+                                )}
+                            >
                                 Cancel
                             </Button>
                         </div>

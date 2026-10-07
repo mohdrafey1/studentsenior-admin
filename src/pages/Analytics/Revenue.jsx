@@ -19,7 +19,7 @@ const metrics = [
 export default function Revenue() {
     const controls = useAnalyticsFilters(366, { revenue: true });
     const query = useAnalyticsQuery('/analytics/v2/revenue', controls.params, {
-        enabled: !controls.error,
+        enabled: controls.ready,
     });
     return (
         <ReportLayout

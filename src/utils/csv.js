@@ -1,6 +1,7 @@
-const escape = (value) => {
+export const escapeCsvCell = (value) => {
     if (value === null || value === undefined) return '';
-    const text = String(value);
+    const raw = String(value);
+    const text = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
     return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
@@ -10,9 +11,9 @@ const escape = (value) => {
  */
 export function downloadCsv(filename, columns, rows) {
     const lines = [
-        columns.map((c) => escape(c.label)).join(','),
+        columns.map((c) => escapeCsvCell(c.label)).join(','),
         ...rows.map((row) =>
-            columns.map((c) => escape(c.value(row))).join(','),
+            columns.map((c) => escapeCsvCell(c.value(row))).join(','),
         ),
     ];
     // BOM so Excel reads ₹ and non-English names correctly.
