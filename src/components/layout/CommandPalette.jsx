@@ -1,9 +1,10 @@
+import { useAuth } from '../../context/AuthContext';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { CornerDownLeft, Search } from 'lucide-react';
 import { useColleges } from '../../context/CollegeContext';
 import { collegeInitials } from '../../utils/initials';
-import { COLLEGE_ITEMS, NAV_GROUPS, WORKSPACE_ITEMS } from './navConfig';
+import { COLLEGE_ITEMS, visibleNavGroups, WORKSPACE_ITEMS } from './navConfig';
 
 /**
  * ⌘K / Ctrl+K jump list: every page in the console, the current college's
@@ -11,6 +12,8 @@ import { COLLEGE_ITEMS, NAV_GROUPS, WORKSPACE_ITEMS } from './navConfig';
  */
 export default function CommandPalette({ open, onClose }) {
     const navigate = useNavigate();
+    const { search } = useLocation();
+    const { user } = useAuth();
     const { colleges, currentCollege, currentSlug } = useColleges();
     const [query, setQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
@@ -33,13 +36,16 @@ export default function CommandPalette({ open, onClose }) {
                 }),
             );
         }
-        NAV_GROUPS.forEach((group) =>
+        visibleNavGroups(user).forEach((group) =>
             group.items.forEach((item) =>
                 list.push({
                     group: group.label,
                     label: item.label,
                     hint: '',
-                    to: item.to,
+                    to:
+                        group.id === 'analytics'
+                            ? `${item.to}${search}`
+                            : item.to,
                 }),
             ),
         );
@@ -52,7 +58,7 @@ export default function CommandPalette({ open, onClose }) {
             }),
         );
         return list;
-    }, [colleges, currentCollege, currentSlug]);
+    }, [colleges, currentCollege, currentSlug, user, search]);
 
     const results = useMemo(() => {
         const q = query.trim().toLowerCase();

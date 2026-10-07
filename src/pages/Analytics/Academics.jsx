@@ -9,9 +9,21 @@ import { Button, Panel } from '../../components/ui';
 export default function Academics() {
     const controls = useAnalyticsFilters();
     const { colleges } = useColleges();
-    const courses = useAnalyticsQuery('/resource/courses');
-    const branches = useAnalyticsQuery('/resource/branches');
-    const subjects = useAnalyticsQuery('/resource/subjects');
+    const courses = useAnalyticsQuery(
+        '/resource/courses',
+        {},
+        { sessionCache: true },
+    );
+    const branches = useAnalyticsQuery(
+        '/resource/branches',
+        {},
+        { sessionCache: true },
+    );
+    const subjects = useAnalyticsQuery(
+        '/resource/subjects',
+        {},
+        { sessionCache: true },
+    );
     const summary = useAnalyticsQuery(
         '/analytics/v2/academics',
         {

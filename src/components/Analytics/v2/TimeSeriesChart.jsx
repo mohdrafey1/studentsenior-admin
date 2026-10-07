@@ -91,6 +91,7 @@ export default function TimeSeriesChart({
                             domain={yDomain}
                         />
                         <Tooltip
+                            filterNull={false}
                             content={<ChartTooltip formatValue={formatValue} />}
                         />
                         {metrics.length > 1 && (

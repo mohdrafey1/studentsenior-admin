@@ -32,7 +32,12 @@ export default function ChartTooltip({
                         />
                     )}
                     <span className='font-mono font-medium'>
-                        {formatValue(item.value)}
+                        {payload.length > 1 && (
+                            <span className='font-sans font-normal text-ink-2'>
+                                {item.name || item.dataKey}:{' '}
+                            </span>
+                        )}
+                        {item.value == null ? '—' : formatValue(item.value)}
                     </span>
                     {unit && <span className='text-ink-2'>{unit}</span>}
                 </div>

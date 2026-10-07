@@ -4,11 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import { QueryCache, stableParams } from '../components/Analytics/v2/data';
 
 const cache = new QueryCache();
+const catalogCache = new QueryCache(8);
 
 export default function useAnalyticsQuery(
     path,
     params = {},
-    { enabled = true, ttl = 30000 } = {},
+    { enabled = true, ttl = 30000, sessionCache = false } = {},
 ) {
     const { token } = useAuth();
     const serialized = stableParams(params);
@@ -25,8 +26,12 @@ export default function useAnalyticsQuery(
 
     useEffect(() => {
         if (!enabled || !path) return;
-        cache.scope(token);
-        const cached = revision === 0 ? cache.get(key, ttl) : undefined;
+        const store = sessionCache ? catalogCache : cache;
+        store.scope(token);
+        const cached =
+            revision === 0
+                ? store.get(key, sessionCache ? Infinity : ttl)
+                : undefined;
         if (cached !== undefined) {
             setState({
                 key,
@@ -56,7 +61,7 @@ export default function useAnalyticsQuery(
                         response.data.message || 'Could not load analytics.',
                     );
                 const data = response.data.data;
-                cache.set(key, data);
+                store.set(key, data);
                 setState({
                     key,
                     owner: token,
@@ -79,7 +84,7 @@ export default function useAnalyticsQuery(
                     });
             });
         return () => controller.abort();
-    }, [path, serialized, key, enabled, revision, ttl, token]);
+    }, [path, serialized, key, enabled, revision, ttl, token, sessionCache]);
 
     const result =
         state.key === key && state.owner === token

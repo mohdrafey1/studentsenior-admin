@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import api from '../../utils/api';
 import UserActivity from '../../components/Analytics/v2/UserActivity';
+import AnalyticsAccess from '../../components/Analytics/v2/AnalyticsAccess';
 import { useColleges } from '../../context/CollegeContext';
 import {
     formatDate,
@@ -356,7 +357,9 @@ const UserDetail = () => {
                 </div>
             </div>
 
-            <UserActivity userId={userId} />
+            <AnalyticsAccess silent>
+                <UserActivity userId={userId} />
+            </AnalyticsAccess>
 
             <div className='grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5 mb-5'>
                 <Panel

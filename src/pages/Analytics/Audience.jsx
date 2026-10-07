@@ -9,7 +9,7 @@ import RetentionGrid from '../../components/Analytics/v2/RetentionGrid';
 import {
     duration,
     hasValues,
-    number,
+    percent,
     retentionCurve,
 } from '../../components/Analytics/v2/data';
 
@@ -118,7 +118,7 @@ export default function Audience() {
                     metrics={[{ key: 'percent', label: 'Retained actors' }]}
                     granularity={false}
                     yDomain={[0, 100]}
-                    formatValue={(value) => `${number(value)}%`}
+                    formatValue={percent}
                 />
             </QueryPanel>
             <QueryPanel

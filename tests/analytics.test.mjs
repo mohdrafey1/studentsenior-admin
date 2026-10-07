@@ -10,6 +10,15 @@ import {
     stableParams,
     weeklySeries,
     retentionCurve,
+    debounceTask,
+    filterSearch,
+    resetFilters,
+    percent,
+    deltaTone,
+    canAccessAnalytics,
+    analyticsLink,
+    typeBreakdown,
+    contentTitle,
 } from '../src/components/Analytics/v2/data.js';
 import { contentDestination } from '../src/components/Analytics/v2/contentDestination.js';
 
@@ -157,96 +166,193 @@ test('all-zero filled series are empty but negative revenue is meaningful', () =
 });
 
 const id = '507f1f77bcf86cd799439011';
-const other = '507f1f77bcf86cd799439012';
-const colleges = [{ _id: other, slug: 'canonical-college' }];
-const response = (data, pagination) => ({
-    data: { success: true, data, pagination },
+const response = (data) => ({ data: { success: true, data } });
+
+test('every content type resolves through exactly one destination read', async () => {
+    for (const { value: type } of CONTENT_TYPES) {
+        const calls = [];
+        const path =
+            type === 'quicknote'
+                ? '/reports/subjects/parent/quick-notes?unit=3'
+                : '/college/pyqs/parent/aisolution';
+        assert.equal(
+            await contentDestination(type, id, async (url) => {
+                calls.push(url);
+                return response({ collegeSlug: 'college', path });
+            }),
+            path,
+        );
+        assert.deepEqual(calls, [
+            `/analytics/v2/content/${type}/${id}/destination`,
+        ]);
+    }
 });
 
-test('content links recover canonical college metadata rather than using a guessed college', async () => {
-    const calls = [];
-    const get = async (path) => {
-        calls.push(path);
-        return response({ college: { slug: 'canonical-college' } });
-    };
-    assert.equal(
-        await contentDestination('pyq', id, colleges, get),
-        `/canonical-college/pyqs/${id}`,
-    );
-    assert.deepEqual(calls, [`/pyq/${id}`]);
-});
-
-test('unpopulated college IDs resolve through the catalog and missing colleges fail safely', async () => {
-    assert.equal(
-        await contentDestination('group', id, colleges, async () =>
-            response({ college: other }),
-        ),
-        `/canonical-college/groups/${id}`,
-    );
-    await assert.rejects(
-        () => contentDestination('note', id, [], async () => response({})),
-        /no longer has a college/,
-    );
-});
-
-test('quick-note links find the correct parent subject through paginated catalogs', async () => {
-    const pages = [];
-    const get = async (path, options) => {
-        pages.push(options.params.page);
-        assert.equal(path, '/quicknotes/all/canonical-college');
-        return options.params.page === 1
-            ? response([], { pages: 2 })
-            : response([{ _id: id, subject: { _id: other }, unitNumber: 3 }], {
-                  pages: 2,
-              });
-    };
-    assert.equal(
-        await contentDestination('quicknote', id, colleges, get),
-        `/reports/subjects/${other}/quick-notes?unit=3`,
-    );
-    assert.deepEqual(pages, [1, 2]);
-});
-
-test('solution links use the parent PYQ ID, not the solution ID', async () => {
-    const get = async () => response([{ _id: id, pyq: { _id: other } }]);
-    assert.equal(
-        await contentDestination('solution', id, colleges, get),
-        `/canonical-college/pyqs/${other}/aisolution`,
-    );
-});
-
-test('blog and affiliate links use the existing editors; invalid IDs fail before reads', async () => {
-    const get = () => {
-        throw new Error('Unexpected request');
-    };
-    assert.equal(
-        await contentDestination('blog', id, [], get),
-        `/blog/edit/${id}`,
-    );
-    assert.equal(
-        await contentDestination('affiliate', id, [], get),
-        '/affiliate-products',
-    );
-    await assert.rejects(
-        () => contentDestination('pyq', 'some-slug', [], get),
-        /Invalid content ID/,
-    );
-});
-
-test('metadata lookup errors and cancelled requests stop catalog traversal', async () => {
+test('destination rejects invalid references before reads and external paths from malformed responses', async () => {
     let calls = 0;
     await assert.rejects(
         () =>
-            contentDestination(
-                'solution',
-                id,
-                [...colleges, ...colleges],
-                async () => {
-                    calls += 1;
-                    throw new Error('cancelled');
-                },
-            ),
+            contentDestination('pyq', 'slug', () => {
+                calls++;
+            }),
+        /Invalid content reference/,
+    );
+    await assert.rejects(
+        () =>
+            contentDestination('unknown', id, () => {
+                calls++;
+            }),
+        /Invalid content reference/,
+    );
+    assert.equal(calls, 0);
+    for (const path of ['https://external.test', '//external.test', null])
+        await assert.rejects(
+            () => contentDestination('pyq', id, async () => response({ path })),
+            /no available admin destination/,
+        );
+});
+
+test('destination request failures and cancellation propagate without scanning catalogs', async () => {
+    let calls = 0;
+    await assert.rejects(
+        () =>
+            contentDestination('solution', id, async () => {
+                calls++;
+                throw new Error('cancelled');
+            }),
         /cancelled/,
     );
     assert.equal(calls, 1);
+});
+
+test('filter debounce commits only the latest value after 350 ms and cancels on cleanup', () => {
+    let now = 0;
+    const timers = new Set();
+    const received = [];
+    const schedule = (fn, ms) => {
+        const timer = { fn, at: now + ms };
+        timers.add(timer);
+        return timer;
+    };
+    const cancel = (timer) => timers.delete(timer);
+    const advance = (ms) => {
+        now += ms;
+        for (const timer of [...timers])
+            if (timer.at <= now) {
+                timers.delete(timer);
+                timer.fn();
+            }
+    };
+    const update = debounceTask(
+        (value) => received.push(value),
+        350,
+        schedule,
+        cancel,
+    );
+    update('android');
+    advance(200);
+    update('web');
+    advance(349);
+    assert.deepEqual(received, []);
+    advance(1);
+    assert.deepEqual(received, ['web']);
+    update('blog');
+    update.cancel();
+    advance(1000);
+    assert.deepEqual(received, ['web']);
+});
+
+test('reset clears custom range and filters without dropping unrelated query state', () => {
+    const original = new URLSearchParams(
+        'range=custom&platform=web&college=sample&compare=false&unit=2',
+    );
+    const next = filterSearch(original, resetFilters(today));
+    assert.equal(next.get('range'), null);
+    assert.equal(next.get('college'), null);
+    assert.equal(next.get('platform'), null);
+    assert.equal(next.get('unit'), '2');
+    assert.equal(next.get('compare'), 'false');
+    assert.equal(original.get('range'), 'custom');
+});
+
+test('realtime rejects server/invalid filters while revenue ignores platform', () => {
+    assert.ok(
+        readFilters(new URLSearchParams('platform=server'), 366, today, {
+            realtime: true,
+        }).error,
+    );
+    assert.ok(
+        readFilters(new URLSearchParams('college=bad slug'), 366, today, {
+            realtime: true,
+        }).error,
+    );
+    const revenue = readFilters(
+        new URLSearchParams('platform=web'),
+        366,
+        today,
+        { revenue: true },
+    );
+    assert.equal(revenue.error, '');
+    assert.equal(reportParams(revenue.filters, 'revenue').platform, undefined);
+});
+
+test('catalog cache can persist for the admin session but clears on identity change', () => {
+    const cache = new QueryCache(8);
+    cache.scope('first-admin');
+    cache.set('subjects', [{ name: 'Maths' }], 1);
+    assert.equal(cache.get('subjects', Infinity, 86400000)[0].name, 'Maths');
+    cache.scope('second-admin');
+    assert.equal(cache.get('subjects', Infinity, 86400000), undefined);
+});
+
+test('overview content types use both aggregate periods without mixing their values', () => {
+    const rows = typeBreakdown({
+        current: [{ type: 'pyq', views: 100 }],
+        previous: [
+            { type: 'pyq', views: 50 },
+            { type: 'note', views: 4 },
+        ],
+    });
+    assert.equal(rows.length, 13);
+    assert.deepEqual(
+        rows.find((row) => row.type === 'pyq'),
+        { type: 'pyq', label: 'PYQs', current: 100, previous: 50 },
+    );
+    assert.equal(rows.find((row) => row.type === 'note').current, 0);
+    assert.equal(rows.find((row) => row.type === 'note').previous, 4);
+});
+
+test('retention distinguishes immature values from observed zero retention', () => {
+    assert.equal(percent(null), '—');
+    assert.equal(percent(undefined), '—');
+    assert.equal(percent(0), '0%');
+    assert.equal(percent(33.333), '33.3%');
+});
+
+test('refund increases are bad while captured revenue increases are good', () => {
+    assert.equal(deltaTone(20, true), 'text-bad-ink');
+    assert.equal(deltaTone(-20, true), 'text-ok-ink');
+    assert.equal(deltaTone(20), 'text-ok-ink');
+});
+
+test('analytics navigation preserves the entire query and table labels avoid raw IDs', () => {
+    const query =
+        '?from=2026-10-01&to=2026-10-07&college=sample&platform=web&compare=false&range=custom';
+    assert.equal(
+        analyticsLink('/analytics/chatbot', query),
+        `/analytics/chatbot${query}`,
+    );
+    assert.equal(
+        contentTitle({ _id: { type: 'pyq', id }, title: 'Maths 2026' }),
+        'Maths 2026',
+    );
+    assert.equal(contentTitle({ _id: { type: 'pyq', id } }), 'PYQs item');
+});
+
+test('only Admin and Moderator can access analytics', () => {
+    for (const role of ['Admin', 'Moderator'])
+        assert.equal(canAccessAnalytics({ role }), true);
+    for (const role of ['Visitor', 'Student', '', undefined])
+        assert.equal(canAccessAnalytics({ role }), false);
+    assert.equal(canAccessAnalytics(null), false);
 });

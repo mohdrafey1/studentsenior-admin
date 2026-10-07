@@ -1,11 +1,19 @@
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { deltaTone } from './v2/data';
 
 /**
  * One cell of the headline strip: label, serif number and a note. `delta`
  * is a whole-number percentage; it shows with an arrow and a sign so the
  * direction never relies on colour alone.
  */
-export default function StatCard({ label, value, note, delta, sparkline }) {
+export default function StatCard({
+    label,
+    value,
+    note,
+    delta,
+    sparkline,
+    increaseIsBad = false,
+}) {
     const hasDelta = delta !== undefined && delta !== null;
     const Arrow = delta < 0 ? ArrowDownRight : ArrowUpRight;
     return (
@@ -19,9 +27,10 @@ export default function StatCard({ label, value, note, delta, sparkline }) {
                 <span className='flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12.5px] text-muted'>
                     {hasDelta && delta !== 0 && (
                         <span
-                            className={`inline-flex items-center gap-0.5 font-medium ${
-                                delta > 0 ? 'text-ok-ink' : 'text-bad-ink'
-                            }`}
+                            className={`inline-flex items-center gap-0.5 font-medium ${deltaTone(
+                                delta,
+                                increaseIsBad,
+                            )}`}
                         >
                             <Arrow className='w-3.5 h-3.5' aria-hidden='true' />
                             {delta > 0 ? '+' : '−'}

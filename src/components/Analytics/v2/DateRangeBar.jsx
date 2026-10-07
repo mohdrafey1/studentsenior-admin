@@ -1,6 +1,30 @@
+import { useState } from 'react';
 import { useColleges } from '../../../context/CollegeContext';
 import { Button, Input, Select, Switch } from '../../ui';
-import { dayKey, rangeDays, shiftDay } from './data';
+import { dayKey, rangeDays, resetFilters, shiftDay } from './data';
+
+function DateField({ label, value, min, max, commit }) {
+    const [draft, setDraft] = useState(value);
+    return (
+        <label className='text-xs text-muted space-y-1'>
+            <span className='block'>{label}</span>
+            <Input
+                type='date'
+                aria-label={`${label} date`}
+                value={draft}
+                min={min}
+                max={max}
+                onChange={(event) => setDraft(event.target.value)}
+                onBlur={() => {
+                    if (draft !== value) commit(draft);
+                }}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter') event.currentTarget.blur();
+                }}
+            />
+        </label>
+    );
+}
 
 export default function DateRangeBar({
     filters,
@@ -8,6 +32,7 @@ export default function DateRangeBar({
     update,
     maxDays = 366,
     realtime = false,
+    revenue = false,
     comparison = true,
 }) {
     const { colleges } = useColleges();
@@ -18,6 +43,13 @@ export default function DateRangeBar({
         !filters.custom && filters.to === today && presets.includes(days)
             ? String(days)
             : 'custom';
+    const platformOptions = [
+        { value: '', label: 'All platforms' },
+        { value: 'android', label: 'Android' },
+        { value: 'web', label: 'Web' },
+        { value: 'blog', label: 'Blog' },
+        ...(!realtime ? [{ value: 'server', label: 'Server events' }] : []),
+    ];
     return (
         <div className='bg-sheet border border-line rounded-xl p-4 space-y-3 mb-6'>
             <div className='flex flex-wrap items-end gap-3'>
@@ -28,18 +60,24 @@ export default function DateRangeBar({
                             <Select
                                 aria-label='Date range preset'
                                 value={selected}
-                                onChange={(event) => {
-                                    if (event.target.value !== 'custom')
-                                        update({
-                                            from: shiftDay(
-                                                today,
-                                                1 - Number(event.target.value),
-                                            ),
-                                            to: today,
-                                            range: '',
-                                        });
-                                    else update({ range: 'custom' });
-                                }}
+                                onChange={(event) =>
+                                    update(
+                                        event.target.value === 'custom'
+                                            ? { range: 'custom' }
+                                            : {
+                                                  from: shiftDay(
+                                                      today,
+                                                      1 -
+                                                          Number(
+                                                              event.target
+                                                                  .value,
+                                                          ),
+                                                  ),
+                                                  to: today,
+                                                  range: '',
+                                              },
+                                    )
+                                }
                             >
                                 {presets.map((value) => (
                                     <option key={value} value={value}>
@@ -49,37 +87,21 @@ export default function DateRangeBar({
                                 <option value='custom'>Custom range</option>
                             </Select>
                         </label>
-                        <label className='text-xs text-muted space-y-1'>
-                            <span className='block'>From</span>
-                            <Input
-                                type='date'
-                                aria-label='From date'
-                                value={filters.from}
-                                max={filters.to < today ? filters.to : today}
-                                onChange={(event) =>
-                                    update({
-                                        from: event.target.value,
-                                        range: 'custom',
-                                    })
-                                }
-                            />
-                        </label>
-                        <label className='text-xs text-muted space-y-1'>
-                            <span className='block'>To</span>
-                            <Input
-                                type='date'
-                                aria-label='To date'
-                                value={filters.to}
-                                min={filters.from}
-                                max={today}
-                                onChange={(event) =>
-                                    update({
-                                        to: event.target.value,
-                                        range: 'custom',
-                                    })
-                                }
-                            />
-                        </label>
+                        <DateField
+                            key={`from:${filters.from}`}
+                            label='From'
+                            value={filters.from}
+                            max={filters.to < today ? filters.to : today}
+                            commit={(from) => update({ from, range: 'custom' })}
+                        />
+                        <DateField
+                            key={`to:${filters.to}`}
+                            label='To'
+                            value={filters.to}
+                            min={filters.from}
+                            max={today}
+                            commit={(to) => update({ to, range: 'custom' })}
+                        />
                     </>
                 )}
                 <label className='text-xs text-muted space-y-1 min-w-44'>
@@ -110,23 +132,19 @@ export default function DateRangeBar({
                         ))}
                     </Select>
                 </label>
-                <label className='text-xs text-muted space-y-1'>
-                    <span className='block'>Platform</span>
-                    <Select
-                        aria-label='Platform filter'
-                        value={filters.platform}
-                        onChange={(event) =>
-                            update({ platform: event.target.value })
-                        }
-                        options={[
-                            { value: '', label: 'All platforms' },
-                            { value: 'android', label: 'Android' },
-                            { value: 'web', label: 'Web' },
-                            { value: 'blog', label: 'Blog' },
-                            { value: 'server', label: 'Server events' },
-                        ]}
-                    />
-                </label>
+                {!revenue && (
+                    <label className='text-xs text-muted space-y-1'>
+                        <span className='block'>Platform</span>
+                        <Select
+                            aria-label='Platform filter'
+                            value={filters.platform}
+                            onChange={(event) =>
+                                update({ platform: event.target.value })
+                            }
+                            options={platformOptions}
+                        />
+                    </label>
+                )}
                 {!realtime && comparison && (
                     <Switch
                         checked={filters.compare}
@@ -141,7 +159,13 @@ export default function DateRangeBar({
                     </span>
                 )}
             </div>
-            {error && !realtime && (
+            {revenue && (
+                <p className='text-xs text-muted'>
+                    Revenue is recorded by the server. The platform filter does
+                    not apply.
+                </p>
+            )}
+            {error && (
                 <div
                     role='alert'
                     className='flex flex-wrap items-center gap-3 text-sm text-bad-ink'
@@ -149,14 +173,7 @@ export default function DateRangeBar({
                     {error}
                     <Button
                         size='sm'
-                        onClick={() =>
-                            update({
-                                from: shiftDay(today, -27),
-                                to: today,
-                                platform: '',
-                                college: '',
-                            })
-                        }
+                        onClick={() => update(resetFilters(today))}
                     >
                         Reset filters
                     </Button>

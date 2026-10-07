@@ -1,3 +1,4 @@
+import AnalyticsAccess from './components/Analytics/v2/AnalyticsAccess';
 import {
     BrowserRouter as Router,
     Routes,
@@ -23,6 +24,7 @@ const Login = lazy(() => import('./pages/Auth/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Analytics = lazy(() => import('./pages/Analytics/Analytics'));
+const AnalyticsChatbot = lazy(() => import('./pages/Analytics/Chatbot'));
 const AnalyticsAudience = lazy(() => import('./pages/Analytics/Audience'));
 const AnalyticsContent = lazy(() => import('./pages/Analytics/Content'));
 const AnalyticsAcademics = lazy(() => import('./pages/Analytics/Academics'));
@@ -181,35 +183,75 @@ function App() {
 
                                         <Route
                                             path='/analytics'
-                                            element={<Analytics />}
+                                            element={
+                                                <AnalyticsAccess>
+                                                    <Analytics />
+                                                </AnalyticsAccess>
+                                            }
+                                        />
+                                        <Route
+                                            path='/analytics/chatbot'
+                                            element={
+                                                <AnalyticsAccess>
+                                                    <AnalyticsChatbot />
+                                                </AnalyticsAccess>
+                                            }
                                         />
                                         <Route
                                             path='/analytics/audience'
-                                            element={<AnalyticsAudience />}
+                                            element={
+                                                <AnalyticsAccess>
+                                                    <AnalyticsAudience />
+                                                </AnalyticsAccess>
+                                            }
                                         />
                                         <Route
                                             path='/analytics/content'
-                                            element={<AnalyticsContent />}
+                                            element={
+                                                <AnalyticsAccess>
+                                                    <AnalyticsContent />
+                                                </AnalyticsAccess>
+                                            }
                                         />
                                         <Route
                                             path='/analytics/content/:type'
-                                            element={<AnalyticsContent />}
+                                            element={
+                                                <AnalyticsAccess>
+                                                    <AnalyticsContent />
+                                                </AnalyticsAccess>
+                                            }
                                         />
                                         <Route
                                             path='/analytics/academics'
-                                            element={<AnalyticsAcademics />}
+                                            element={
+                                                <AnalyticsAccess>
+                                                    <AnalyticsAcademics />
+                                                </AnalyticsAccess>
+                                            }
                                         />
                                         <Route
                                             path='/analytics/revenue'
-                                            element={<AnalyticsRevenue />}
+                                            element={
+                                                <AnalyticsAccess>
+                                                    <AnalyticsRevenue />
+                                                </AnalyticsAccess>
+                                            }
                                         />
                                         <Route
                                             path='/analytics/realtime'
-                                            element={<AnalyticsRealtime />}
+                                            element={
+                                                <AnalyticsAccess>
+                                                    <AnalyticsRealtime />
+                                                </AnalyticsAccess>
+                                            }
                                         />
                                         <Route
                                             path='/analytics/open/:type/:id'
-                                            element={<AnalyticsOpenContent />}
+                                            element={
+                                                <AnalyticsAccess>
+                                                    <AnalyticsOpenContent />
+                                                </AnalyticsAccess>
+                                            }
                                         />
 
                                         <Route

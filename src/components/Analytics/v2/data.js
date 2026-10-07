@@ -31,7 +31,12 @@ export const validDay = (value) =>
     Number.isFinite(Date.parse(value)) &&
     new Date(value).toISOString().slice(0, 10) === value;
 
-export function readFilters(search, maxDays = 366, today = dayKey()) {
+export function readFilters(
+    search,
+    maxDays = 366,
+    today = dayKey(),
+    { realtime = false, revenue = false } = {},
+) {
     const filters = {
         from: search.get('from') || shiftDay(today, -27),
         to: search.get('to') || today,
@@ -51,7 +56,12 @@ export function readFilters(search, maxDays = 366, today = dayKey()) {
         error = `Choose 1–${maxDays} days ending today or earlier (IST).`;
     else if (
         filters.platform &&
-        !['android', 'web', 'blog', 'server'].includes(filters.platform)
+        !revenue &&
+        !(
+            realtime
+                ? ['android', 'web', 'blog']
+                : ['android', 'web', 'blog', 'server']
+        ).includes(filters.platform)
     )
         error = 'Choose a supported platform.';
     else if (filters.college && !/^[a-z0-9-]{1,100}$/.test(filters.college))
@@ -63,7 +73,7 @@ export function reportParams(filters, kind = 'period') {
     return {
         ...(kind !== 'realtime' ? { from: filters.from, to: filters.to } : {}),
         ...(filters.college ? { college: filters.college } : {}),
-        ...(filters.platform && kind !== 'growth'
+        ...(filters.platform && !['growth', 'revenue'].includes(kind)
             ? { platform: filters.platform }
             : {}),
     };
@@ -177,3 +187,57 @@ export const hasValues = (series, fields) =>
                 Number(row[field]) !== 0 && Number.isFinite(Number(row[field])),
         ),
     );
+
+export function filterSearch(previous, changes) {
+    const next = new URLSearchParams(previous);
+    for (const [key, value] of Object.entries(changes)) {
+        if (value === '' || value == null) next.delete(key);
+        else next.set(key, String(value));
+    }
+    return next;
+}
+
+export function resetFilters(today = dayKey()) {
+    return {
+        from: shiftDay(today, -27),
+        to: today,
+        platform: '',
+        college: '',
+        range: '',
+    };
+}
+
+export function debounceTask(
+    run,
+    delay = 350,
+    schedule = setTimeout,
+    cancel = clearTimeout,
+) {
+    let timer;
+    const update = (value) => {
+        cancel(timer);
+        timer = schedule(() => run(value), delay);
+    };
+    update.cancel = () => cancel(timer);
+    return update;
+}
+
+export const canAccessAnalytics = (user) =>
+    ['Admin', 'Moderator'].includes(user?.role);
+export const analyticsLink = (path, search = '') => `${path}${search}`;
+export const percent = (value) =>
+    value == null || !Number.isFinite(Number(value))
+        ? '—'
+        : `${number(value)}%`;
+export const deltaTone = (delta, increaseIsBad = false) =>
+    delta > 0 !== increaseIsBad ? 'text-ok-ink' : 'text-bad-ink';
+export const contentTitle = (row) =>
+    row.title || `${typeLabel(row._id.type)} item`;
+export function typeBreakdown(values = {}) {
+    return CONTENT_TYPES.map(({ value: type, label }) => ({
+        type,
+        label,
+        current: values.current?.find((row) => row.type === type)?.views || 0,
+        previous: values.previous?.find((row) => row.type === type)?.views || 0,
+    }));
+}

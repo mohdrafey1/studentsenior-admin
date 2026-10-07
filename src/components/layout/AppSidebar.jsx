@@ -6,7 +6,7 @@ import { useColleges } from '../../context/CollegeContext';
 import CollegeSwitcher from './CollegeSwitcher';
 import {
     COLLEGE_ITEMS,
-    NAV_GROUPS,
+    visibleNavGroups,
     WORKSPACE_ITEMS,
     isPathActive,
 } from './navConfig';
@@ -68,12 +68,13 @@ function SubItem({ to, label, active, disabled, onNavigate }) {
  * college's content, then collapsible Money, People, Catalog and Blog groups.
  */
 export default function AppSidebar({ onNavigate }) {
-    const { pathname } = useLocation();
+    const { pathname, search } = useLocation();
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const { currentSlug, urlSlug } = useColleges();
 
-    const activeGroup = NAV_GROUPS.find((group) =>
+    const groups = visibleNavGroups(user);
+    const activeGroup = groups.find((group) =>
         group.items.some((item) => isPathActive(pathname, item.to, item.end)),
     )?.id;
 
@@ -187,7 +188,7 @@ export default function AppSidebar({ onNavigate }) {
                 </div>
 
                 <div className='flex flex-col gap-0.5'>
-                    {NAV_GROUPS.map((group) => {
+                    {groups.map((group) => {
                         const Icon = group.icon;
                         const open = openGroups.has(group.id);
                         return (
@@ -224,7 +225,11 @@ export default function AppSidebar({ onNavigate }) {
                                     group.items.map((item) => (
                                         <SubItem
                                             key={item.to}
-                                            to={item.to}
+                                            to={
+                                                group.id === 'analytics'
+                                                    ? `${item.to}${search}`
+                                                    : item.to
+                                            }
                                             label={item.label}
                                             active={isPathActive(
                                                 pathname,

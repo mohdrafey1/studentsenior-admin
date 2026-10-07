@@ -9,6 +9,7 @@ export default function QueryPanel({
     note,
     action,
     className = '',
+    emptyWindow = 'this range',
 }) {
     return (
         <Panel title={title} action={action} className={className}>
@@ -24,8 +25,12 @@ export default function QueryPanel({
             ) : empty ? (
                 <EmptyState
                     icon={Activity}
-                    title='Analytics has no data yet for this range.'
-                    description='Try another period or check back after new activity is recorded.'
+                    title={`Analytics has no data yet for ${emptyWindow === 'last 30 minutes' ? 'the ' : ''}${emptyWindow}.`}
+                    description={
+                        emptyWindow === 'last 30 minutes'
+                            ? 'Check back after new activity is recorded.'
+                            : 'Try another period or check back after new activity is recorded.'
+                    }
                 />
             ) : (
                 children

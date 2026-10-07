@@ -8,8 +8,8 @@ import { Button } from '../../components/ui';
 import { number } from '../../components/Analytics/v2/data';
 
 export default function Realtime() {
-    const controls = useAnalyticsFilters();
-    const query = useRealtimeAnalytics(controls.filters);
+    const controls = useAnalyticsFilters(366, { realtime: true });
+    const query = useRealtimeAnalytics(controls);
     const data = query.data;
     return (
         <ReportLayout
@@ -21,6 +21,7 @@ export default function Realtime() {
             <QueryPanel
                 title='Active actors · last 30 minutes'
                 query={query}
+                emptyWindow='last 30 minutes'
                 empty={!data?.activeActors}
                 action={
                     <Button
@@ -40,6 +41,7 @@ export default function Realtime() {
             <QueryPanel
                 title='Active screens'
                 query={query}
+                emptyWindow='last 30 minutes'
                 empty={!data?.screens?.length}
             >
                 <BreakdownBars
@@ -52,6 +54,7 @@ export default function Realtime() {
             <QueryPanel
                 title='Viewed content'
                 query={query}
+                emptyWindow='last 30 minutes'
                 empty={!data?.content?.length}
                 note='Provisional raw content_view events; final view counts may be lower.'
             >

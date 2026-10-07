@@ -50,6 +50,7 @@ export const COLLEGE_ITEMS = [
 export const NAV_GROUPS = [
     {
         id: 'analytics',
+        roles: ['Admin', 'Moderator'],
         label: 'Analytics',
         icon: BarChart3,
         items: [
@@ -59,6 +60,7 @@ export const NAV_GROUPS = [
             { label: 'Academics', to: '/analytics/academics' },
             { label: 'Revenue', to: '/analytics/revenue' },
             { label: 'Realtime', to: '/analytics/realtime' },
+            { label: 'Chatbot', to: '/analytics/chatbot' },
         ],
     },
     {
@@ -112,3 +114,8 @@ export const NAV_GROUPS = [
 /** True when `pathname` is `to` or a page below it. */
 export const isPathActive = (pathname, to, end = false) =>
     end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
+
+export const visibleNavGroups = (user) =>
+    NAV_GROUPS.filter(
+        (group) => !group.roles || group.roles.includes(user?.role),
+    );

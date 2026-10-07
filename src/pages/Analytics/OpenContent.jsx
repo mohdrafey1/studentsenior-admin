@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import api, { apiErrorMessage } from '../../utils/api';
 import {
     Button,
@@ -13,6 +13,7 @@ import { contentDestination } from '../../components/Analytics/v2/contentDestina
 export default function OpenContent() {
     const { type, id } = useParams();
     const navigate = useNavigate();
+    const { search } = useLocation();
     const [error, setError] = useState(null);
     const [attempt, setAttempt] = useState(0);
     useEffect(() => {
@@ -22,13 +23,7 @@ export default function OpenContent() {
             api.get(path, { ...options, signal: controller.signal });
         const open = async () => {
             try {
-                const response = await get('/college');
-                const path = await contentDestination(
-                    type,
-                    id,
-                    response.data.data || [],
-                    get,
-                );
+                const path = await contentDestination(type, id, get);
                 if (!controller.signal.aborted)
                     navigate(path, { replace: true });
             } catch (error) {
@@ -59,7 +54,7 @@ export default function OpenContent() {
                                 <Button onClick={() => setAttempt(attempt + 1)}>
                                     Try again
                                 </Button>
-                                <Button to='/analytics/content/all'>
+                                <Button to={`/analytics/content/all${search}`}>
                                     Back to content
                                 </Button>
                             </div>
@@ -69,7 +64,9 @@ export default function OpenContent() {
                     <>
                         <SkeletonRows rows={3} />
                         <div className='p-5'>
-                            <Button to='/analytics/content/all'>Cancel</Button>
+                            <Button to={`/analytics/content/all${search}`}>
+                                Cancel
+                            </Button>
                         </div>
                     </>
                 )}

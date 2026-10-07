@@ -7,6 +7,10 @@ const ROUTES = [
     [['dashboard'], [['Home']]],
     [['analytics'], [['Analytics'], ['Overview']]],
     [
+        ['analytics', 'chatbot'],
+        [['Analytics', '/analytics'], ['Chatbot']],
+    ],
+    [
         ['analytics', 'audience'],
         [['Analytics', '/analytics'], ['Audience']],
     ],

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import useAnalyticsFilters from '../../hooks/useAnalyticsFilters';
 import useAnalyticsQuery from '../../hooks/useAnalyticsQuery';
 import useRealtimeAnalytics from '../../hooks/useRealtimeAnalytics';
@@ -19,6 +19,7 @@ import {
 
 export default function Analytics() {
     const controls = useAnalyticsFilters();
+    const { search } = useLocation();
     const { params, filters, error } = controls;
     const options = { enabled: !error };
     const overview = useAnalyticsQuery(
@@ -26,18 +27,13 @@ export default function Analytics() {
         params,
         options,
     );
-    const audience = useAnalyticsQuery(
-        '/analytics/v2/audience',
-        params,
-        options,
-    );
     const content = useAnalyticsQuery('/analytics/v2/content', params, options);
     const growth = useAnalyticsQuery(
         '/analytics/v2/growth',
-        reportParams(filters, 'growth'),
+        reportParams(controls.requestFilters, 'growth'),
         options,
     );
-    const realtime = useRealtimeAnalytics(filters);
+    const realtime = useRealtimeAnalytics(controls);
     const { colleges } = useColleges();
     const growthSeries = (growth.data?.series || []).map((row) => ({
         day: row.day,
@@ -81,7 +77,10 @@ export default function Analytics() {
                 />
             </QueryPanel>
             <div className='grid xl:grid-cols-2 gap-5'>
-                <ContentTypeBreakdown params={params} overview={overview} />
+                <ContentTypeBreakdown
+                    overview={overview}
+                    compare={filters.compare}
+                />
                 <QueryPanel
                     title='Growth of totals'
                     query={growth}
@@ -106,17 +105,17 @@ export default function Analytics() {
             <div className='grid xl:grid-cols-2 gap-5'>
                 <QueryPanel
                     title='Top colleges'
-                    query={audience}
-                    empty={!audience.data?.colleges?.length}
+                    query={overview}
+                    empty={!overview.data?.topColleges?.length}
                     note='Ranked by distinct active actors; an actor may appear in multiple colleges.'
                 >
                     <BreakdownBars
-                        rows={(audience.data?.colleges || []).map((row) => ({
+                        rows={(overview.data?.topColleges || []).map((row) => ({
                             label:
                                 colleges.find(
-                                    (college) => college.slug === row._id,
+                                    (college) => college.slug === row.college,
                                 )?.name ||
-                                row._id ||
+                                row.college ||
                                 'Unassigned',
                             value: row.activeUsers,
                         }))}
@@ -124,11 +123,12 @@ export default function Analytics() {
                 </QueryPanel>
                 <QueryPanel
                     title='Right now'
+                    emptyWindow='last 30 minutes'
                     query={realtime}
                     empty={!realtime.data?.activeActors}
                     action={
                         <Link
-                            to='/analytics/realtime'
+                            to={`/analytics/realtime${search}`}
                             className='text-sm text-link'
                         >
                             Open realtime

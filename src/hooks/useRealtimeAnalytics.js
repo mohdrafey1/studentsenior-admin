@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react';
 import useAnalyticsQuery from './useAnalyticsQuery';
-import { reportParams } from '../components/Analytics/v2/data';
+import { reportParams, stableParams } from '../components/Analytics/v2/data';
 
-export default function useRealtimeAnalytics(filters) {
+export default function useRealtimeAnalytics(controls) {
     const [visible, setVisible] = useState(
         () => document.visibilityState !== 'hidden',
     );
-    const query = useAnalyticsQuery(
-        '/analytics/v2/realtime',
-        reportParams(filters, 'realtime'),
-        { enabled: visible, ttl: 0 },
-    );
-    const { refresh } = query;
+    const params = reportParams(controls.requestFilters, 'realtime');
+    const key = stableParams(params);
+    const [failedKey, setFailedKey] = useState(null);
+    const enabled = visible && !controls.error;
+    const query = useAnalyticsQuery('/analytics/v2/realtime', params, {
+        enabled: enabled && failedKey !== key,
+        ttl: 0,
+    });
+    const { refresh, error } = query;
+    useEffect(() => {
+        if (error) setFailedKey(key);
+    }, [error, key]);
     useEffect(() => {
         const onVisibility = () =>
             setVisible(document.visibilityState !== 'hidden');
@@ -20,9 +26,14 @@ export default function useRealtimeAnalytics(filters) {
             document.removeEventListener('visibilitychange', onVisibility);
     }, []);
     useEffect(() => {
-        if (!visible) return;
+        if (!enabled || error || failedKey === key) return;
         const timer = window.setInterval(refresh, 15000);
         return () => window.clearInterval(timer);
-    }, [visible, refresh]);
-    return { ...query, visible };
+    }, [enabled, error, failedKey, key, refresh]);
+    const retry = () => {
+        if (!enabled) return;
+        setFailedKey(null);
+        refresh();
+    };
+    return { ...query, refresh: retry, visible, paused: failedKey === key };
 }

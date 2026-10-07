@@ -11,7 +11,7 @@ const isMac =
 
 /** Breadcrumbs on the left; search and the theme switch on the right. */
 export default function TopBar({ onOpenMenu, onOpenSearch }) {
-    const { pathname } = useLocation();
+    const { pathname, search } = useLocation();
     const { currentCollege } = useColleges();
     const { isDark, toggleTheme } = useTheme();
     const crumbs = buildBreadcrumbs(pathname, currentCollege?.name);
@@ -40,7 +40,11 @@ export default function TopBar({ onOpenMenu, onOpenSearch }) {
                         )}
                         {crumb.to ? (
                             <Link
-                                to={crumb.to}
+                                to={
+                                    crumb.to.startsWith('/analytics')
+                                        ? `${crumb.to}${search}`
+                                        : crumb.to
+                                }
                                 className='truncate hover:text-ink transition-colors'
                             >
                                 {crumb.label}

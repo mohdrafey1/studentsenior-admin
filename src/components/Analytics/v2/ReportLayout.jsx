@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { PageHeader } from '../../ui';
 import DateRangeBar from './DateRangeBar';
+import { analyticsLink } from './data';
 
 const pages = [
     ['', 'Overview'],
@@ -9,6 +10,7 @@ const pages = [
     ['/academics', 'Academics'],
     ['/revenue', 'Revenue'],
     ['/realtime', 'Realtime'],
+    ['/chatbot', 'Chatbot'],
 ];
 
 export default function ReportLayout({
@@ -16,6 +18,8 @@ export default function ReportLayout({
     description,
     controls,
     realtime = false,
+    revenue = false,
+    filtersVisible = true,
     children,
 }) {
     const { search, pathname } = useLocation();
@@ -33,7 +37,7 @@ export default function ReportLayout({
                 {pages.map(([path, label]) => (
                     <NavLink
                         key={path}
-                        to={`/analytics${path}${search}`}
+                        to={analyticsLink(`/analytics${path}`, search)}
                         end={!path}
                         className={({ isActive }) =>
                             `text-sm whitespace-nowrap pb-1 ${isActive || (path.startsWith('/content') && pathname.startsWith('/analytics/content')) ? 'font-semibold text-ink' : 'text-muted hover:text-link'}`
@@ -43,9 +47,15 @@ export default function ReportLayout({
                     </NavLink>
                 ))}
             </nav>
-            <DateRangeBar {...controls} realtime={realtime} />
-            {(!controls.error || realtime) && children}
-            {!realtime && (
+            {filtersVisible && (
+                <DateRangeBar
+                    {...controls}
+                    realtime={realtime}
+                    revenue={revenue}
+                />
+            )}
+            {!controls.error && children}
+            {!realtime && filtersVisible && (
                 <p className='text-xs text-muted'>
                     Inclusive dates in Asia/Kolkata. Activity rollups usually
                     lag by up to 6 minutes. Anonymous history stays separate
