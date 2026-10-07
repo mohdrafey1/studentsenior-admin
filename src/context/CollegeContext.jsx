@@ -16,7 +16,7 @@ const LAST_COLLEGE_KEY = 'ss_admin_last_college';
 // First URL segments that belong to the console itself, not to a college.
 const RESERVED_SEGMENTS = new Set([
     'dashboard',
-    'analytics',
+    'analytics', // Reserves every /analytics/* report and content resolver.
     'tasks',
     'notifications',
     'affiliate-products',

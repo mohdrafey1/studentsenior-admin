@@ -45,6 +45,13 @@
     --ss-neutral-soft: #efede8;
     --ss-neutral-ink: #45423c;
 
+    --ss-chart-1: #245bc4;
+    --ss-chart-2: #2d8054;
+    --ss-chart-3: #a36916;
+    --ss-chart-4: #97548d;
+    --ss-chart-5: #bb4c3e;
+    --ss-chart-6: #247f8a;
+
     color-scheme: light;
 }
 
@@ -82,6 +89,13 @@
     --ss-neutral: #8c877d;
     --ss-neutral-soft: #2a2926;
     --ss-neutral-ink: #c9c5bc;
+
+    --ss-chart-1: #8fb2f2;
+    --ss-chart-2: #7fd1a0;
+    --ss-chart-3: #edba67;
+    --ss-chart-4: #d7a1ce;
+    --ss-chart-5: #f09a90;
+    --ss-chart-6: #77c9d3;
 
     color-scheme: dark;
 }

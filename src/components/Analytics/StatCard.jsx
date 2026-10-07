@@ -5,7 +5,7 @@ import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
  * is a whole-number percentage; it shows with an arrow and a sign so the
  * direction never relies on colour alone.
  */
-export default function StatCard({ label, value, note, delta }) {
+export default function StatCard({ label, value, note, delta, sparkline }) {
     const hasDelta = delta !== undefined && delta !== null;
     const Arrow = delta < 0 ? ArrowDownRight : ArrowUpRight;
     return (
@@ -14,6 +14,7 @@ export default function StatCard({ label, value, note, delta }) {
             <span className='font-serif font-bold text-[24px] sm:text-[30px] leading-none text-ink break-words'>
                 {value}
             </span>
+            {sparkline}
             {(hasDelta || note) && (
                 <span className='flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12.5px] text-muted'>
                     {hasDelta && delta !== 0 && (

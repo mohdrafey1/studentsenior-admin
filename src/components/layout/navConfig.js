@@ -13,7 +13,6 @@ import {
 /** Console-wide pages, always visible at the top of the sidebar. */
 export const WORKSPACE_ITEMS = [
     { id: 'home', label: 'Home', to: '/dashboard', icon: Home },
-    { id: 'analytics', label: 'Analytics', to: '/analytics', icon: BarChart3 },
     {
         id: 'reports',
         label: 'Reports',
@@ -49,6 +48,19 @@ export const COLLEGE_ITEMS = [
 
 /** Collapsible groups below the college section. */
 export const NAV_GROUPS = [
+    {
+        id: 'analytics',
+        label: 'Analytics',
+        icon: BarChart3,
+        items: [
+            { label: 'Overview', to: '/analytics', end: true },
+            { label: 'Audience', to: '/analytics/audience' },
+            { label: 'Content', to: '/analytics/content' },
+            { label: 'Academics', to: '/analytics/academics' },
+            { label: 'Revenue', to: '/analytics/revenue' },
+            { label: 'Realtime', to: '/analytics/realtime' },
+        ],
+    },
     {
         id: 'money',
         label: 'Money',

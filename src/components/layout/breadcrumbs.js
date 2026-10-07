@@ -5,7 +5,35 @@ import { COLLEGE_ITEMS } from './navConfig';
 // Each trail entry is [label, link or null].
 const ROUTES = [
     [['dashboard'], [['Home']]],
-    [['analytics'], [['Analytics']]],
+    [['analytics'], [['Analytics'], ['Overview']]],
+    [
+        ['analytics', 'audience'],
+        [['Analytics', '/analytics'], ['Audience']],
+    ],
+    [
+        ['analytics', 'content'],
+        [['Analytics', '/analytics'], ['Content']],
+    ],
+    [
+        ['analytics', 'content', ':id'],
+        [['Analytics', '/analytics'], ['Content']],
+    ],
+    [
+        ['analytics', 'academics'],
+        [['Analytics', '/analytics'], ['Academics']],
+    ],
+    [
+        ['analytics', 'revenue'],
+        [['Analytics', '/analytics'], ['Revenue']],
+    ],
+    [
+        ['analytics', 'realtime'],
+        [['Analytics', '/analytics'], ['Realtime']],
+    ],
+    [
+        ['analytics', 'open', ':id', ':id'],
+        [['Analytics', '/analytics'], ['Open content']],
+    ],
     [['tasks'], [['Tasks']]],
     [['notifications'], [['Push notifications']]],
     [['reports'], [['Reports']]],

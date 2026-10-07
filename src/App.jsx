@@ -23,6 +23,14 @@ const Login = lazy(() => import('./pages/Auth/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Analytics = lazy(() => import('./pages/Analytics/Analytics'));
+const AnalyticsAudience = lazy(() => import('./pages/Analytics/Audience'));
+const AnalyticsContent = lazy(() => import('./pages/Analytics/Content'));
+const AnalyticsAcademics = lazy(() => import('./pages/Analytics/Academics'));
+const AnalyticsRevenue = lazy(() => import('./pages/Analytics/Revenue'));
+const AnalyticsRealtime = lazy(() => import('./pages/Analytics/Realtime'));
+const AnalyticsOpenContent = lazy(
+    () => import('./pages/Analytics/OpenContent'),
+);
 const Notifications = lazy(() => import('./pages/Notifications'));
 
 // Financial
@@ -174,6 +182,34 @@ function App() {
                                         <Route
                                             path='/analytics'
                                             element={<Analytics />}
+                                        />
+                                        <Route
+                                            path='/analytics/audience'
+                                            element={<AnalyticsAudience />}
+                                        />
+                                        <Route
+                                            path='/analytics/content'
+                                            element={<AnalyticsContent />}
+                                        />
+                                        <Route
+                                            path='/analytics/content/:type'
+                                            element={<AnalyticsContent />}
+                                        />
+                                        <Route
+                                            path='/analytics/academics'
+                                            element={<AnalyticsAcademics />}
+                                        />
+                                        <Route
+                                            path='/analytics/revenue'
+                                            element={<AnalyticsRevenue />}
+                                        />
+                                        <Route
+                                            path='/analytics/realtime'
+                                            element={<AnalyticsRealtime />}
+                                        />
+                                        <Route
+                                            path='/analytics/open/:type/:id'
+                                            element={<AnalyticsOpenContent />}
                                         />
 
                                         <Route
