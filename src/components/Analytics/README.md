@@ -12,6 +12,8 @@ academic tree, request states, content links and user activity panel.
 - `useAnalyticsQuery` uses the existing authenticated axios instance, cancels
   requests on navigation, and maintains a bounded, identity-scoped memory cache.
   Academic catalog labels use a separate cache with a 10-minute lifetime.
+  Loading panels remain visible during the filter debounce. Each endpoint checks
+  its own parameters, so unrelated filter edits leave its pending request intact.
 - Overview makes four analytics requests: overview (including type and college
   breakdowns), growth, all content, and realtime.
 - Growth ignores the platform filter because inventory has no platform dimension.
@@ -23,10 +25,12 @@ academic tree, request states, content links and user activity panel.
   young to reach each day. Incomplete weekly cohort intervals are marked `*`.
 - Realtime reads provisional raw events in a rolling 30-minute window and polls
   every 15 seconds only while the tab is visible and filters are valid. An error
-  pauses polling until Retry; a server platform URL selects all platforms here.
+  pauses polling until Retry; a server platform URL selects all platforms here
+  and in the Overview realtime panel.
 - Content links use one destination request to resolve the canonical editor.
   Tables display titles and offer CSV export through the shared CSV utility,
-  which prefixes spreadsheet formula triggers to keep titles as text.
+  which prefixes spreadsheet formula triggers to keep titles as text while
+  preserving numeric values and decimal strings for calculations.
 - The Chatbot tab reuses the existing all-time chatbot report and its 30-day
   activity chart. It hides filters and does not add date defaults to its URL.
 - Only Admin and Moderator roles see Analytics in navigation or mount reports.
@@ -44,3 +48,5 @@ Tests cover date validation, debounce, endpoint-specific filters, cache isolatio
 weekly aggregation, retention, single-request destinations, role access and CSV.
 Rendering regressions compile JSX using Vite’s existing esbuild dependency and
 exercise the real UI components with fixture app contexts.
+Hook regressions render React in jsdom with deferred network fixtures to verify
+loading states and request cancellation across filter changes.

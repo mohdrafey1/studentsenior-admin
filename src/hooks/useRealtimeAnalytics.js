@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import useAnalyticsQuery from './useAnalyticsQuery';
-import { reportParams, stableParams } from '../components/Analytics/v2/data';
+import {
+    reportParams,
+    reportReady,
+    stableParams,
+} from '../components/Analytics/v2/data';
 
 export default function useRealtimeAnalytics(controls) {
     const [visible, setVisible] = useState(
@@ -9,7 +13,7 @@ export default function useRealtimeAnalytics(controls) {
     const params = reportParams(controls.requestFilters, 'realtime');
     const key = stableParams(params);
     const [failedKey, setFailedKey] = useState(null);
-    const enabled = visible && controls.ready;
+    const enabled = visible && reportReady(controls, 'realtime');
     const query = useAnalyticsQuery('/analytics/v2/realtime', params, {
         enabled: enabled && failedKey !== key,
         ttl: 0,

@@ -16,6 +16,7 @@ import {
     hasValues,
     number,
     reportParams,
+    reportReady,
 } from '../../components/Analytics/v2/data';
 
 export default function Analytics() {
@@ -32,7 +33,7 @@ export default function Analytics() {
     const growth = useAnalyticsQuery(
         '/analytics/v2/growth',
         reportParams(controls.requestFilters, 'growth'),
-        options,
+        { enabled: reportReady(controls, 'growth') },
     );
     const realtime = useRealtimeAnalytics(controls);
     const { colleges } = useColleges();

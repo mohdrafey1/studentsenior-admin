@@ -256,7 +256,8 @@ test('CSV formula prefixes are escaped before RFC quoting without corrupting nor
     const risky = [
         '=1+1',
         '+SUM(A1)',
-        '-10',
+        '-10+1',
+        '+919876543210',
         '@SUM(A1)',
         '\t=1+1',
         '\r=1+1',
@@ -275,4 +276,18 @@ test('CSV formula prefixes are escaped before RFC quoting without corrupting nor
             .data[0][0],
         'Ordinary, "title"',
     );
+});
+
+test('CSV keeps negative numbers and numeric strings summable', () => {
+    for (const value of [-50, -12.5, 0, 20, '-50', '-12.5', '0', '20.25']) {
+        const cell = escapeCsvCell(value);
+        assert.equal(cell, String(value));
+        const parsed = Papa.parse(cell, {
+            delimiter: ',',
+            dynamicTyping: true,
+        });
+        assert.equal(parsed.data[0][0], Number(value));
+    }
+    assert.equal(escapeCsvCell('+91'), "'+91");
+    assert.equal(escapeCsvCell('-50 points'), "'-50 points");
 });

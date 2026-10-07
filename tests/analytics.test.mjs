@@ -453,3 +453,35 @@ test('zero deltas always have a neutral tone', () => {
     assert.equal(deltaTone(0, true), 'text-ink-2');
     assert.equal(deltaTone(-0, true), 'text-ink-2');
 });
+
+test('analytics links preserve filters without URLSearchParams.size in older Safari', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(
+        URLSearchParams.prototype,
+        'size',
+    );
+    Object.defineProperty(URLSearchParams.prototype, 'size', {
+        configurable: true,
+        get: () => undefined,
+    });
+    try {
+        assert.equal(
+            analyticsLink(
+                '/analytics/audience',
+                '?college=sample&platform=web&ignored=1',
+            ),
+            '/analytics/audience?college=sample&platform=web',
+        );
+        assert.equal(
+            analyticsLink('/analytics/audience', '?ignored=1'),
+            '/analytics/audience',
+        );
+    } finally {
+        if (descriptor)
+            Object.defineProperty(
+                URLSearchParams.prototype,
+                'size',
+                descriptor,
+            );
+        else delete URLSearchParams.prototype.size;
+    }
+});

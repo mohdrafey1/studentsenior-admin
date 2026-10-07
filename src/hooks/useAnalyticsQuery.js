@@ -94,5 +94,9 @@ export default function useAnalyticsQuery(
         state.key === key && state.owner === token
             ? state
             : { data: null, loading: enabled, error: null };
-    return { ...result, loading: enabled && result.loading, refresh };
+    return {
+        ...result,
+        loading: result.loading && (enabled || state.key === key),
+        refresh,
+    };
 }

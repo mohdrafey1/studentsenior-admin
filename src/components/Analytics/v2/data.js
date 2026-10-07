@@ -78,7 +78,9 @@ export function reportParams(filters, kind = 'period') {
     return {
         ...(kind !== 'realtime' ? { from: filters.from, to: filters.to } : {}),
         ...(filters.college ? { college: filters.college } : {}),
-        ...(filters.platform && !['growth', 'revenue'].includes(kind)
+        ...(filters.platform &&
+        !['growth', 'revenue'].includes(kind) &&
+        !(kind === 'realtime' && filters.platform === 'server')
             ? { platform: filters.platform }
             : {}),
     };
@@ -244,7 +246,8 @@ export function analyticsLink(path, search = '', pathname = '/analytics') {
     const query = new URLSearchParams();
     for (const key of ANALYTICS_FILTER_KEYS)
         if (source.has(key)) query.set(key, source.get(key));
-    return query.size ? `${path}?${query}` : path;
+    const encoded = query.toString();
+    return encoded ? `${path}?${encoded}` : path;
 }
 
 // A malformed filter must never be cached as the next request. Readiness also
@@ -255,6 +258,11 @@ export const settledFilterRequest = (serialized, settled) => ({
     ready: serialized !== null && serialized === settled,
     requestFilters: JSON.parse(settled || '{}'),
 });
+// Unrelated filter edits must not pause or restart an endpoint's current read.
+export const reportReady = ({ filters, requestFilters, error }, kind) =>
+    !error &&
+    validFilterRequest(filters, error, kind) ===
+        stableParams(reportParams(requestFilters, kind));
 export const percent = (value) =>
     value == null || !Number.isFinite(Number(value))
         ? '—'

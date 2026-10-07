@@ -1,7 +1,8 @@
 export const escapeCsvCell = (value) => {
     if (value === null || value === undefined) return '';
     const raw = String(value);
-    const text = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+    const numeric = typeof value === 'number' || /^-?\d+(\.\d+)?$/.test(raw);
+    const text = !numeric && /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
     return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
