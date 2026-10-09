@@ -10,7 +10,7 @@ import {
     Upload,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import api from '../../utils/api';
+import api, { apiErrorMessage } from '../../utils/api';
 import { formatDateTime, formatNumber } from '../../utils/format';
 import { examTypeLabel } from '../../utils/labels';
 import { relativeTime } from '../../utils/relativeTime';
@@ -32,11 +32,6 @@ import {
 const VERSIONS = [
     ['concise', 'Concise'],
     ['expert', 'Expert'],
-];
-
-const MODELS = [
-    ['gemini-2.5-flash-lite', 'Gemini 2.5 Flash Lite'],
-    ['gemini-2.5-pro', 'Gemini 2.5 Pro'],
 ];
 
 // Full-paper prompts are long; one-line edits are short. Split them so the
@@ -84,7 +79,25 @@ const PyqSolutionPage = () => {
     const [solutionUpdating, setSolutionUpdating] = useState(false);
     const [pyqDetails, setPyqDetails] = useState(null);
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
-    const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash-lite');
+    // The server decides the AI provider (AI_PROVIDER); it lists the models
+    // it can use. Empty means "server default".
+    const [models, setModels] = useState([]);
+    const [selectedModel, setSelectedModel] = useState('');
+
+    useEffect(() => {
+        let active = true;
+        api.get('/quicknotes/models')
+            .then((res) => {
+                const list = Array.isArray(res.data?.data) ? res.data.data : [];
+                if (!active || !list.length) return;
+                setModels(list.map((m) => [m.id, m.name || m.id]));
+                setSelectedModel(list[0].id);
+            })
+            .catch(() => {});
+        return () => {
+            active = false;
+        };
+    }, []);
 
     const fetchData = useCallback(async () => {
         try {
@@ -128,7 +141,7 @@ const PyqSolutionPage = () => {
             setAiLoading(true);
             const res = await api.post('/pyq-solution/generate', {
                 pyqId: pyqid,
-                model: selectedModel,
+                ...(selectedModel && { model: selectedModel }),
             });
 
             if (res.data.success) {
@@ -137,7 +150,12 @@ const PyqSolutionPage = () => {
             }
         } catch (error) {
             console.error('Generation Error:', error);
-            toast.error('Couldn’t generate solutions. Try again.');
+            toast.error(
+                apiErrorMessage(
+                    error,
+                    'Couldn’t generate solutions. Try again.',
+                ),
+            );
         } finally {
             setAiLoading(false);
         }
@@ -163,7 +181,12 @@ const PyqSolutionPage = () => {
             }
         } catch (error) {
             console.error(error);
-            toast.error('Couldn’t refine the solution. Try again.');
+            toast.error(
+                apiErrorMessage(
+                    error,
+                    'Couldn’t refine the solution. Try again.',
+                ),
+            );
         } finally {
             setSolutionUpdating(false);
         }
@@ -332,23 +355,25 @@ const PyqSolutionPage = () => {
                 actions={
                     !solution && (
                         <>
-                            <label className='inline-flex items-center gap-1 h-9 pl-3 pr-1 rounded-lg border border-line-strong bg-sheet text-[13px] text-muted'>
-                                Model
-                                <select
-                                    value={selectedModel}
-                                    onChange={(e) =>
-                                        setSelectedModel(e.target.value)
-                                    }
-                                    disabled={aiLoading}
-                                    className='h-8 pl-1 pr-1 bg-transparent text-[13px] font-medium text-ink rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/30'
-                                >
-                                    {MODELS.map(([value, label]) => (
-                                        <option key={value} value={value}>
-                                            {label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
+                            {models.length > 0 && (
+                                <label className='inline-flex items-center gap-1 h-9 pl-3 pr-1 rounded-lg border border-line-strong bg-sheet text-[13px] text-muted'>
+                                    Model
+                                    <select
+                                        value={selectedModel}
+                                        onChange={(e) =>
+                                            setSelectedModel(e.target.value)
+                                        }
+                                        disabled={aiLoading}
+                                        className='h-8 pl-1 pr-1 bg-transparent text-[13px] font-medium text-ink rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/30'
+                                    >
+                                        {models.map(([value, label]) => (
+                                            <option key={value} value={value}>
+                                                {label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                            )}
                             <Button
                                 icon={Upload}
                                 onClick={() => setIsManualModalOpen(true)}

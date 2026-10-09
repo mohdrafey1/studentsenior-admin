@@ -115,6 +115,9 @@ const QuickNotes = () => {
 
     const [modelsList, setModelsList] = useState(DEFAULT_MODELS);
     const [fetchingModels, setFetchingModels] = useState(false);
+    // 'api' and 'fallback' are Gemini lists; any other source (e.g. 'openai')
+    // means the server's provider is not Gemini and a Gemini key does nothing.
+    const [modelsSource, setModelsSource] = useState('fallback');
 
     const [selectedModel, setSelectedModel] = useState(() => {
         const saved = localStorage.getItem('quicknotes_gemini_model');
@@ -155,6 +158,7 @@ const QuickNotes = () => {
             ) {
                 const fetched = res.data.data;
                 setModelsList(fetched);
+                setModelsSource(res.data.source || 'fallback');
                 // If currently stored selectedModel is invalid or gemini-3.8-flash, sync to first valid model
                 const isCurrentValid = fetched.some(
                     (m) => m.id === selectedModel,
@@ -268,13 +272,13 @@ const QuickNotes = () => {
                 unitNumber: selectedUnit.unitNumber,
                 model: selectedModel,
             };
-            if (apiKey.trim()) {
+            if (usingCustomKey) {
                 payload.apiKey = apiKey.trim();
                 payload.customApiKey = apiKey.trim();
             }
 
             const res = await api.post('/quicknotes/generate', payload, {
-                headers: apiKey.trim()
+                headers: usingCustomKey
                     ? { 'x-gemini-api-key': apiKey.trim() }
                     : {},
             });
@@ -317,13 +321,13 @@ const QuickNotes = () => {
                 userPrompt: chatInput,
                 model: selectedModel,
             };
-            if (apiKey.trim()) {
+            if (usingCustomKey) {
                 payload.apiKey = apiKey.trim();
                 payload.customApiKey = apiKey.trim();
             }
 
             const res = await api.put('/quicknotes/update', payload, {
-                headers: apiKey.trim()
+                headers: usingCustomKey
                     ? { 'x-gemini-api-key': apiKey.trim() }
                     : {},
             });
@@ -432,7 +436,8 @@ const QuickNotes = () => {
     const syllabusLink = syllabus.college?.slug
         ? `/${syllabus.college.slug}/syllabus/${syllabus._id}`
         : null;
-    const usingCustomKey = Boolean(apiKey.trim());
+    const geminiActive = ['api', 'fallback'].includes(modelsSource);
+    const usingCustomKey = geminiActive && Boolean(apiKey.trim());
 
     return (
         <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
@@ -487,23 +492,25 @@ const QuickNotes = () => {
                                 fetchingModels ? '[&>svg]:animate-spin' : ''
                             }
                         />
-                        <Button
-                            icon={KeyRound}
-                            onClick={() => {
-                                setTempKey(apiKey);
-                                setShowKeyModal(true);
-                            }}
-                        >
-                            {usingCustomKey && (
-                                <span
-                                    className='w-[7px] h-[7px] rounded-full bg-warn'
-                                    aria-hidden='true'
-                                />
-                            )}
-                            {usingCustomKey
-                                ? 'Your API key'
-                                : 'Default API key'}
-                        </Button>
+                        {geminiActive && (
+                            <Button
+                                icon={KeyRound}
+                                onClick={() => {
+                                    setTempKey(apiKey);
+                                    setShowKeyModal(true);
+                                }}
+                            >
+                                {usingCustomKey && (
+                                    <span
+                                        className='w-[7px] h-[7px] rounded-full bg-warn'
+                                        aria-hidden='true'
+                                    />
+                                )}
+                                {usingCustomKey
+                                    ? 'Your API key'
+                                    : 'Default API key'}
+                            </Button>
+                        )}
                     </>
                 }
             />
@@ -733,7 +740,7 @@ const QuickNotes = () => {
                             icon={updating ? Loader2 : Send}
                             className={`w-full ${updating ? '[&>svg]:animate-spin' : ''}`}
                         >
-                            {updating ? 'Writing…' : 'Send to Gemini'}
+                            {updating ? 'Writing…' : 'Send to AI'}
                         </Button>
                         <span className='text-[12px] leading-snug text-muted'>
                             Uses {modelName} with{' '}
