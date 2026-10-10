@@ -242,8 +242,16 @@ export const isContentAlert = (notification) =>
     notification?.kind === 'content_alert';
 
 /** "Content alert · Computer Science · Sem 5" (no semester when branch-wide). */
+/** The short branch name alerts use: the stored label, else name if short, else code. */
+export function shortBranchName(audience = {}) {
+    if (audience.shortBranch) return audience.shortBranch;
+    return audience.branchName && audience.branchName.length <= 24
+        ? audience.branchName
+        : audience.branch || audience.branchName || '';
+}
+
 export function contentAlertLabel(audience = {}) {
-    const branch = audience.branchName || audience.branch;
+    const branch = shortBranchName(audience);
     return [
         'Content alert',
         branch,

@@ -372,3 +372,25 @@ test('imports show their alert summary and wait briefly for it', () => {
         'No students to notify',
     );
 });
+
+test('alert labels use the short branch name', async () => {
+    const { contentAlertLabel, shortBranchName } = await import(
+        '../src/utils/contentAlerts.js'
+    );
+    const long = {
+        branch: 'BTech-CSE',
+        branchName:
+            'BTech - Computer Science & Engineering ( All Specialization Inc)',
+        semester: 3,
+    };
+    assert.equal(shortBranchName(long), 'BTech-CSE');
+    assert.equal(contentAlertLabel(long), 'Content alert · BTech-CSE · Sem 3');
+    assert.equal(
+        contentAlertLabel({ ...long, shortBranch: 'CSE' }),
+        'Content alert · CSE · Sem 3',
+    );
+    assert.equal(
+        contentAlertLabel({ branch: 'ECE', branchName: 'ECE', semester: null }),
+        'Content alert · ECE',
+    );
+});

@@ -1,3 +1,4 @@
+import { shortBranchName } from '../../utils/contentAlerts.js';
 // Who a notification can go to. The API validates the same shapes.
 export const AUDIENCES = [
     { value: 'all', label: 'Everyone' },
@@ -115,7 +116,7 @@ export function describeAudience(audience) {
         case 'branch': {
             // Content alerts: followers of one branch (and semester).
             const branch = [
-                audience.branchName || audience.branch,
+                shortBranchName(audience),
                 audience.semester ? `Sem ${audience.semester}` : '',
             ]
                 .filter(Boolean)
