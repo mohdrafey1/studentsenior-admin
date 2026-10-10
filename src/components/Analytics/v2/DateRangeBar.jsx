@@ -34,6 +34,7 @@ export default function DateRangeBar({
     realtime = false,
     revenue = false,
     comparison = true,
+    platform = true,
 }) {
     const { colleges } = useColleges();
     const today = dayKey();
@@ -132,7 +133,7 @@ export default function DateRangeBar({
                         ))}
                     </Select>
                 </label>
-                {!revenue && (
+                {!revenue && platform && (
                     <label className='text-xs text-muted space-y-1'>
                         <span className='block'>Platform</span>
                         <Select

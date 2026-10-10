@@ -58,6 +58,7 @@ export const NAV_GROUPS = [
             { label: 'Audience', to: '/analytics/audience' },
             { label: 'Content', to: '/analytics/content' },
             { label: 'Academics', to: '/analytics/academics' },
+            { label: 'Students & branches', to: '/analytics/branches' },
             { label: 'Revenue', to: '/analytics/revenue' },
             { label: 'Realtime', to: '/analytics/realtime' },
             { label: 'Chatbot', to: '/analytics/chatbot' },

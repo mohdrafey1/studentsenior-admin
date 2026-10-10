@@ -28,6 +28,7 @@ const AnalyticsChatbot = lazy(() => import('./pages/Analytics/Chatbot'));
 const AnalyticsAudience = lazy(() => import('./pages/Analytics/Audience'));
 const AnalyticsContent = lazy(() => import('./pages/Analytics/Content'));
 const AnalyticsAcademics = lazy(() => import('./pages/Analytics/Academics'));
+const AnalyticsBranches = lazy(() => import('./pages/Analytics/Branches'));
 const AnalyticsRevenue = lazy(() => import('./pages/Analytics/Revenue'));
 const AnalyticsRealtime = lazy(() => import('./pages/Analytics/Realtime'));
 const AnalyticsOpenContent = lazy(
@@ -226,6 +227,14 @@ function App() {
                                             element={
                                                 <AnalyticsAccess>
                                                     <AnalyticsAcademics />
+                                                </AnalyticsAccess>
+                                            }
+                                        />
+                                        <Route
+                                            path='/analytics/branches'
+                                            element={
+                                                <AnalyticsAccess>
+                                                    <AnalyticsBranches />
                                                 </AnalyticsAccess>
                                             }
                                         />

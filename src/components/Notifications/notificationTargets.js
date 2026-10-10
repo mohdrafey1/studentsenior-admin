@@ -112,6 +112,17 @@ export function describeAudience(audience) {
             return `Students who joined in the last ${audience.days} days`;
         case 'college':
             return `Students of ${audience.college}`;
+        case 'branch': {
+            // Content alerts: followers of one branch (and semester).
+            const branch = [
+                audience.branchName || audience.branch,
+                audience.semester ? `Sem ${audience.semester}` : '',
+            ]
+                .filter(Boolean)
+                .join(' · ');
+            const college = audience.collegeName || audience.college;
+            return `Followers of ${branch}${college ? ` at ${college}` : ''}`;
+        }
         case 'users': {
             const names = (audience.users || []).map((u) => `@${u.username}`);
             const count = audience.userIds?.length || names.length;
@@ -129,7 +140,10 @@ export function describeTarget(data, collegeName = (slug) => slug) {
     const bare = (url) => url.replace(/^https:\/\//, '');
     if (!data?.screen && data?.url) return bare(data.url);
     if (!data?.screen) return 'The app';
-    const label = TAP_TARGETS.find((t) => t.value === data.screen)?.label;
+    // Content alerts also open quick notes and a branch's resource list.
+    const label =
+        TAP_TARGETS.find((t) => t.value === data.screen)?.label ||
+        { quicknotes: 'Quick notes', resources: 'Resources' }[data.screen];
     if (data.screen === 'blog') {
         return data.params?.slug
             ? `Blog post · ${data.params.slug}`
@@ -139,6 +153,7 @@ export function describeTarget(data, collegeName = (slug) => slug) {
     return [
         label || data.screen,
         data.params?.college && collegeName(data.params.college),
+        data.params?.branchCode,
         data.params?.slug,
     ]
         .filter(Boolean)

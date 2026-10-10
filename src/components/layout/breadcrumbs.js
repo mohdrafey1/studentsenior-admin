@@ -27,6 +27,10 @@ const ROUTES = [
         [['Analytics', '/analytics'], ['Academics']],
     ],
     [
+        ['analytics', 'branches'],
+        [['Analytics', '/analytics'], ['Students & branches']],
+    ],
+    [
         ['analytics', 'revenue'],
         [['Analytics', '/analytics'], ['Revenue']],
     ],

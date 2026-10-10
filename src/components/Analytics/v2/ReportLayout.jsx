@@ -8,6 +8,7 @@ const pages = [
     ['/audience', 'Audience'],
     ['/content/all', 'Content'],
     ['/academics', 'Academics'],
+    ['/branches', 'Students & branches'],
     ['/revenue', 'Revenue'],
     ['/realtime', 'Realtime'],
     ['/chatbot', 'Chatbot'],
@@ -20,6 +21,8 @@ export default function ReportLayout({
     realtime = false,
     revenue = false,
     filtersVisible = true,
+    platform = true,
+    comparison = true,
     children,
 }) {
     const { search, pathname } = useLocation();
@@ -56,6 +59,8 @@ export default function ReportLayout({
                     {...controls}
                     realtime={realtime}
                     revenue={revenue}
+                    platform={platform}
+                    comparison={comparison}
                 />
             )}
             {!controls.error && children}

@@ -7,6 +7,10 @@ import RejectDialog from './RejectDialog';
 import ReasonPicker from './ReasonPicker';
 import { reasonError as checkReason } from './reviewReasons';
 import { Button, StatusBadge } from './ui';
+import NotifySwitch from './ContentAlerts/NotifySwitch';
+import AlertStatus from './ContentAlerts/AlertStatus';
+import { sendContentAlerts } from './ContentAlerts/sendAlerts';
+import { useNotifyPreference } from '../hooks/useContentAlerts';
 
 /**
  * Approve or reject a student upload.
@@ -15,6 +19,10 @@ import { Button, StatusBadge } from './ui';
  * variant='panel' — the "Review" card for the side column of review pages.
  *                   Shows the decision controls while pending, and the
  *                   current decision (with "Change decision") otherwise.
+ *
+ * contentAlert={ type, id } (PYQs and notes, panel only) adds a "Notify
+ * students" switch to approving, announces the item to its branch followers
+ * once the approval succeeds, and shows whether they were notified after.
  */
 const ApprovalActions = ({
     resourceType,
@@ -24,8 +32,11 @@ const ApprovalActions = ({
     onStatusChange,
     variant = 'bar',
     approveNote,
+    contentAlert,
 }) => {
     const [isProcessing, setIsProcessing] = useState(false);
+    const [notify, setNotify] = useNotifyPreference();
+    const [alertRevision, setAlertRevision] = useState(0);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [rejectOpen, setRejectOpen] = useState(false);
 
@@ -55,6 +66,18 @@ const ApprovalActions = ({
             setReopened(false);
             setReason('');
             onStatusChange && onStatusChange(submissionStatus);
+            if (
+                submissionStatus === 'approved' &&
+                variant === 'panel' &&
+                contentAlert &&
+                notify
+            ) {
+                // Only after the approval: the API announces live items only.
+                sendContentAlerts([contentAlert], {
+                    afterApproval: true,
+                    onSettled: () => setAlertRevision((n) => n + 1),
+                });
+            }
             return true;
         } catch (error) {
             toast.error(
@@ -132,6 +155,13 @@ const ApprovalActions = ({
                                 ? `Students can see this ${noun}.`
                                 : `Students can’t see this ${noun}.`}
                         </p>
+                        {status === 'approved' && contentAlert && (
+                            <AlertStatus
+                                item={contentAlert}
+                                revision={alertRevision}
+                                className='pt-3.5 border-t border-line-soft'
+                            />
+                        )}
                         <Button
                             onClick={() => {
                                 setDecision(
@@ -176,10 +206,21 @@ const ApprovalActions = ({
                                 disabled={isProcessing}
                             />
                         ) : (
-                            <p className='text-[13px] leading-relaxed text-ink-2'>
-                                {approveNote ||
-                                    `Approving makes this ${noun} visible to every student.`}
-                            </p>
+                            <>
+                                <p className='text-[13px] leading-relaxed text-ink-2'>
+                                    {approveNote ||
+                                        `Approving makes this ${noun} visible to every student.`}
+                                </p>
+                                {contentAlert && (
+                                    <NotifySwitch
+                                        items={[contentAlert]}
+                                        checked={notify}
+                                        onChange={setNotify}
+                                        disabled={isProcessing}
+                                        className='px-3 py-2.5 rounded-lg bg-sunken'
+                                    />
+                                )}
+                            </>
                         )}
                         <Button
                             variant='dark'

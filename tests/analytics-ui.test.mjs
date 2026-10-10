@@ -27,8 +27,10 @@ const bundle = await build({
         import AnalyticsAccess from './src/components/Analytics/v2/AnalyticsAccess.jsx';
         import ContentTypeBreakdown from './src/components/Analytics/v2/ContentTypeBreakdown.jsx';
         import Chatbot from './src/pages/Analytics/Chatbot.jsx';
+        import FollowTree from './src/components/Analytics/v2/FollowTree.jsx';
         export { visibleNavGroups } from './src/components/layout/navConfig.js';
-        const components = { ChartTooltip, StatCard, QueryPanel, DateRangeBar, ContentTable, AnalyticsAccess, ContentTypeBreakdown, Chatbot };
+        export { followTree } from './src/components/Analytics/v2/follows.js';
+        const components = { ChartTooltip, StatCard, QueryPanel, DateRangeBar, ContentTable, AnalyticsAccess, ContentTypeBreakdown, Chatbot, FollowTree };
         export const render = (name, props, path = '/analytics') => renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: [path] }, React.createElement(components[name], props)));
     `,
         resolveDir: process.cwd(),
@@ -74,7 +76,9 @@ const bundle = await build({
 });
 await mkdir(resolve('node_modules/.cache'), { recursive: true });
 await writeFile(output, bundle.outputFiles[0].contents);
-const { render, visibleNavGroups } = await import(pathToFileURL(output).href);
+const { render, visibleNavGroups, followTree } = await import(
+    pathToFileURL(output).href
+);
 after(async () => {
     await rm(output, { force: true });
     delete globalThis.__analyticsTestUser;
@@ -145,6 +149,46 @@ test('realtime excludes server option; revenue hides platforms and explains serv
     });
     assert.doesNotMatch(revenue, /aria-label="Platform filter"/);
     assert.match(revenue, /Revenue is recorded by the server/);
+});
+
+test('Students & branches hides platform and comparison and is in the analytics nav', () => {
+    const html = render('DateRangeBar', {
+        filters: { ...filters, platform: 'web' },
+        update() {},
+        platform: false,
+        comparison: false,
+    });
+    assert.doesNotMatch(html, /aria-label="Platform filter"/);
+    assert.doesNotMatch(html, /Compare to previous period/);
+    assert.match(html, /aria-label="College filter"/);
+    assert.ok(
+        visibleNavGroups({ role: 'Admin' })
+            .find((group) => group.id === 'analytics')
+            .items.some((item) => item.to === '/analytics/branches'),
+    );
+});
+
+test('follow tree opens a lone college and shows its courses and content', () => {
+    const html = render('FollowTree', {
+        tree: followTree([
+            {
+                college: { slug: 'iul', name: 'Integral University' },
+                course: { code: 'BTECH', name: 'B.Tech' },
+                branch: { id: 'b1', code: 'CSE', name: 'Computer Science' },
+                semester: 5,
+                students: 7,
+                alertsOn: 6,
+                reachable: 5,
+                content: { pyq: 2, note: 1, quicknote: 0 },
+            },
+        ]),
+    });
+    assert.match(html, /Integral University/);
+    assert.match(html, /B\.Tech/);
+    assert.match(html, /aria-expanded="true"/);
+    assert.match(html, /Quick notes/);
+    // Branches stay collapsed until opened.
+    assert.doesNotMatch(html, /Semester 5/);
 });
 
 test('content table displays titles, CSV action and query-preserving destinations', () => {

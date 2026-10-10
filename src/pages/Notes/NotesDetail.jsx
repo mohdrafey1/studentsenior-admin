@@ -188,6 +188,11 @@ const NotesDetail = () => {
                         apiEndpoint={`/notes/edit/${note._id}`}
                         onStatusChange={fetchNote}
                         approveNote={`Publishes the note to every student at the college${paid ? ` for ${formatPoints(note.price)}` : ' for free'}. The uploader earns reward points the first time it’s approved.`}
+                        contentAlert={
+                            note.deleted
+                                ? undefined
+                                : { type: 'note', id: note._id }
+                        }
                     />
 
                     <Panel

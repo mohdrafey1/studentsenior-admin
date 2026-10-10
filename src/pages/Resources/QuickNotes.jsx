@@ -4,6 +4,7 @@ import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import ReactMarkdown from 'react-markdown';
 import {
+    BellRing,
     BookOpen,
     Eye,
     EyeOff,
@@ -16,7 +17,15 @@ import {
     Sparkles,
 } from 'lucide-react';
 import Loader from '../../components/Common/Loader';
+import { sendContentAlerts } from '../../components/ContentAlerts/sendAlerts';
+import { useAlertStatus } from '../../hooks/useContentAlerts';
 import { formatShortDateTime } from '../../utils/format';
+import {
+    alertItems,
+    alertKey,
+    alertStatusText,
+    canNotify,
+} from '../../utils/contentAlerts';
 import {
     Button,
     Dialog,
@@ -24,6 +33,7 @@ import {
     Field,
     Input,
     PageHeader,
+    StatusBadge,
     Textarea,
 } from '../../components/ui';
 import { PROSE_CLASS } from './catalogUtils';
@@ -108,7 +118,8 @@ const QuickNotes = () => {
     const [selectedUnit, setSelectedUnit] = useState(null);
     const [generating, setGenerating] = useState(false);
     const [updating, setUpdating] = useState(false);
-    const [saving, setSaving] = useState(false);
+    const [saving, setSaving] = useState(''); // '', 'save' or 'notify'
+    const [notifying, setNotifying] = useState(false);
     const [chatInput, setChatInput] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState('');
@@ -134,6 +145,21 @@ const QuickNotes = () => {
 
     const modelName =
         modelsList.find((m) => m.id === selectedModel)?.name || selectedModel;
+
+    // Which saved notes were already announced to their branch followers.
+    const alertStatus = useAlertStatus(
+        alertItems(
+            'quicknote',
+            notes.map((n) => n._id),
+        ),
+    );
+    const notifyStudents = async (noteId) => {
+        setNotifying(true);
+        await sendContentAlerts(alertItems('quicknote', [noteId]), {
+            onSettled: alertStatus.refresh,
+        });
+        setNotifying(false);
+    };
 
     const handleModelChange = (model) => {
         setSelectedModel(model);
@@ -352,11 +378,12 @@ const QuickNotes = () => {
         }
     };
 
-    const handleSaveManual = async () => {
+    // "Save & notify" announces the note once the save has gone through.
+    const handleSaveManual = async (andNotify = false) => {
         const currentNote = getNoteForUnit(selectedUnit?.unitNumber);
         if (!currentNote) return;
 
-        setSaving(true);
+        setSaving(andNotify ? 'notify' : 'save');
         try {
             const res = await api.put('/quicknotes/save', {
                 noteId: currentNote._id,
@@ -371,12 +398,13 @@ const QuickNotes = () => {
                         n._id === updatedNote._id ? updatedNote : n,
                     ),
                 );
+                if (andNotify) notifyStudents(updatedNote._id);
             }
         } catch (error) {
             console.error(error);
             toast.error('Couldn’t save the note. Try again.');
         } finally {
-            setSaving(false);
+            setSaving('');
         }
     };
 
@@ -436,6 +464,13 @@ const QuickNotes = () => {
     const syllabusLink = syllabus.college?.slug
         ? `/${syllabus.college.slug}/syllabus/${syllabus._id}`
         : null;
+    const alertRecord = currentNote
+        ? alertStatus.data[alertKey({ type: 'quicknote', id: currentNote._id })]
+        : undefined;
+    // Wait for the status; if it can't load, still allow notifying (the API
+    // never announces a note twice).
+    const alertLoading = alertStatus.loading && !alertRecord;
+    const mayNotify = !alertLoading && canNotify(alertRecord);
     const geminiActive = ['api', 'fallback'].includes(modelsSource);
     const usingCustomKey = geminiActive && Boolean(apiKey.trim());
 
@@ -598,26 +633,64 @@ const QuickNotes = () => {
                                                 size='sm'
                                                 variant='ghost'
                                                 onClick={toggleEditMode}
-                                                disabled={saving}
+                                                disabled={Boolean(saving)}
                                             >
                                                 Cancel
                                             </Button>
                                             <Button
                                                 size='sm'
-                                                variant='primary'
-                                                icon={saving ? Loader2 : Save}
-                                                onClick={handleSaveManual}
-                                                disabled={saving}
+                                                variant={
+                                                    mayNotify
+                                                        ? 'secondary'
+                                                        : 'primary'
+                                                }
+                                                icon={
+                                                    saving === 'save'
+                                                        ? Loader2
+                                                        : Save
+                                                }
+                                                onClick={() =>
+                                                    handleSaveManual(false)
+                                                }
+                                                disabled={Boolean(saving)}
                                                 className={
-                                                    saving
+                                                    saving === 'save'
                                                         ? '[&>svg]:animate-spin'
                                                         : ''
                                                 }
                                             >
-                                                {saving
+                                                {saving === 'save'
                                                     ? 'Saving…'
-                                                    : 'Save note'}
+                                                    : 'Save'}
                                             </Button>
+                                            {mayNotify && (
+                                                <Button
+                                                    size='sm'
+                                                    variant='primary'
+                                                    icon={
+                                                        saving === 'notify'
+                                                            ? Loader2
+                                                            : BellRing
+                                                    }
+                                                    onClick={() =>
+                                                        handleSaveManual(true)
+                                                    }
+                                                    disabled={
+                                                        Boolean(saving) ||
+                                                        notifying
+                                                    }
+                                                    title='Save, then alert students who follow this subject’s branch'
+                                                    className={
+                                                        saving === 'notify'
+                                                            ? '[&>svg]:animate-spin'
+                                                            : ''
+                                                    }
+                                                >
+                                                    {saving === 'notify'
+                                                        ? 'Saving…'
+                                                        : 'Save & notify'}
+                                                </Button>
+                                            )}
                                         </>
                                     ) : (
                                         <>
@@ -627,6 +700,64 @@ const QuickNotes = () => {
                                                     currentNote.lastUpdated,
                                                 )}
                                             </span>
+                                            {alertLoading ? null : mayNotify ? (
+                                                <Button
+                                                    size='sm'
+                                                    icon={
+                                                        notifying
+                                                            ? Loader2
+                                                            : BellRing
+                                                    }
+                                                    onClick={() =>
+                                                        notifyStudents(
+                                                            currentNote._id,
+                                                        )
+                                                    }
+                                                    disabled={notifying}
+                                                    title={
+                                                        alertRecord
+                                                            ? alertStatusText(
+                                                                  alertRecord,
+                                                              )
+                                                            : 'Alert students who follow this subject’s branch'
+                                                    }
+                                                    className={
+                                                        notifying
+                                                            ? '[&>svg]:animate-spin'
+                                                            : ''
+                                                    }
+                                                >
+                                                    {notifying
+                                                        ? 'Notifying…'
+                                                        : 'Notify students'}
+                                                </Button>
+                                            ) : (
+                                                <span
+                                                    title={alertStatusText(
+                                                        alertRecord,
+                                                    )}
+                                                >
+                                                    <StatusBadge
+                                                        tone={
+                                                            alertRecord?.status ===
+                                                            'sent'
+                                                                ? 'ok'
+                                                                : 'info'
+                                                        }
+                                                    >
+                                                        {alertRecord?.status ===
+                                                        'sent'
+                                                            ? 'Sent'
+                                                            : 'Sending…'}
+                                                    </StatusBadge>
+                                                    <span className='sr-only'>
+                                                        {' '}
+                                                        {alertStatusText(
+                                                            alertRecord,
+                                                        )}
+                                                    </span>
+                                                </span>
+                                            )}
                                             <Button
                                                 size='sm'
                                                 icon={Pencil}

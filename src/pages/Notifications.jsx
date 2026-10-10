@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Bell, RotateCcw, Send, Smartphone, Sparkles, X } from 'lucide-react';
+import {
+    Bell,
+    Loader2,
+    RotateCcw,
+    Send,
+    Smartphone,
+    Sparkles,
+    X,
+} from 'lucide-react';
 import api from '../utils/api';
 import { useColleges } from '../context/CollegeContext';
 import { formatNumber, formatShortDateTime } from '../utils/format';
@@ -9,6 +17,13 @@ import ConfirmModal from '../components/ConfirmModal';
 import RecipientSearch from '../components/Notifications/RecipientSearch';
 import BlogPostPicker from '../components/Notifications/BlogPostPicker';
 import AiDraftPanel from '../components/Notifications/AiDraftPanel';
+import { sendContentAlerts } from '../components/ContentAlerts/sendAlerts';
+import {
+    alertOpensText,
+    canRetryAlert,
+    contentAlertLabel,
+    isContentAlert,
+} from '../utils/contentAlerts';
 import {
     AUDIENCES,
     COLLEGE_TARGETS,
@@ -130,6 +145,7 @@ const Notifications = () => {
     const [ownAccount, setOwnAccount] = useState(undefined); // undefined while loading
     const [chosenTester, setChosenTester] = useState(readStoredRecipient);
     const [pickingTester, setPickingTester] = useState(false);
+    const [retrying, setRetrying] = useState(null); // notification id
 
     // Fetch notification stats
     const fetchStats = async () => {
@@ -329,6 +345,21 @@ const Notifications = () => {
         setChosenTester(isOwn ? null : picked);
         storeRecipient(isOwn ? null : picked);
         setPickingTester(false);
+    };
+
+    // A content alert that reached no phone: send its items again. The API
+    // skips items announced since, so this can't notify anyone twice.
+    const retryContentAlert = async (notification) => {
+        setRetrying(notification._id);
+        await sendContentAlerts(notification.items, {
+            onSettled: (result) => {
+                if (result?.ok) {
+                    fetchNotifications(pagination.page);
+                    fetchStats();
+                }
+            },
+        });
+        setRetrying(null);
     };
 
     // Copy an earlier notification into the form so it can be edited and sent.
@@ -941,10 +972,19 @@ const Notifications = () => {
                                               (delivered / recipients) * 1000,
                                           ) / 10
                                         : 0;
+                                    const alert = isContentAlert(notification);
+                                    const opened = alertOpensText(notification);
                                     return (
                                         <Tr key={notification._id}>
                                             <Td className='max-w-[380px]'>
                                                 <div className='flex flex-col gap-0.5 min-w-0'>
+                                                    {alert && (
+                                                        <span className='text-xs font-medium text-brand-ink'>
+                                                            {contentAlertLabel(
+                                                                notification.audience,
+                                                            )}
+                                                        </span>
+                                                    )}
                                                     <span className='font-medium text-ink'>
                                                         {notification.title}
                                                     </span>
@@ -1016,21 +1056,57 @@ const Notifications = () => {
                                                         {failed > 0 &&
                                                             ` · ${formatNumber(failed)} failed`}
                                                     </span>
+                                                    {opened && (
+                                                        <span className='text-xs text-ink-2'>
+                                                            {opened}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </Td>
                                             <Td align='right'>
-                                                <Button
-                                                    size='sm'
-                                                    icon={RotateCcw}
-                                                    onClick={() =>
-                                                        handleRepeatNotification(
-                                                            notification,
-                                                        )
-                                                    }
-                                                    aria-label={`Reuse “${notification.title}”`}
-                                                >
-                                                    Reuse
-                                                </Button>
+                                                {!alert ? (
+                                                    <Button
+                                                        size='sm'
+                                                        icon={RotateCcw}
+                                                        onClick={() =>
+                                                            handleRepeatNotification(
+                                                                notification,
+                                                            )
+                                                        }
+                                                        aria-label={`Reuse “${notification.title}”`}
+                                                    >
+                                                        Reuse
+                                                    </Button>
+                                                ) : canRetryAlert(
+                                                      notification,
+                                                  ) ? (
+                                                    <Button
+                                                        size='sm'
+                                                        icon={
+                                                            retrying ===
+                                                            notification._id
+                                                                ? Loader2
+                                                                : RotateCcw
+                                                        }
+                                                        className={
+                                                            retrying ===
+                                                            notification._id
+                                                                ? '[&>svg]:animate-spin'
+                                                                : ''
+                                                        }
+                                                        disabled={Boolean(
+                                                            retrying,
+                                                        )}
+                                                        onClick={() =>
+                                                            retryContentAlert(
+                                                                notification,
+                                                            )
+                                                        }
+                                                        aria-label={`Retry “${notification.title}”`}
+                                                    >
+                                                        Retry
+                                                    </Button>
+                                                ) : null}
                                             </Td>
                                         </Tr>
                                     );

@@ -46,6 +46,8 @@ export default function Analytics() {
         { key: 'pyqs', label: 'PYQs' },
         { key: 'notes', label: 'Notes' },
         { key: 'premiumUsers', label: 'Premium students' },
+        // Students who picked "Your branch" (older snapshots have no value).
+        { key: 'followers', label: 'Branch followers' },
     ];
     return (
         <ReportLayout

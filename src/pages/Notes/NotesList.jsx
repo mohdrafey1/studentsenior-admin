@@ -15,6 +15,10 @@ import {
 import FilterBar from '../../components/Common/FilterBar';
 import { filterByTime } from '../../components/Common/timeFilterUtils';
 import Loader from '../../components/Common/Loader';
+import ListNotifySwitch from '../../components/ContentAlerts/ListNotifySwitch';
+import { sendContentAlerts } from '../../components/ContentAlerts/sendAlerts';
+import { useNotifyPreference } from '../../hooks/useContentAlerts';
+import { alertItems } from '../../utils/contentAlerts';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import RejectDialog from '../../components/RejectDialog';
@@ -82,6 +86,8 @@ const NotesList = () => {
     const [confirm, setConfirm] = useState(null);
     const [rejecting, setRejecting] = useState(null); // array of ids
     const [bulkBusy, setBulkBusy] = useState(false);
+    // One switch for the page: row and bulk approvals both follow it.
+    const [notify, setNotify] = useNotifyPreference();
 
     const fetchNotes = async () => {
         try {
@@ -236,6 +242,11 @@ const NotesList = () => {
             rejectionReason: '',
         });
         selection.clear();
+        // Announce only what was approved; one alert per branch and semester.
+        if (notify && done.length)
+            sendContentAlerts(alertItems('note', done), {
+                afterApproval: true,
+            });
     };
 
     const reject = async (ids, reason) => {
@@ -519,6 +530,21 @@ const NotesList = () => {
                 </Alert>
             )}
 
+            {(selection.count > 0 ||
+                notes.some(
+                    (item) =>
+                        (item.submissionStatus || 'pending') === 'pending',
+                )) && (
+                <ListNotifySwitch
+                    type='note'
+                    noun='notes'
+                    selectedIds={selectedIds}
+                    checked={notify}
+                    onChange={setNotify}
+                    disabled={bulkBusy}
+                />
+            )}
+
             {viewMode === 'table' ? (
                 <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
                     <BulkBar count={selection.count} onClear={selection.clear}>
@@ -528,7 +554,7 @@ const NotesList = () => {
                             disabled={bulkBusy}
                             onClick={() => approve(selectedIds)}
                         >
-                            Approve
+                            {notify ? 'Approve & notify' : 'Approve'}
                         </BulkButton>
                         <BulkButton
                             icon={X}

@@ -206,6 +206,11 @@ const PyqDetail = () => {
                         apiEndpoint={`/pyq/edit/${pyq._id}`}
                         onStatusChange={fetchPyq}
                         approveNote='Approving publishes this paper to every student at the college.'
+                        contentAlert={
+                            pyq.deleted
+                                ? undefined
+                                : { type: 'pyq', id: pyq._id }
+                        }
                     />
 
                     <Panel

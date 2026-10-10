@@ -4,10 +4,13 @@ import toast from 'react-hot-toast';
 import { FileText, Loader2, UploadCloud } from 'lucide-react';
 import api from '../../utils/api';
 import { useColleges } from '../../context/CollegeContext';
+import { useNotifyPreference } from '../../hooks/useContentAlerts';
 import { formatNumber, formatShortDateTime } from '../../utils/format';
+import { awaitingAlerts, importAlertState } from '../../utils/contentAlerts';
 import {
     Alert,
     Button,
+    Checkbox,
     EmptyState,
     Field,
     Input,
@@ -45,6 +48,46 @@ const MATCHING_NOTES = [
     'Imported papers are saved as Approved, so students see them straight away. Check the folder first.',
 ];
 
+// What the job view says about alerting students, with the groups sent.
+function ImportAlerts({ job }) {
+    const state = importAlertState(job);
+    if (!state) return null;
+    const groups = state.groups || [];
+    return (
+        <Alert
+            tone={state.tone}
+            title={state.title}
+            action={
+                state.pending ? (
+                    <Loader2
+                        className='w-4 h-4 mt-0.5 animate-spin'
+                        aria-hidden='true'
+                    />
+                ) : undefined
+            }
+        >
+            {state.text}
+            {groups.length > 0 && (
+                <ul className='mt-1.5 flex flex-col gap-0.5 text-[12.5px]'>
+                    {groups.map((group, i) => (
+                        <li key={`${group.label}-${i}`}>
+                            <span className='font-medium'>{group.label}</span>
+                            {group.college && ` · ${group.college}`} ·{' '}
+                            {formatNumber(group.items)} paper
+                            {group.items === 1 ? '' : 's'} ·{' '}
+                            {formatNumber(group.students)} student
+                            {group.students === 1 ? '' : 's'} ·{' '}
+                            {formatNumber(group.successCount)} delivered
+                            {group.failureCount > 0 &&
+                                ` · ${formatNumber(group.failureCount)} failed`}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </Alert>
+    );
+}
+
 const percent = (job) => {
     const total = job.counts?.total ?? 0;
     const processed = job.counts?.processed ?? 0;
@@ -59,6 +102,7 @@ const BulkImport = () => {
     const [folderError, setFolderError] = useState('');
     const [examType, setExamType] = useState('Endsem');
     const [year, setYear] = useState('');
+    const [notifyStudents, setNotifyStudents] = useNotifyPreference();
     const [submitting, setSubmitting] = useState(false);
 
     const [currentJob, setCurrentJob] = useState(null);
@@ -75,6 +119,8 @@ const BulkImport = () => {
             (currentJob.status === 'queued' || currentJob.status === 'running'),
         [currentJob],
     );
+    // The alert summary lands just after the job finishes; keep polling for it.
+    const keepPolling = Boolean(isLive || awaitingAlerts(currentJob));
 
     const fetchJobs = async () => {
         try {
@@ -105,7 +151,7 @@ const BulkImport = () => {
     useEffect(() => {
         if (!currentJob?._id) return;
         if (pollRef.current) clearInterval(pollRef.current);
-        if (!isLive) return;
+        if (!keepPolling) return;
 
         pollRef.current = setInterval(async () => {
             try {
@@ -113,14 +159,13 @@ const BulkImport = () => {
                 const fresh = res.data?.data;
                 if (fresh) {
                     setCurrentJob(fresh);
-                    if (
-                        fresh.status !== 'queued' &&
-                        fresh.status !== 'running'
-                    ) {
+                    const finished =
+                        fresh.status !== 'queued' && fresh.status !== 'running';
+                    if (finished && !awaitingAlerts(fresh)) {
                         clearInterval(pollRef.current);
                         pollRef.current = null;
-                        fetchJobs();
                     }
+                    if (finished && isLive) fetchJobs();
                 }
             } catch {
                 // swallow transient errors
@@ -131,7 +176,7 @@ const BulkImport = () => {
             if (pollRef.current) clearInterval(pollRef.current);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentJob?._id, isLive]);
+    }, [currentJob?._id, isLive, keepPolling]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -147,6 +192,7 @@ const BulkImport = () => {
                 collegeSlug: collegeslug,
                 examType: examType.trim() || 'Endsem',
                 year: year.trim() || undefined,
+                notifyStudents,
             });
             const data = res.data?.data;
             toast.success('Import started');
@@ -270,6 +316,13 @@ const BulkImport = () => {
                             />
                         </Field>
                     </div>
+                    <Checkbox
+                        bordered
+                        checked={notifyStudents}
+                        onChange={(e) => setNotifyStudents(e.target.checked)}
+                        label='Notify students when the import finishes'
+                        description='Students who follow each branch get one alert per branch and semester for the papers this import adds.'
+                    />
                     <div className='flex flex-wrap items-center gap-3 mt-auto pt-1'>
                         <Button
                             type='submit'
@@ -331,6 +384,8 @@ const BulkImport = () => {
                                 examLabel(currentJob.examType),
                                 currentJob.startedAt &&
                                     `started ${formatShortDateTime(currentJob.startedAt)}`,
+                                currentJob.notifyStudents &&
+                                    'notifies students',
                             ]
                                 .filter(Boolean)
                                 .join(' · ')}
@@ -415,6 +470,8 @@ const BulkImport = () => {
                                 {currentJob.failureReason}
                             </Alert>
                         )}
+
+                        <ImportAlerts job={currentJob} />
 
                         {placeholders > 0 && (
                             <Alert

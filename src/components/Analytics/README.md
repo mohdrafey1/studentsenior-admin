@@ -31,6 +31,12 @@ academic tree, request states, content links and user activity panel.
   Tables display titles and offer CSV export through the shared CSV utility,
   which prefixes spreadsheet formula triggers to keep titles as text while
   preserving numeric values and decimal strings for calculations.
+- Students & branches (`/analytics/branches`) reads `/analytics/v2/follows`:
+  students' saved "Your branch" picks with their alert settings, built into a
+  college → course → branch → semester tree (`FollowTree`, `follows.js`) next to
+  each branch's approved content. Picks and alert counts follow the dates; the
+  tree is everyone's current pick. Platform and comparison are hidden because
+  the data comes from accounts and the server, not app events.
 - The Chatbot tab reuses the existing all-time chatbot report and its 30-day
   activity chart. It hides filters and does not add date defaults to its URL.
 - Only Admin and Moderator roles see Analytics in navigation or mount reports.

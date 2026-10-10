@@ -79,7 +79,7 @@ export function reportParams(filters, kind = 'period') {
         ...(kind !== 'realtime' ? { from: filters.from, to: filters.to } : {}),
         ...(filters.college ? { college: filters.college } : {}),
         ...(filters.platform &&
-        !['growth', 'revenue'].includes(kind) &&
+        !['growth', 'revenue', 'follows'].includes(kind) &&
         !(kind === 'realtime' && filters.platform === 'server')
             ? { platform: filters.platform }
             : {}),
