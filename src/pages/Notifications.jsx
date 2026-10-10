@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Bell, RotateCcw, Send, Smartphone, X } from 'lucide-react';
+import { Bell, RotateCcw, Send, Smartphone, Sparkles, X } from 'lucide-react';
 import api from '../utils/api';
 import { useColleges } from '../context/CollegeContext';
 import { formatNumber, formatShortDateTime } from '../utils/format';
@@ -8,6 +8,7 @@ import Pagination from '../components/Pagination';
 import ConfirmModal from '../components/ConfirmModal';
 import RecipientSearch from '../components/Notifications/RecipientSearch';
 import BlogPostPicker from '../components/Notifications/BlogPostPicker';
+import AiDraftPanel from '../components/Notifications/AiDraftPanel';
 import {
     AUDIENCES,
     COLLEGE_TARGETS,
@@ -118,6 +119,7 @@ const Notifications = () => {
     });
     const [notifications, setNotifications] = useState([]);
     const [formData, setFormData] = useState(EMPTY_FORM);
+    const [aiOpen, setAiOpen] = useState(false);
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 10,
@@ -474,12 +476,43 @@ const Notifications = () => {
                     aria-labelledby='compose-title'
                     className='flex flex-col gap-4 p-5 sm:px-[22px] bg-sheet border border-line rounded-xl scroll-mt-6'
                 >
-                    <h2
-                        id='compose-title'
-                        className='text-[15px] font-semibold text-ink'
-                    >
-                        New notification
-                    </h2>
+                    <div className='flex items-center gap-2'>
+                        <h2
+                            id='compose-title'
+                            className='flex-1 text-[15px] font-semibold text-ink'
+                        >
+                            New notification
+                        </h2>
+                        {!aiOpen && (
+                            <Button
+                                size='sm'
+                                icon={Sparkles}
+                                onClick={() => setAiOpen(true)}
+                            >
+                                Write with AI
+                            </Button>
+                        )}
+                    </div>
+
+                    {aiOpen && (
+                        <AiDraftPanel
+                            title={formData.title}
+                            body={formData.body}
+                            audienceText={audienceText}
+                            opensText={opensText}
+                            onClose={() => setAiOpen(false)}
+                            onUse={(draft) => {
+                                setFormData((current) => ({
+                                    ...current,
+                                    title: draft.title.slice(0, 100),
+                                    body: draft.message.slice(0, 500),
+                                }));
+                                toast.success(
+                                    'Added to the form. Review it, then send a test.',
+                                );
+                            }}
+                        />
+                    )}
 
                     <div className='flex flex-col gap-1.5'>
                         <CountedLabel
