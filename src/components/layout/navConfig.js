@@ -33,6 +33,7 @@ export const WORKSPACE_ITEMS = [
 export const COLLEGE_ITEMS = [
     { id: 'overview', label: 'Overview', path: '', end: true },
     { id: 'pyqs', label: 'PYQs', path: 'pyqs' },
+    { id: 'coverage', label: 'PYQ coverage', path: 'pyqs-coverage' },
     { id: 'solutions', label: 'PYQ solutions', path: 'pyqs-solutions' },
     { id: 'bulk-import', label: 'Bulk import PYQs', path: 'pyqs-bulk-import' },
     { id: 'notes', label: 'Notes', path: 'notes' },

@@ -27,13 +27,16 @@ import {
 
 // Values the import API expects, with the words shown for them.
 const EXAM_TYPES = [
-    ['Endsem', 'End sem'],
-    ['Midsem', 'Mid sem'],
-    ['Quiz', 'Quiz'],
-    ['Other', 'Other'],
+    ['endsem', 'End sem'],
+    ['midsem1', 'Mid sem 1'],
+    ['midsem2', 'Mid sem 2'],
+    ['improvement', 'Improvement'],
 ];
+// Older jobs were saved as Endsem, Midsem, Quiz or Other.
 const examLabel = (value) =>
-    EXAM_TYPES.find(([v]) => v === value)?.[1] || value || '—';
+    EXAM_TYPES.find(([v]) => v === String(value).toLowerCase())?.[1] ||
+    value ||
+    '—';
 
 const MATCHING_NOTES = [
     <>
@@ -100,7 +103,7 @@ const BulkImport = () => {
 
     const [driveFolderUrl, setDriveFolderUrl] = useState('');
     const [folderError, setFolderError] = useState('');
-    const [examType, setExamType] = useState('Endsem');
+    const [examType, setExamType] = useState('endsem');
     const [year, setYear] = useState('');
     const [notifyStudents, setNotifyStudents] = useNotifyPreference();
     const [submitting, setSubmitting] = useState(false);
@@ -190,7 +193,7 @@ const BulkImport = () => {
             const res = await api.post('/bulk-import/pyq', {
                 driveFolderUrl: driveFolderUrl.trim(),
                 collegeSlug: collegeslug,
-                examType: examType.trim() || 'Endsem',
+                examType: examType.trim() || 'endsem',
                 year: year.trim() || undefined,
                 notifyStudents,
             });

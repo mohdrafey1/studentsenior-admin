@@ -6,6 +6,7 @@ import {
     Briefcase,
     ExternalLink,
     FileText,
+    Grid3x3,
     Info,
     ListChecks,
     MessageCircle,
@@ -96,6 +97,12 @@ const TILES = [
 ];
 
 const TOOLS = [
+    {
+        path: 'pyqs-coverage',
+        label: 'PYQ coverage',
+        note: 'Which midsem and endsem papers are missing',
+        icon: Grid3x3,
+    },
     {
         path: 'pyqs-solutions',
         label: 'PYQ solutions',

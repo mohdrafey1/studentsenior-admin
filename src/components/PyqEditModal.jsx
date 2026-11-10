@@ -25,6 +25,7 @@ const PyqEditModal = ({ isOpen, onClose, pyq, onUpdate }) => {
         '2023-24',
         '2024-25',
         '2025-26',
+        '2026-27',
     ];
 
     const examTypes = EXAM_TYPES;
