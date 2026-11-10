@@ -270,6 +270,8 @@ export default function OrderPage() {
     const timeLabel = getTimeFilterLabel(timeFilter).toLowerCase();
     const statusLabel = STATUS_TABS.find(([v]) => v === status)?.[1] || 'All';
     const scope = `${statusLabel === 'All' ? 'All statuses' : statusLabel} · ${timeLabel}`;
+    // The API counts only completed orders in the "Paid" totals.
+    const paidScope = `Completed orders only · ${timeLabel}`;
     const paymentLink = (o) =>
         o.paymentId ? `/reports/payments/${o.paymentId}` : null;
 
@@ -351,22 +353,22 @@ export default function OrderPage() {
                 <Stat
                     label='Paid in rupees'
                     value={<RupeeValue amount={totals?.rupees} />}
-                    note={`Online and in-app · ${scope}`}
+                    note={`Online and in-app · ${paidScope}`}
                 />
                 <Stat
                     label='Paid in points'
                     value={<PointsValue points={totals?.points} />}
-                    note={`From wallets · ${scope}`}
+                    note={`From wallets · ${paidScope}`}
                 />
                 <Stat
                     className='col-span-2 lg:col-span-1'
                     label='Orders'
                     value={formatNumber(totalItems)}
-                    note={
+                    note={`${
                         orderType
                             ? orderTypeLabel(orderType)
                             : 'Unlocks and top-ups'
-                    }
+                    } · ${scope}`}
                 />
             </div>
 
