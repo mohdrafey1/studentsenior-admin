@@ -30,11 +30,12 @@ import {
     Tr,
 } from '../../components/ui';
 import { SORT_OPTIONS, hasTimeFilter, sortCatalog } from './catalogUtils';
-
-const branchesPath = (course) =>
-    `/reports/branches?search=&page=1&pageSize=12&course=${course._id}`;
+import { useCatalogCollege } from './useCatalogCollege';
 
 const Courses = () => {
+    const { slug, college, base, params: collegeParams } = useCatalogCollege();
+    const branchesPath = (course) =>
+        `${base}/branches?search=&page=1&pageSize=12&course=${course._id}`;
     const [courses, setCourses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -88,7 +89,9 @@ const Courses = () => {
     const fetchCourses = async () => {
         try {
             setError(null);
-            const res = await api.get('/resource/courses');
+            const res = await api.get('/resource/courses', {
+                params: collegeParams,
+            });
             setCourses(res.data.data || []);
         } catch (e) {
             console.error(e);
@@ -101,8 +104,11 @@ const Courses = () => {
     };
 
     useEffect(() => {
+        setLoading(true);
+        setCourses([]);
         fetchCourses();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [slug]);
 
     // Read URL params on mount
     useEffect(() => {
@@ -174,7 +180,10 @@ const Courses = () => {
                     ),
                 );
             } else {
-                await api.post('/resource/courses', formData);
+                await api.post('/resource/courses', {
+                    ...formData,
+                    college: slug,
+                });
                 toast.success('Course added');
                 fetchCourses(); // Refresh to get updated data
             }
@@ -212,7 +221,7 @@ const Courses = () => {
         const ok = await showConfirm({
             title: `Delete ${course.courseName}?`,
             message: branchCount
-                ? `Its ${formatNumber(branchCount)} branch${branchCount === 1 ? '' : 'es'} and every subject in them are deleted too. Students lose access straight away. This can’t be undone.`
+                ? `Its ${formatNumber(branchCount)} branch${branchCount === 1 ? '' : 'es'} are deleted too. Subjects that have PYQs, notes or a syllabus move to Unassigned; subjects with nothing in them are deleted. This can’t be undone.`
                 : 'Students lose access straight away. This can’t be undone.',
             confirmText: 'Delete course',
         });
@@ -328,7 +337,7 @@ const Courses = () => {
         <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
             <PageHeader
                 title='Courses'
-                description='The courses that every branch, subject, PYQ and note belongs to.'
+                description={`The courses${college ? ` at ${college.name}` : ''} that every branch, subject, PYQ and note belongs to.`}
                 actions={
                     <Button variant='primary' icon={Plus} onClick={handleAdd}>
                         Add course
@@ -404,17 +413,8 @@ const Courses = () => {
                             <tbody>
                                 {current.map((course) => (
                                     <Tr key={course._id}>
-                                        <Td className='max-w-[320px]'>
-                                            <div className='flex flex-col gap-0.5 min-w-0'>
-                                                <span className='font-medium truncate'>
-                                                    {course.courseName}
-                                                </span>
-                                                {course.college?.name && (
-                                                    <span className='text-[12.5px] text-muted truncate'>
-                                                        {course.college.name}
-                                                    </span>
-                                                )}
-                                            </div>
+                                        <Td className='font-medium max-w-[320px] truncate'>
+                                            {course.courseName}
                                         </Td>
                                         <Td
                                             mono
@@ -476,11 +476,6 @@ const Courses = () => {
                                         <span className='font-medium text-ink truncate'>
                                             {course.courseName}
                                         </span>
-                                        {course.college?.name && (
-                                            <span className='text-[12.5px] text-muted truncate'>
-                                                {course.college.name}
-                                            </span>
-                                        )}
                                         <code className='self-start font-mono text-[12px] px-1.5 py-px rounded bg-ground text-ink-2'>
                                             {course.courseCode}
                                         </code>

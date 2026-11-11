@@ -39,6 +39,7 @@ import {
     sortCatalog,
     syllabusPath,
 } from './catalogUtils';
+import { useCatalogCollege } from './useCatalogCollege';
 
 // The three cards above the list; they filter by syllabus.
 const VIEWS = [
@@ -60,22 +61,37 @@ const VIEWS = [
 const matchesView = (subject, view) =>
     !view || (view === 'ready' ? hasSyllabus(subject) : !hasSyllabus(subject));
 
-const branchLine = (subject) =>
-    [subject.course?.courseCode, subject.branch?.branchCode]
-        .filter(Boolean)
-        .join(' · ') || 'No branch';
+// A subject can be taught in several branches, each with its own semester.
+const offeringsOf = (subject) =>
+    subject.offerings?.length
+        ? subject.offerings
+        : subject.branch
+          ? [{ branch: subject.branch, semester: subject.semester }]
+          : [];
+const idOf = (value) => value?._id || value || '';
+
+const branchLine = (subject) => {
+    const codes = offeringsOf(subject)
+        .map((o) => o.branch?.branchCode)
+        .filter(Boolean);
+    if (!codes.length) return 'No branch';
+    return codes.length > 3
+        ? `${codes.slice(0, 3).join(' · ')} +${codes.length - 3} more`
+        : codes.join(' · ');
+};
 
 const Subjects = () => {
+    const { slug, college, params: collegeParams } = useCatalogCollege();
+    // The add dialog picks the college from this list: only the one we're in.
+    const colleges = useMemo(() => (college ? [college] : []), [college]);
     const [subjects, setSubjects] = useState([]);
     const [courses, setCourses] = useState([]);
     const [branches, setBranches] = useState([]);
-    const [colleges, setColleges] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(12);
-    const [filterCollege, setFilterCollege] = useState('');
     const [filterCourse, setFilterCourse] = useState('');
     const [filterBranch, setFilterBranch] = useState('');
     const [filterSemester, setFilterSemester] = useState('');
@@ -139,17 +155,14 @@ const Subjects = () => {
     const fetchData = async () => {
         try {
             setError(null);
-            const [subjectsRes, coursesRes, branchesRes, collegesRes] =
-                await Promise.all([
-                    api.get('/resource/subjects'),
-                    api.get('/resource/courses'),
-                    api.get('/resource/branches'),
-                    api.get('/college'),
-                ]);
+            const [subjectsRes, coursesRes, branchesRes] = await Promise.all([
+                api.get('/resource/subjects', { params: collegeParams }),
+                api.get('/resource/courses', { params: collegeParams }),
+                api.get('/resource/branches', { params: collegeParams }),
+            ]);
             setSubjects(subjectsRes.data.data || []);
             setCourses(coursesRes.data.data || []);
             setBranches(branchesRes.data.data || []);
-            setColleges(collegesRes.data.data || []);
         } catch (e) {
             console.error(e);
             setError(
@@ -161,8 +174,13 @@ const Subjects = () => {
     };
 
     useEffect(() => {
+        setLoading(true);
+        setSubjects([]);
+        setCourses([]);
+        setBranches([]);
         fetchData();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [slug]);
 
     // Read URL params on mount
     useEffect(() => {
@@ -170,7 +188,6 @@ const Subjects = () => {
         const q = params.get('search') || '';
         const p = parseInt(params.get('page') || '1', 10);
         const ps = parseInt(params.get('pageSize') || '12', 10);
-        const fco = params.get('college') || '';
         const fc = params.get('course') || '';
         const fb = params.get('branch') || '';
         const fs = params.get('semester') || '';
@@ -184,7 +201,6 @@ const Subjects = () => {
         setSearch(q);
         setPage(Number.isFinite(p) && p > 0 ? p : 1);
         setPageSize(Number.isFinite(ps) && ps > 0 ? ps : 12);
-        setFilterCollege(fco);
         setFilterCourse(fc);
         setFilterBranch(fb);
         setFilterSemester(fs);
@@ -202,7 +218,7 @@ const Subjects = () => {
         params.set('search', search || '');
         params.set('page', String(page));
         params.set('pageSize', String(pageSize));
-        params.set('college', filterCollege || '');
+        params.delete('college'); // The college is in the path now.
         params.set('course', filterCourse || '');
         params.set('branch', filterBranch || '');
         params.set('semester', filterSemester || '');
@@ -220,7 +236,6 @@ const Subjects = () => {
         search,
         page,
         pageSize,
-        filterCollege,
         filterCourse,
         filterBranch,
         filterSemester,
@@ -385,19 +400,26 @@ const Subjects = () => {
                         s.course?.courseName?.toLowerCase().includes(q) ||
                         s.branch?.branchName?.toLowerCase().includes(q) ||
                         s.semester?.toString().includes(q);
-                    const matchesCollege =
-                        !filterCollege ||
-                        (s.college?._id || '') === filterCollege;
-                    const matchesCourse =
-                        !filterCourse || (s.course?._id || '') === filterCourse;
-                    const matchesBranch =
-                        !filterBranch || (s.branch?._id || '') === filterBranch;
+                    // Course, branch and semester match through any branch
+                    // that teaches the subject, with that branch's semester.
+                    const offerings = offeringsOf(s).filter(
+                        (o) =>
+                            (!filterBranch ||
+                                idOf(o.branch) === filterBranch) &&
+                            (!filterCourse ||
+                                idOf(o.branch?.course) === filterCourse),
+                    );
+                    const matchesCourse = !filterCourse || offerings.length > 0;
+                    const matchesBranch = !filterBranch || offerings.length > 0;
                     const matchesSemester =
                         !filterSemester ||
-                        String(s.semester || '') === String(filterSemester);
+                        offerings.some(
+                            (o) =>
+                                String(o.semester || '') ===
+                                String(filterSemester),
+                        );
                     return (
                         matchesSearch &&
-                        matchesCollege &&
                         matchesCourse &&
                         matchesBranch &&
                         matchesSemester
@@ -409,7 +431,6 @@ const Subjects = () => {
     }, [
         subjects,
         search,
-        filterCollege,
         filterCourse,
         filterBranch,
         filterSemester,
@@ -440,13 +461,9 @@ const Subjects = () => {
         ready: base.filter(hasSyllabus).length,
         missing: base.filter((s) => !hasSyllabus(s)).length,
     };
-    const collegeCount = new Set(
-        base.map((s) => s.college?._id).filter(Boolean),
-    ).size;
 
     const filtersActive = Boolean(
         search ||
-            filterCollege ||
             filterCourse ||
             filterBranch ||
             filterSemester ||
@@ -454,7 +471,6 @@ const Subjects = () => {
     );
     const clearFilters = () => {
         setSearch('');
-        setFilterCollege('');
         setFilterCourse('');
         setFilterBranch('');
         setFilterSemester('');
@@ -509,7 +525,7 @@ const Subjects = () => {
                 <Button
                     size='sm'
                     icon={Sparkles}
-                    to={quickNotesPath(subject)}
+                    to={quickNotesPath(subject, slug)}
                     aria-label={`Quick notes for ${subject.subjectName}`}
                 >
                     Quick notes
@@ -593,7 +609,7 @@ const Subjects = () => {
         <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
             <PageHeader
                 title='Subjects'
-                description='Every subject across colleges, and whether it has a syllabus yet.'
+                description={`Every subject${college ? ` at ${college.name}` : ''}, and whether it has a syllabus yet.`}
                 actions={
                     <Button
                         variant='primary'
@@ -642,7 +658,7 @@ const Subjects = () => {
                             </span>
                             <span className='hidden sm:block text-[12.5px] text-muted'>
                                 {view.note ||
-                                    `Across ${collegeCount} college${collegeCount === 1 ? '' : 's'}`}
+                                    `Across ${formatNumber(branches.length)} branch${branches.length === 1 ? '' : 'es'}`}
                             </span>
                         </button>
                     );
@@ -655,18 +671,6 @@ const Subjects = () => {
                 onSearch={setFilter(setSearch)}
                 searchPlaceholder='Search by subject, code, course, branch or semester'
                 filters={[
-                    {
-                        label: 'College',
-                        value: filterCollege,
-                        onChange: setFilter(setFilterCollege),
-                        options: [
-                            { value: '', label: 'Any college' },
-                            ...colleges.map((c) => ({
-                                value: c._id,
-                                label: c.name || c.slug,
-                            })),
-                        ],
-                    },
                     {
                         label: 'Course',
                         value: filterCourse,
@@ -760,7 +764,7 @@ const Subjects = () => {
                             <thead>
                                 <tr>
                                     <Th>Subject</Th>
-                                    <Th>College · branch</Th>
+                                    <Th>Course · branches</Th>
                                     <Th>Sem</Th>
                                     <Th>Syllabus</Th>
                                     <Th>Added</Th>
@@ -785,9 +789,9 @@ const Subjects = () => {
                                         <Td className='max-w-[240px]'>
                                             <div className='flex flex-col gap-0.5 min-w-0'>
                                                 <span className='truncate'>
-                                                    {subject.college?.name ||
-                                                        subject.college?.slug ||
-                                                        'No college'}
+                                                    {subject.course
+                                                        ?.courseName ||
+                                                        'No course'}
                                                 </span>
                                                 <span className='text-[12.5px] text-muted truncate'>
                                                     {branchLine(subject)}
@@ -843,11 +847,6 @@ const Subjects = () => {
                                     {syllabusStatus(subject)}
                                 </div>
                                 <div className='flex flex-wrap gap-x-3 gap-y-1 text-[13px] text-ink-2'>
-                                    <span>
-                                        {subject.college?.name ||
-                                            subject.college?.slug ||
-                                            'No college'}
-                                    </span>
                                     <span>{branchLine(subject)}</span>
                                     <span>
                                         Added {formatDate(subject.createdAt)}

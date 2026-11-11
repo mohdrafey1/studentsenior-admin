@@ -146,7 +146,7 @@ const SyllabusDetail = () => {
         .map((line) => line.trim())
         .filter(Boolean);
     const quickNotesUrl = subject._id
-        ? `/reports/subjects/${subject._id}/quick-notes`
+        ? `/${collegeslug}/subjects/${subject._id}/quick-notes`
         : null;
     const notedCount = notedUnits
         ? units.filter((u) => notedUnits.has(Number(u.unitNumber))).length

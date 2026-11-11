@@ -31,16 +31,17 @@ import {
     Tr,
 } from '../../components/ui';
 import { SORT_OPTIONS, hasTimeFilter, sortCatalog } from './catalogUtils';
-
-const subjectsPath = (branch) => `/reports/branches/${branch._id}/subjects`;
-const allSubjectsPath = (branch) =>
-    `/reports/subjects?search=&page=1&pageSize=12&course=&branch=${branch._id}`;
+import { useCatalogCollege } from './useCatalogCollege';
 
 const plural = (n, one, many) => `${formatNumber(n)} ${n === 1 ? one : many}`;
 
 const isWide = () => window.innerWidth >= 1024;
 
 const Branches = () => {
+    const { slug, college, base, params: collegeParams } = useCatalogCollege();
+    const subjectsPath = (branch) => `${base}/branches/${branch._id}/subjects`;
+    const allSubjectsPath = (branch) =>
+        `${base}/subjects?search=&page=1&pageSize=12&course=&branch=${branch._id}`;
     const [branches, setBranches] = useState([]);
     const [courses, setCourses] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -109,8 +110,8 @@ const Branches = () => {
         try {
             setError(null);
             const [branchesRes, coursesRes] = await Promise.all([
-                api.get('/resource/branches'),
-                api.get('/resource/courses'),
+                api.get('/resource/branches', { params: collegeParams }),
+                api.get('/resource/courses', { params: collegeParams }),
             ]);
             setBranches(branchesRes.data.data || []);
             setCourses(coursesRes.data.data || []);
@@ -125,8 +126,12 @@ const Branches = () => {
     };
 
     useEffect(() => {
+        setLoading(true);
+        setBranches([]);
+        setCourses([]);
         fetchData();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [slug]);
 
     // Read URL params on mount
     useEffect(() => {
@@ -238,7 +243,7 @@ const Branches = () => {
         const ok = await showConfirm({
             title: `Delete ${branch.branchName}?`,
             message: subjectCount
-                ? `Its ${plural(subjectCount, 'subject', 'subjects')} are deleted too. Students lose access straight away. This can’t be undone.`
+                ? `Of its ${plural(subjectCount, 'subject', 'subjects')}, those taught in another branch stay there, those with PYQs, notes or a syllabus move to Unassigned, and the rest are deleted. This can’t be undone.`
                 : 'Students lose access straight away. This can’t be undone.',
             confirmText: 'Delete branch',
         });
@@ -415,7 +420,7 @@ const Branches = () => {
         <div className='min-h-full px-4 sm:px-10 pt-8 pb-12'>
             <PageHeader
                 title='Branches'
-                description='Branches within each course. Every subject, PYQ and note sits in one.'
+                description={`Branches within each course${college ? ` at ${college.name}` : ''}. Every subject, PYQ and note sits in one.`}
                 actions={
                     <Button variant='primary' icon={Plus} onClick={handleAdd}>
                         Add branch
@@ -447,9 +452,7 @@ const Branches = () => {
                             {courses.map((c) =>
                                 courseOption(
                                     c._id,
-                                    c.college?.name
-                                        ? `${c.courseName} · ${c.college.name}`
-                                        : c.courseName,
+                                    c.courseName,
                                     c.courseCode,
                                     branchCounts[c._id] ?? c.totalBranch ?? 0,
                                 ),
@@ -602,9 +605,6 @@ const Branches = () => {
                                                             {branch.course
                                                                 ?.courseName ||
                                                                 'No course'}
-                                                            {branch.college
-                                                                ?.name &&
-                                                                ` · ${branch.college.name}`}
                                                         </span>
                                                     )}
                                                 </div>
@@ -769,12 +769,7 @@ const Branches = () => {
                             placeholder='Choose a course'
                             options={courses.map((course) => ({
                                 value: course._id,
-                                // Each college has its own courses.
-                                label: `${course.courseName} (${course.courseCode})${
-                                    course.college?.name
-                                        ? ` · ${course.college.name}`
-                                        : ''
-                                }`,
+                                label: `${course.courseName} (${course.courseCode})`,
                             }))}
                         />
                     </Field>

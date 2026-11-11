@@ -66,7 +66,7 @@ function SubItem({ to, label, active, disabled, onNavigate }) {
 
 /**
  * The one navigation for the whole console: workspace pages, the current
- * college's content, then collapsible Money, People, Catalog and Blog groups.
+ * college's catalogue and content, then collapsible Money, People and Blog groups.
  */
 export default function AppSidebar({ onNavigate }) {
     const { pathname, search } = useLocation();

@@ -4,9 +4,9 @@ import {
     CreditCard,
     FileText,
     Home,
-    Layers,
     Megaphone,
     PenLine,
+    ShoppingBag,
     Users,
 } from 'lucide-react';
 
@@ -27,11 +27,21 @@ export const WORKSPACE_ITEMS = [
         to: '/notifications',
         icon: Megaphone,
     },
+    {
+        id: 'affiliate-products',
+        label: 'Affiliate products',
+        to: '/affiliate-products',
+        icon: ShoppingBag,
+    },
 ];
 
 /** Pages scoped to one college. `path` is appended to /:collegeslug. */
 export const COLLEGE_ITEMS = [
     { id: 'overview', label: 'Overview', path: '', end: true },
+    // The college's own catalogue: every PYQ, note and syllabus hangs off it.
+    { id: 'courses', label: 'Courses', path: 'courses' },
+    { id: 'branches', label: 'Branches', path: 'branches' },
+    { id: 'subjects', label: 'Subjects', path: 'subjects' },
     { id: 'pyqs', label: 'PYQs', path: 'pyqs' },
     { id: 'coverage', label: 'PYQ coverage', path: 'pyqs-coverage' },
     { id: 'solutions', label: 'PYQ solutions', path: 'pyqs-solutions' },
@@ -88,17 +98,6 @@ export const NAV_GROUPS = [
             { label: 'Support tickets', to: '/support' },
             { label: 'Community', to: '/community' },
             { label: 'Admin team', to: '/reports/dashboard-users' },
-        ],
-    },
-    {
-        id: 'catalog',
-        label: 'Catalog',
-        icon: Layers,
-        items: [
-            { label: 'Courses', to: '/reports/courses' },
-            { label: 'Branches', to: '/reports/branches' },
-            { label: 'Subjects', to: '/reports/subjects' },
-            { label: 'Affiliate products', to: '/affiliate-products' },
         ],
     },
     {

@@ -16,7 +16,6 @@ import {
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import { formatNumber } from '../../utils/format';
-import { collegeInitials } from '../../utils/initials';
 import BulkSubjectModal from '../../components/BulkSubjectModal';
 import AddSubjectModal from '../../components/AddSubjectModal';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -27,33 +26,29 @@ import {
     EmptyState,
     PageHeader,
     Segmented,
-    Select,
     Table,
     Td,
     Th,
     Tr,
 } from '../../components/ui';
-import {
-    SEMESTERS,
-    hasSyllabus,
-    quickNotesPath,
-    syllabusPath,
-} from './catalogUtils';
+import { hasSyllabus, quickNotesPath, syllabusPath } from './catalogUtils';
+import { useCatalogCollege } from './useCatalogCollege';
 
 const plural = (n, one, many) => `${formatNumber(n)} ${n === 1 ? one : many}`;
 
 const BranchSubjects = () => {
     const { branchId } = useParams();
+    const { slug, college, base, params: collegeParams } = useCatalogCollege();
+    // The modals pick the college from this list: only the one we're in.
+    const colleges = useMemo(() => (college ? [college] : []), [college]);
 
     const [branch, setBranch] = useState(null);
-    const [colleges, setColleges] = useState([]);
     const [subjects, setSubjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [viewMode, setViewMode] = useState('grid');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSemester, setSelectedSemester] = useState('all');
-    const [selectedCollege, setSelectedCollege] = useState('all');
 
     // Modal states
     const [showBulkModal, setShowBulkModal] = useState(false);
@@ -67,18 +62,17 @@ const BranchSubjects = () => {
         setLoading(true);
         setError(null);
         try {
-            const [branchRes, subjectsRes, collegesRes] = await Promise.all([
-                api.get(`/resource/branches`),
+            const [branchRes, subjectsRes] = await Promise.all([
+                api.get('/resource/branches', { params: collegeParams }),
                 api.get(`/resource/subjects/${branchId}`),
-                api.get('/college'),
             ]);
 
+            // Only this college's branches: another college's id is not found.
             const branchData = branchRes.data.data.find(
                 (b) => b._id === branchId,
             );
-            setBranch(branchData);
-            setSubjects(subjectsRes.data.data || []);
-            setColleges(collegesRes.data.data || []);
+            setBranch(branchData || null);
+            setSubjects(branchData ? subjectsRes.data.data || [] : []);
         } catch (error) {
             console.error('Error fetching data:', error);
             setError(
@@ -92,7 +86,16 @@ const BranchSubjects = () => {
     useEffect(() => {
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [branchId]);
+    }, [branchId, slug]);
+
+    // Semesters this branch teaches, for the filter.
+    const semesters = useMemo(
+        () =>
+            [...new Set(subjects.map((s) => s.semester).filter(Boolean))].sort(
+                (a, b) => a - b,
+            ),
+        [subjects],
+    );
 
     // Filter subjects
     const filteredSubjects = useMemo(() => {
@@ -113,31 +116,20 @@ const BranchSubjects = () => {
             );
         }
 
-        if (selectedCollege !== 'all') {
-            filtered = filtered.filter(
-                (s) => s.college?._id === selectedCollege,
-            );
-        }
-
         return filtered;
-    }, [subjects, searchQuery, selectedSemester, selectedCollege]);
+    }, [subjects, searchQuery, selectedSemester]);
 
-    // Group subjects by college
+    // Subjects grouped by semester, in semester order.
     const groupedSubjects = useMemo(() => {
-        const groups = {};
-        filteredSubjects.forEach((subject) => {
-            const collegeId = subject.college?._id || 'no-college';
-            const collegeName = subject.college?.name || 'No college';
-            if (!groups[collegeId]) {
-                groups[collegeId] = {
-                    name: collegeName,
-                    slug: subject.college?.slug || '',
-                    subjects: [],
-                };
-            }
-            groups[collegeId].subjects.push(subject);
-        });
-        return groups;
+        const groups = new Map();
+        [...filteredSubjects]
+            .sort((a, b) => (a.semester || 0) - (b.semester || 0))
+            .forEach((subject) => {
+                const key = subject.semester || 0;
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(subject);
+            });
+        return [...groups.entries()];
     }, [filteredSubjects]);
 
     const handleRefresh = async () => {
@@ -193,13 +185,13 @@ const BranchSubjects = () => {
                         }
                         description={
                             error ||
-                            'It may have been deleted. Pick another branch from the list.'
+                            `It may have been deleted, or it belongs to another college. Pick a branch from ${college?.name || 'this college'}’s list.`
                         }
                         action={
                             error ? (
                                 <Button onClick={fetchData}>Try again</Button>
                             ) : (
-                                <Button to='/reports/branches'>
+                                <Button to={`${base}/branches`}>
                                     All branches
                                 </Button>
                             )
@@ -210,15 +202,10 @@ const BranchSubjects = () => {
         );
     }
 
-    const collegeCount = new Set(subjects.map((s) => s.college?._id || 'none'))
-        .size;
-    const filtersActive = Boolean(
-        searchQuery || selectedSemester !== 'all' || selectedCollege !== 'all',
-    );
+    const filtersActive = Boolean(searchQuery || selectedSemester !== 'all');
     const clearFilters = () => {
         setSearchQuery('');
         setSelectedSemester('all');
-        setSelectedCollege('all');
     };
 
     const syllabusCell = (subject) => {
@@ -273,7 +260,7 @@ const BranchSubjects = () => {
                 size='sm'
                 iconOnly
                 icon={deleting === subject._id ? Loader2 : Trash2}
-                aria-label={`Delete ${subject.subjectName}`}
+                aria-label={`Remove ${subject.subjectName} from this branch`}
                 disabled={deleting === subject._id}
                 className={`text-bad-ink hover:text-bad-ink ${
                     deleting === subject._id ? '[&>svg]:animate-spin' : ''
@@ -283,16 +270,12 @@ const BranchSubjects = () => {
         </div>
     );
 
-    const subjectTable = (list, showCollege) => (
-        <Table
-            minWidth={showCollege ? 900 : 720}
-            className='[&_table]:table-fixed'
-        >
+    const subjectTable = (list) => (
+        <Table minWidth={720} className='[&_table]:table-fixed'>
             <colgroup>
                 <col />
                 <col className='w-[110px]' />
                 <col className='w-[64px]' />
-                {showCollege && <col className='w-[200px]' />}
                 <col className='w-[120px]' />
                 <col className='w-[150px]' />
                 <col className='w-[100px]' />
@@ -302,7 +285,6 @@ const BranchSubjects = () => {
                     <Th>Subject</Th>
                     <Th>Code</Th>
                     <Th>Sem</Th>
-                    {showCollege && <Th>College</Th>}
                     <Th>Syllabus</Th>
                     <Th>Quick notes</Th>
                     <Th>
@@ -320,16 +302,11 @@ const BranchSubjects = () => {
                             {subject.subjectCode}
                         </Td>
                         <Td mono>{subject.semester}</Td>
-                        {showCollege && (
-                            <Td className='text-ink-2 truncate'>
-                                {subject.college?.name || '—'}
-                            </Td>
-                        )}
                         <Td>{syllabusCell(subject)}</Td>
                         <Td>
                             {hasSyllabus(subject) ? (
                                 <Link
-                                    to={quickNotesPath(subject)}
+                                    to={quickNotesPath(subject, slug)}
                                     className='text-[13px] text-link hover:underline'
                                     aria-label={`Quick notes for ${subject.subjectName}`}
                                 >
@@ -360,8 +337,8 @@ const BranchSubjects = () => {
                     .join(' · ')}
                 title={branch.branchName || 'Branch'}
                 description={`${plural(subjects.length, 'subject', 'subjects')}${
-                    subjects.length
-                        ? ` across ${plural(collegeCount, 'college', 'colleges')}`
+                    semesters.length
+                        ? ` across ${plural(semesters.length, 'semester', 'semesters')}`
                         : ''
                 }`}
                 actions={
@@ -396,7 +373,7 @@ const BranchSubjects = () => {
                         onChange={setSelectedSemester}
                         options={[
                             { value: 'all', label: 'All' },
-                            ...SEMESTERS.map((sem) => ({
+                            ...semesters.map((sem) => ({
                                 value: String(sem),
                                 label: `Sem ${sem}`,
                             })),
@@ -404,19 +381,6 @@ const BranchSubjects = () => {
                     />
                 </div>
                 <span className='flex-1' />
-                <Select
-                    aria-label='College'
-                    value={selectedCollege}
-                    onChange={(e) => setSelectedCollege(e.target.value)}
-                    className='!w-auto max-w-[240px]'
-                    options={[
-                        { value: 'all', label: 'All colleges' },
-                        ...colleges.map((college) => ({
-                            value: college._id,
-                            label: college.name,
-                        })),
-                    ]}
-                />
                 <label className='flex items-center gap-2 flex-1 sm:flex-none sm:w-64 min-w-[200px] h-9 px-3 rounded-lg border border-line-strong bg-sheet text-muted focus-within:ring-2 focus-within:ring-brand/30'>
                     <Search
                         className='w-[15px] h-[15px] shrink-0'
@@ -439,7 +403,7 @@ const BranchSubjects = () => {
                         {
                             value: 'grid',
                             icon: Layers,
-                            ariaLabel: 'Group by college',
+                            ariaLabel: 'Group by semester',
                         },
                         {
                             value: 'table',
@@ -463,7 +427,7 @@ const BranchSubjects = () => {
                         description={
                             subjects.length === 0
                                 ? 'Add them one at a time, or upload a scheme PDF and let AI list them.'
-                                : 'Try another semester, college or search.'
+                                : 'Try another semester or search.'
                         }
                         action={
                             subjects.length === 0 ? (
@@ -482,44 +446,40 @@ const BranchSubjects = () => {
                     />
                 </div>
             ) : viewMode === 'grid' ? (
-                // Grouped by college
+                // Grouped by semester
                 <div className='flex flex-col gap-5'>
-                    {Object.entries(groupedSubjects).map(
-                        ([collegeId, group]) => (
-                            <section
-                                key={collegeId}
-                                aria-labelledby={`college-${collegeId}`}
-                                className='bg-sheet border border-line rounded-xl overflow-hidden'
-                            >
-                                <div className='flex items-center gap-2.5 px-5 py-3 border-b border-line-soft bg-sunken'>
-                                    <span
-                                        aria-hidden='true'
-                                        className='w-[26px] h-[26px] rounded-[7px] bg-brand-soft text-brand-ink flex items-center justify-center text-[10.5px] font-semibold shrink-0'
-                                    >
-                                        {collegeInitials(group.name)}
-                                    </span>
-                                    <h2
-                                        id={`college-${collegeId}`}
-                                        className='flex-1 min-w-0 text-[14.5px] font-semibold text-ink truncate'
-                                    >
-                                        {group.name}
-                                    </h2>
-                                    <span className='text-[12.5px] text-muted whitespace-nowrap'>
-                                        {plural(
-                                            group.subjects.length,
-                                            'subject',
-                                            'subjects',
-                                        )}
-                                    </span>
-                                </div>
-                                {subjectTable(group.subjects, false)}
-                            </section>
-                        ),
-                    )}
+                    {groupedSubjects.map(([semester, list]) => (
+                        <section
+                            key={semester}
+                            aria-labelledby={`semester-${semester}`}
+                            className='bg-sheet border border-line rounded-xl overflow-hidden'
+                        >
+                            <div className='flex items-center gap-2.5 px-5 py-3 border-b border-line-soft bg-sunken'>
+                                <span
+                                    aria-hidden='true'
+                                    className='w-[26px] h-[26px] rounded-[7px] bg-brand-soft text-brand-ink flex items-center justify-center text-[11px] font-semibold shrink-0'
+                                >
+                                    {semester || '–'}
+                                </span>
+                                <h2
+                                    id={`semester-${semester}`}
+                                    className='flex-1 min-w-0 text-[14.5px] font-semibold text-ink truncate'
+                                >
+                                    {semester
+                                        ? `Semester ${semester}`
+                                        : 'No semester'}
+                                </h2>
+                                <span className='text-[12.5px] text-muted whitespace-nowrap'>
+                                    {plural(list.length, 'subject', 'subjects')}
+                                </span>
+                            </div>
+                            {subjectTable(list)}
+                        </section>
+                    ))}
                 </div>
             ) : (
                 <div className='bg-sheet border border-line rounded-xl overflow-hidden'>
-                    {subjectTable(filteredSubjects, true)}
+                    {subjectTable(filteredSubjects)}
                 </div>
             )}
 
@@ -527,11 +487,7 @@ const BranchSubjects = () => {
             <BulkSubjectModal
                 showModal={showBulkModal}
                 branch={branch}
-                college={
-                    selectedCollege !== 'all'
-                        ? selectedCollege
-                        : colleges[0]?._id
-                }
+                college={college?._id}
                 colleges={colleges}
                 onClose={() => setShowBulkModal(false)}
                 onSuccess={handleRefresh}
@@ -556,9 +512,9 @@ const BranchSubjects = () => {
                 isOpen={Boolean(confirmDelete)}
                 onClose={() => setConfirmDelete(null)}
                 onConfirm={() => handleDelete(confirmDelete._id)}
-                title={`Delete ${confirmDelete?.subjectName || 'this subject'}?`}
-                message='Students can no longer find it in this branch, and PYQs and notes linked to it lose their subject. This can’t be undone.'
-                confirmText='Delete subject'
+                title={`Remove ${confirmDelete?.subjectName || 'this subject'} from this branch?`}
+                message='Students stop seeing it in this branch. It stays in any other branch that teaches it. If this is its only branch, a subject with PYQs, notes or a syllabus moves to Unassigned and keeps them; one with nothing in it is deleted.'
+                confirmText='Remove subject'
                 variant='danger'
             />
         </div>
