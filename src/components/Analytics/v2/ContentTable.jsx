@@ -39,7 +39,7 @@ export default function ContentTable({ rows = [], realtime = false }) {
                                 <Th align='right'>Unlocks</Th>
                                 <Th align='right'>7 days</Th>
                                 <Th align='right'>30 days</Th>
-                                <Th align='right'>Since launch</Th>
+                                <Th align='right'>90-day views</Th>
                             </>
                         )}
                     </tr>

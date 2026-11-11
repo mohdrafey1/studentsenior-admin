@@ -8,7 +8,7 @@ import { Button } from '../../components/ui';
 import { number } from '../../components/Analytics/v2/data';
 
 export default function Realtime() {
-    const controls = useAnalyticsFilters(366, { realtime: true });
+    const controls = useAnalyticsFilters(undefined, { realtime: true });
     const query = useRealtimeAnalytics(controls);
     const data = query.data;
     return (

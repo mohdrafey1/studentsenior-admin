@@ -17,7 +17,7 @@ const metrics = [
     { key: 'netRevenueINR', label: 'Net revenue', format: money },
 ];
 export default function Revenue() {
-    const controls = useAnalyticsFilters(366, { revenue: true });
+    const controls = useAnalyticsFilters(undefined, { revenue: true });
     const query = useAnalyticsQuery('/analytics/v2/revenue', controls.params, {
         enabled: controls.ready,
     });

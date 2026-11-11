@@ -22,11 +22,12 @@ import {
     analyticsLink,
     typeBreakdown,
     contentTitle,
+    REPORT_MAX_DAYS,
 } from '../src/components/Analytics/v2/data.js';
 import { contentDestination } from '../src/components/Analytics/v2/contentDestination.js';
 
 const today = '2026-10-07';
-const read = (query, maxDays = 366) =>
+const read = (query, maxDays) =>
     readFilters(new URLSearchParams(query), maxDays, today);
 
 test('default range is 28 inclusive IST days and handles IST midnight', () => {
@@ -59,9 +60,10 @@ test('invalid, future and reversed dates are rejected before a request', () => {
         assert.ok(read(query).error, query);
 });
 
-test('reports allow up to 366 days, while user activity stops at 90 days', () => {
-    assert.equal(read('from=2025-10-07').error, '');
-    assert.ok(read('from=2025-10-06').error);
+test('reports and user activity cover at most the 90 days the API keeps', () => {
+    assert.equal(REPORT_MAX_DAYS, 90);
+    assert.equal(read('from=2026-07-10').error, '');
+    assert.ok(read('from=2026-07-09').error);
     assert.equal(read('from=2026-07-10', 90).error, '');
     assert.ok(read('from=2026-07-09', 90).error);
 });

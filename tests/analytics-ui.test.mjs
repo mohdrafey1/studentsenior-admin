@@ -278,7 +278,7 @@ test('content CSV uses the shared exporter and retains quoted titles, counts and
         const text = await blob.text();
         assert.match(text, /"Maths, ""2026"" — हिन्दी"/);
         assert.match(text, /12,3,0/);
-        assert.match(text, /Views since launch/);
+        assert.match(text, /90-day views/);
     } finally {
         globalThis.document = oldDocument;
         URL.createObjectURL = oldCreate;

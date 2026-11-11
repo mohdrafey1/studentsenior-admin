@@ -7,10 +7,11 @@ import {
     reportParams,
     validFilterRequest,
     settledFilterRequest,
+    REPORT_MAX_DAYS,
 } from '../components/Analytics/v2/data';
 
 export default function useAnalyticsFilters(
-    maxDays = 366,
+    maxDays = REPORT_MAX_DAYS,
     { realtime = false, revenue = false } = {},
 ) {
     const [search, setSearch] = useSearchParams();

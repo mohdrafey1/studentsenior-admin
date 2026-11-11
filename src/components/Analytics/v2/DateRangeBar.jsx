@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { useColleges } from '../../../context/CollegeContext';
 import { Button, Input, Select, Switch } from '../../ui';
-import { dayKey, rangeDays, resetFilters, shiftDay } from './data';
+import {
+    dayKey,
+    rangeDays,
+    REPORT_MAX_DAYS,
+    resetFilters,
+    shiftDay,
+} from './data';
 
 function DateField({ label, value, min, max, commit }) {
     const [draft, setDraft] = useState(value);
@@ -30,7 +36,7 @@ export default function DateRangeBar({
     filters,
     error,
     update,
-    maxDays = 366,
+    maxDays = REPORT_MAX_DAYS,
     realtime = false,
     revenue = false,
     comparison = true,
@@ -38,7 +44,7 @@ export default function DateRangeBar({
 }) {
     const { colleges } = useColleges();
     const today = dayKey();
-    const presets = [7, 14, 28, 90, 365].filter((days) => days <= maxDays);
+    const presets = [7, 14, 28, 90].filter((days) => days <= maxDays);
     const days = rangeDays(filters.from, filters.to);
     const selected =
         !filters.custom && filters.to === today && presets.includes(days)

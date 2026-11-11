@@ -33,9 +33,13 @@ export const validDay = (value) =>
     Number.isFinite(Date.parse(value)) &&
     new Date(value).toISOString().slice(0, 10) === value;
 
+// The API keeps 90 days of daily analytics (the free database tier has room
+// for no more), so no report can cover a longer range.
+export const REPORT_MAX_DAYS = 90;
+
 export function readFilters(
     search,
-    maxDays = 366,
+    maxDays = REPORT_MAX_DAYS,
     today = dayKey(),
     { realtime = false, revenue = false } = {},
 ) {

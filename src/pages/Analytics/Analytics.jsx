@@ -102,7 +102,7 @@ export default function Analytics() {
                 title='Top content this period'
                 query={content}
                 empty={!content.data?.top?.length}
-                note='7-day and 30-day views end on the selected end date. Since launch excludes legacy counters.'
+                note='7-, 30- and 90-day views end on the selected end date. Older days are not kept.'
             >
                 <ContentTable rows={content.data?.top} />
             </QueryPanel>
