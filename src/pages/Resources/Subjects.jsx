@@ -242,7 +242,7 @@ const Subjects = () => {
         const ok = await showConfirm({
             title: `Delete ${subject.subjectName}?`,
             message:
-                'Students can no longer find it, and PYQs and notes linked to it lose their subject. This can’t be undone.',
+                'It is removed from every branch. A subject that still has PYQs, notes or a syllabus can’t be deleted; remove it from a branch instead. This can’t be undone.',
             confirmText: 'Delete subject',
         });
         if (!ok) return;
@@ -253,7 +253,10 @@ const Subjects = () => {
             toast.success('Subject deleted');
         } catch (e) {
             console.error(e);
-            toast.error('Couldn’t delete the subject. Try again.');
+            toast.error(
+                e.response?.data?.message ||
+                    'Couldn’t delete the subject. Try again.',
+            );
         }
     };
 

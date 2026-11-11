@@ -152,12 +152,19 @@ const BranchSubjects = () => {
     const handleDelete = async (id) => {
         setDeleting(id);
         try {
-            await api.delete(`/resource/subjects/${id}`);
-            toast.success('Subject deleted');
+            // A subject can be shared by several branches: take it out of
+            // this one only. Its papers and notes stay with it.
+            await api.delete(`/resource/subjects/${id}`, {
+                params: { branch: branchId },
+            });
+            toast.success('Subject removed from this branch');
             setSubjects((prev) => prev.filter((s) => s._id !== id));
         } catch (error) {
-            console.error('Error deleting subject:', error);
-            toast.error('Couldn’t delete the subject. Try again.');
+            console.error('Error removing subject:', error);
+            toast.error(
+                error.response?.data?.message ||
+                    'Couldn’t remove the subject. Try again.',
+            );
         } finally {
             setDeleting(null);
         }

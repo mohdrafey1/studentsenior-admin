@@ -447,7 +447,9 @@ const Branches = () => {
                             {courses.map((c) =>
                                 courseOption(
                                     c._id,
-                                    c.courseName,
+                                    c.college?.name
+                                        ? `${c.courseName} · ${c.college.name}`
+                                        : c.courseName,
                                     c.courseCode,
                                     branchCounts[c._id] ?? c.totalBranch ?? 0,
                                 ),
@@ -600,6 +602,9 @@ const Branches = () => {
                                                             {branch.course
                                                                 ?.courseName ||
                                                                 'No course'}
+                                                            {branch.college
+                                                                ?.name &&
+                                                                ` · ${branch.college.name}`}
                                                         </span>
                                                     )}
                                                 </div>
@@ -764,7 +769,12 @@ const Branches = () => {
                             placeholder='Choose a course'
                             options={courses.map((course) => ({
                                 value: course._id,
-                                label: `${course.courseName} (${course.courseCode})`,
+                                // Each college has its own courses.
+                                label: `${course.courseName} (${course.courseCode})${
+                                    course.college?.name
+                                        ? ` · ${course.college.name}`
+                                        : ''
+                                }`,
                             }))}
                         />
                     </Field>

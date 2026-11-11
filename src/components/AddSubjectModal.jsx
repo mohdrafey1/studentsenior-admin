@@ -252,7 +252,11 @@ const AddSubjectModal = ({
                                 placeholder='Choose a course'
                                 options={courses.map((course) => ({
                                     value: course._id,
-                                    label: `${course.courseName} (${course.courseCode})`,
+                                    label: `${course.courseName} (${course.courseCode})${
+                                        course.college?.name
+                                            ? ` · ${course.college.name}`
+                                            : ''
+                                    }`,
                                 }))}
                             />
                         </Field>
