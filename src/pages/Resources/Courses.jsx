@@ -404,8 +404,17 @@ const Courses = () => {
                             <tbody>
                                 {current.map((course) => (
                                     <Tr key={course._id}>
-                                        <Td className='font-medium max-w-[320px] truncate'>
-                                            {course.courseName}
+                                        <Td className='max-w-[320px]'>
+                                            <div className='flex flex-col gap-0.5 min-w-0'>
+                                                <span className='font-medium truncate'>
+                                                    {course.courseName}
+                                                </span>
+                                                {course.college?.name && (
+                                                    <span className='text-[12.5px] text-muted truncate'>
+                                                        {course.college.name}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </Td>
                                         <Td
                                             mono
@@ -467,6 +476,11 @@ const Courses = () => {
                                         <span className='font-medium text-ink truncate'>
                                             {course.courseName}
                                         </span>
+                                        {course.college?.name && (
+                                            <span className='text-[12.5px] text-muted truncate'>
+                                                {course.college.name}
+                                            </span>
+                                        )}
                                         <code className='self-start font-mono text-[12px] px-1.5 py-px rounded bg-ground text-ink-2'>
                                             {course.courseCode}
                                         </code>
