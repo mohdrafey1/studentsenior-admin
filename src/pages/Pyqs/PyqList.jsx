@@ -22,7 +22,7 @@ import {
 } from '../../utils/format';
 import { EXAM_TYPES, examTypeLabel } from '../../utils/labels';
 import FilterBar from '../../components/Common/FilterBar';
-import { filterByTime } from '../../components/Common/timeFilterUtils';
+import { timeFilterRange } from '../../components/Common/timeFilterUtils';
 import Loader from '../../components/Common/Loader';
 import ListNotifySwitch from '../../components/ContentAlerts/ListNotifySwitch';
 import { sendContentAlerts } from '../../components/ContentAlerts/sendAlerts';
@@ -81,8 +81,13 @@ const PyqList = () => {
 
     // Filters live in the URL so a filtered list can be shared or reloaded.
     const params = new URLSearchParams(location.search);
+    // One page of PYQs; the server filters, counts and pages.
     const [pyqs, setPyqs] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [counts, setCounts] = useState({ '': 0 });
+    const [uniqueYears, setUniqueYears] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [exporting, setExporting] = useState(false);
     const [error, setError] = useState(null);
     const [search, setSearch] = useState(params.get('search') || '');
     const [page, setPage] = useState(parseInt(params.get('page')) || 1);
@@ -109,23 +114,57 @@ const PyqList = () => {
     // One switch for the page: row and bulk approvals both follow it.
     const [notify, setNotify] = useNotifyPreference();
 
-    const fetchPyqs = async () => {
-        try {
-            setError(null);
-            const response = await api.get(`/pyq/all/${collegeslug}`);
-            setPyqs(response.data.data || []);
-        } catch {
-            setError(
-                'Couldn’t load PYQs. Check your connection and try again.',
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
+    // Wait for a pause in typing before searching.
+    const [query, setQuery] = useState(search);
+    useEffect(() => {
+        const timer = setTimeout(() => setQuery(search.trim()), 300);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    const listParams = () => ({
+        ...Object.fromEntries(
+            Object.entries(filters).filter(([, value]) => value),
+        ),
+        ...(query ? { search: query } : {}),
+        ...timeFilterRange(timeFilter),
+        sortBy,
+        sortOrder,
+    });
+
+    // Bumped after approvals, edits and deletes to reload the page.
+    const [reload, setReload] = useState(0);
+    const fetchPyqs = () => setReload((n) => n + 1);
 
     useEffect(() => {
-        fetchPyqs();
-    }, [collegeslug]); // eslint-disable-line react-hooks/exhaustive-deps
+        let cancelled = false;
+        setError(null);
+        api.get(`/pyq/all/${collegeslug}`, {
+            params: { ...listParams(), page, limit: pageSize },
+        })
+            .then((response) => {
+                if (cancelled) return;
+                const data = response.data.data;
+                // Approving or deleting the last rows can empty this page.
+                if (!data.items?.length && page > 1 && data.total > 0) {
+                    setPage(Math.ceil(data.total / pageSize));
+                    return;
+                }
+                setPyqs(data.items || []);
+                setTotal(data.total || 0);
+                setCounts({ ...data.counts, '': data.counts?.all || 0 });
+                setUniqueYears(data.years || []);
+            })
+            .catch(() => {
+                if (!cancelled)
+                    setError(
+                        'Couldn’t load PYQs. Check your connection and try again.',
+                    );
+            })
+            .finally(() => !cancelled && setLoading(false));
+        return () => {
+            cancelled = true;
+        };
+    }, [collegeslug, query, timeFilter, filters, sortBy, sortOrder, page, pageSize, reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         const next = new URLSearchParams();
@@ -143,60 +182,7 @@ const PyqList = () => {
         setPage(1);
     };
 
-    const uniqueYears = useMemo(
-        () =>
-            [...new Set(pyqs.map((p) => p.year))]
-                .filter(Boolean)
-                .sort((a, b) => b.localeCompare(a)),
-        [pyqs],
-    );
-
-    // Everything except the status tab, so tab counts reflect the other filters.
-    const matchesFilters = (p) => {
-        const q = search.trim().toLowerCase();
-        const matchesSearch =
-            !q ||
-            p.subject?.subjectName?.toLowerCase().includes(q) ||
-            p.subject?.subjectCode?.toLowerCase().includes(q) ||
-            p.subject?.branch?.branchName?.toLowerCase().includes(q) ||
-            p.subject?.branch?.course?.courseName?.toLowerCase().includes(q) ||
-            p.year?.toString().includes(q) ||
-            p.examType?.toLowerCase().includes(q);
-        const bool = (filter, value) =>
-            filter === '' || (filter === 'true' ? value : !value);
-        return (
-            matchesSearch &&
-            (!filters.year || p.year === filters.year) &&
-            (!filters.examType || p.examType === filters.examType) &&
-            filterByTime(p, timeFilter) &&
-            bool(filters.solved, p.solved) &&
-            bool(filters.isPaid, p.isPaid) &&
-            bool(filters.deleted, p.deleted)
-        );
-    };
-
-    const base = pyqs.filter(matchesFilters);
-    const counts = base.reduce(
-        (acc, p) => {
-            const status = p.submissionStatus || 'pending';
-            acc[status] = (acc[status] || 0) + 1;
-            return acc;
-        },
-        { '': base.length },
-    );
-    const filtered = base.filter(
-        (p) =>
-            !filters.submissionStatus ||
-            (p.submissionStatus || 'pending') === filters.submissionStatus,
-    );
-    const sorted = [...filtered].sort((a, b) => {
-        const diff =
-            sortBy === 'clickCounts'
-                ? (a.clickCounts || 0) - (b.clickCounts || 0)
-                : new Date(a.createdAt) - new Date(b.createdAt);
-        return sortOrder === 'desc' ? -diff : diff;
-    });
-    const current = sorted.slice((page - 1) * pageSize, page * pageSize);
+    const current = pyqs;
 
     const selection = useSelection(
         useMemo(() => current.map((p) => p._id), [current]),
@@ -217,10 +203,13 @@ const PyqList = () => {
         setPage(1);
     };
 
-    const updateLocal = (ids, patch) =>
+    // Show the change at once, then reload so tabs and totals catch up.
+    const updateLocal = (ids, patch) => {
         setPyqs((prev) =>
             prev.map((p) => (ids.includes(p._id) ? { ...p, ...patch } : p)),
         );
+        fetchPyqs();
+    };
 
     // Runs one request per PYQ and reports how many went through.
     const runBulk = async (ids, request, verb) => {
@@ -294,11 +283,28 @@ const PyqList = () => {
                     'deleted',
                 );
                 setPyqs((prev) => prev.filter((p) => !done.includes(p._id)));
+                fetchPyqs();
                 selection.clear();
             },
         });
 
-    const exportCsv = () =>
+    // Every PYQ matching the filters, not just this page.
+    const exportCsv = async () => {
+        setExporting(true);
+        try {
+            const response = await api.get(`/pyq/all/${collegeslug}`, {
+                params: listParams(),
+                timeout: 60000,
+            });
+            writeCsv(response.data.data || []);
+        } catch {
+            toast.error('Couldn’t export the PYQs. Try again.');
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const writeCsv = (rows) =>
         downloadCsv(
             `pyqs-${collegeslug}`,
             [
@@ -327,7 +333,7 @@ const PyqList = () => {
                     value: (p) => formatDateTime(p.createdAt),
                 },
             ],
-            sorted,
+            rows,
         );
 
     if (loading) return <Loader />;
@@ -389,7 +395,7 @@ const PyqList = () => {
         <Pagination
             currentPage={page}
             pageSize={pageSize}
-            totalItems={sorted.length}
+            totalItems={total}
             onPageChange={setPage}
             onPageSizeChange={(size) => {
                 setPageSize(size);
@@ -398,6 +404,8 @@ const PyqList = () => {
         />
     );
 
+    const nothingYet =
+        !counts[''] && !search && !activeFilters && timeFilter === 'all';
     const empty = (
         <EmptyState
             icon={FileText}
@@ -409,7 +417,7 @@ const PyqList = () => {
                     : 'neutral'
             }
             title={
-                pyqs.length === 0
+                nothingYet
                     ? 'No PYQs yet'
                     : filters.submissionStatus === 'pending' &&
                         !activeFilters &&
@@ -418,7 +426,7 @@ const PyqList = () => {
                       : 'No PYQs match'
             }
             description={
-                pyqs.length === 0
+                nothingYet
                     ? 'Papers students upload for this college appear here.'
                     : 'Try another search or clear the filters.'
             }
@@ -440,7 +448,7 @@ const PyqList = () => {
                         <Button
                             icon={Download}
                             onClick={exportCsv}
-                            disabled={!sorted.length}
+                            disabled={!total || exporting}
                         >
                             Export CSV
                         </Button>
@@ -538,7 +546,10 @@ const PyqList = () => {
                 }}
                 sortBy={{
                     value: sortBy,
-                    onChange: setSortBy,
+                    onChange: (v) => {
+                        setSortBy(v);
+                        setPage(1);
+                    },
                     options: [
                         { value: 'createdAt', label: 'Newest first' },
                         { value: 'clickCounts', label: 'Most viewed' },
@@ -546,8 +557,10 @@ const PyqList = () => {
                 }}
                 sortOrder={{
                     value: sortOrder,
-                    onToggle: () =>
-                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                    onToggle: () => {
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                        setPage(1);
+                    },
                 }}
                 viewMode={{ value: viewMode, onChange: setViewMode }}
                 onClear={clearAll}
@@ -741,7 +754,7 @@ const PyqList = () => {
                             </tbody>
                         </Table>
                     )}
-                    {sorted.length > 0 && (
+                    {total > 0 && (
                         <div className='px-4 py-3 border-t border-line-soft'>
                             {pagination}
                         </div>

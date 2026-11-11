@@ -81,19 +81,15 @@ const UserDetail = () => {
     const fetchUser = async () => {
         try {
             setLoading(true);
-            // There is no single-user endpoint; find the user in the full list.
-            const response = await api.get(`/user/users`);
-            const foundUser = response.data.data.find((u) => u._id === userId);
-            if (foundUser) {
-                setUser(foundUser);
-                setError(null);
-            } else {
-                setError('This user doesn’t exist or was deleted.');
-            }
+            const response = await api.get(`/user/users/${userId}`);
+            setUser(response.data.data);
+            setError(null);
         } catch (e) {
             console.error('Error fetching user:', e);
             setError(
-                'Couldn’t load this user. Check your connection and try again.',
+                e.response?.status === 404
+                    ? 'This user doesn’t exist or was deleted.'
+                    : 'Couldn’t load this user. Check your connection and try again.',
             );
         } finally {
             setLoading(false);

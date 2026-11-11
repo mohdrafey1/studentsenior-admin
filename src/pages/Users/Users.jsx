@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -11,7 +11,7 @@ import api from '../../utils/api';
 import { downloadCsv } from '../../utils/csv';
 import { formatDate, formatDateTime, formatNumber } from '../../utils/format';
 import FilterBar from '../../components/Common/FilterBar';
-import { filterByTime } from '../../components/Common/timeFilterUtils';
+import { timeFilterRange } from '../../components/Common/timeFilterUtils';
 import Loader from '../../components/Common/Loader';
 import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -45,8 +45,12 @@ const UsersPage = () => {
 
     // Filters live in the URL so a filtered list can be shared or reloaded.
     const params = new URLSearchParams(location.search);
+    // One page of users; the server filters, counts and pages.
     const [items, setItems] = useState([]);
+    const [totalItems, setTotalItems] = useState(0);
+    const [counts, setCounts] = useState({ '': 0, true: 0, false: 0 });
     const [loading, setLoading] = useState(true);
+    const [exporting, setExporting] = useState(false);
     const [error, setError] = useState(null);
     const [search, setSearch] = useState(params.get('search') || '');
     const [page, setPage] = useState(() => {
@@ -76,24 +80,58 @@ const UsersPage = () => {
     });
     const [confirm, setConfirm] = useState(null);
 
-    const fetchData = async () => {
-        try {
-            setError(null);
-            const res = await api.get('/user/users');
-            setItems(res.data.data || []);
-        } catch (e) {
-            console.error(e);
-            setError(
-                'Couldn’t load users. Check your connection and try again.',
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
+    // Wait for a pause in typing before searching.
+    const [query, setQuery] = useState(search);
+    useEffect(() => {
+        const timer = setTimeout(() => setQuery(search.trim()), 300);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    const listParams = () => ({
+        ...(query ? { search: query } : {}),
+        ...(blockedFilter ? { blocked: blockedFilter } : {}),
+        ...timeFilterRange(timeFilter || 'all'),
+        sortBy,
+        sortOrder,
+    });
+
+    const [reload, setReload] = useState(0);
+    const fetchData = () => setReload((n) => n + 1);
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        let cancelled = false;
+        setError(null);
+        api.get('/user/users', {
+            params: { ...listParams(), page, limit: pageSize },
+        })
+            .then((res) => {
+                if (cancelled) return;
+                const data = res.data.data;
+                // Approving or deleting the last rows can empty this page.
+                if (!data.items?.length && page > 1 && data.total > 0) {
+                    setPage(Math.ceil(data.total / pageSize));
+                    return;
+                }
+                setItems(data.items || []);
+                setTotalItems(data.total || 0);
+                setCounts({
+                    '': data.counts?.all || 0,
+                    true: data.counts?.blocked || 0,
+                    false: data.counts?.active || 0,
+                });
+            })
+            .catch((e) => {
+                console.error(e);
+                if (!cancelled)
+                    setError(
+                        'Couldn’t load users. Check your connection and try again.',
+                    );
+            })
+            .finally(() => !cancelled && setLoading(false));
+        return () => {
+            cancelled = true;
+        };
+    }, [query, blockedFilter, timeFilter, sortBy, sortOrder, page, pageSize, reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Persist filters in the URL.
     useEffect(() => {
@@ -123,56 +161,15 @@ const UsersPage = () => {
         navigate,
     ]);
 
-    // Everything except the status tab, so tab counts reflect the other filters.
-    const base = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        return items.filter((u) => {
-            const email = (u.email || '').toLowerCase();
-            const name = (u.username || u.name || '').toLowerCase();
-            const matchesSearch = !q || email.includes(q) || name.includes(q);
-            return matchesSearch && filterByTime(u, timeFilter || 'all');
-        });
-    }, [items, search, timeFilter]);
+    const current = items;
 
-    const counts = useMemo(
-        () => ({
-            '': base.length,
-            true: base.filter((u) => u.blocked).length,
-            false: base.filter((u) => !u.blocked).length,
-        }),
-        [base],
-    );
-
-    const filteredAndSorted = useMemo(
-        () =>
-            base
-                .filter(
-                    (u) =>
-                        blockedFilter === '' ||
-                        String(!!u.blocked) === blockedFilter,
-                )
-                .sort((a, b) => {
-                    const aVal =
-                        sortBy === 'points'
-                            ? wallet(a, 'currentBalance')
-                            : new Date(a.createdAt || 0).getTime();
-                    const bVal =
-                        sortBy === 'points'
-                            ? wallet(b, 'currentBalance')
-                            : new Date(b.createdAt || 0).getTime();
-                    return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-                }),
-        [base, blockedFilter, sortBy, sortOrder],
-    );
-
-    const totalItems = filteredAndSorted.length;
-    const start = (page - 1) * pageSize;
-    const current = filteredAndSorted.slice(start, start + pageSize);
-
-    const updateItem = (id, partial) =>
+    // Show the change at once, then reload so tabs and totals catch up.
+    const updateItem = (id, partial) => {
         setItems((prev) =>
             prev.map((u) => (u._id === id ? { ...u, ...partial } : u)),
         );
+        fetchData();
+    };
 
     const askBlock = (u) =>
         setConfirm({
@@ -211,7 +208,23 @@ const UsersPage = () => {
             },
         });
 
-    const exportCsv = () =>
+    // Every user matching the filters, not just this page.
+    const exportCsv = async () => {
+        setExporting(true);
+        try {
+            const res = await api.get('/user/users', {
+                params: listParams(),
+                timeout: 60000,
+            });
+            writeCsv(res.data.data || []);
+        } catch {
+            toast.error('Couldn’t export the users. Try again.');
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const writeCsv = (rows) =>
         downloadCsv(
             'users',
             [
@@ -244,7 +257,7 @@ const UsersPage = () => {
                 },
                 { label: 'Joined', value: (u) => formatDateTime(u.createdAt) },
             ],
-            filteredAndSorted,
+            rows,
         );
 
     if (loading) return <Loader />;
@@ -314,12 +327,13 @@ const UsersPage = () => {
         />
     );
 
+    const nothingYet = !counts[''] && !hasFilters;
     const empty = (
         <EmptyState
             icon={UsersIcon}
-            title={items.length === 0 ? 'No users yet' : 'No users match'}
+            title={nothingYet ? 'No users yet' : 'No users match'}
             description={
-                items.length === 0
+                nothingYet
                     ? 'Students who sign up on the website or app appear here.'
                     : 'Try another search or clear the filters.'
             }
@@ -340,7 +354,7 @@ const UsersPage = () => {
                     <Button
                         icon={Download}
                         onClick={exportCsv}
-                        disabled={!filteredAndSorted.length}
+                        disabled={!totalItems || exporting}
                     >
                         Export CSV
                     </Button>
@@ -379,7 +393,10 @@ const UsersPage = () => {
                 }}
                 sortBy={{
                     value: sortBy,
-                    onChange: setSortBy,
+                    onChange: (v) => {
+                        setSortBy(v);
+                        setPage(1);
+                    },
                     options: [
                         { value: 'createdAt', label: 'Date joined' },
                         { value: 'points', label: 'Points balance' },
@@ -387,8 +404,10 @@ const UsersPage = () => {
                 }}
                 sortOrder={{
                     value: sortOrder,
-                    onToggle: () =>
-                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'),
+                    onToggle: () => {
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                        setPage(1);
+                    },
                 }}
                 viewMode={{ value: viewMode, onChange: setViewMode }}
                 onClear={clearFilters}

@@ -36,7 +36,11 @@ api.interceptors.response.use(
         return response;
     },
     (error) => {
-        if (error.response?.status === 401) {
+        // Only the dashboard API can say the admin session is over. A 401 from
+        // any other service (an absolute URL) must not sign the reviewer out.
+        const url = error.config?.url || '';
+        const toDashboard = !/^https?:\/\//i.test(url) || url.startsWith(API_BASE_URL);
+        if (error.response?.status === 401 && toDashboard) {
             // Token expired or invalid
             localStorage.removeItem('admin_token');
             localStorage.removeItem('admin_user');

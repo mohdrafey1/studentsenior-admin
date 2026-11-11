@@ -3,9 +3,9 @@ import { ExternalLink, FileText, Loader2 } from 'lucide-react';
 import api from '../utils/api';
 import { Button, EmptyState } from './ui';
 
-// Uploaded PDFs live in a private bucket; the main API signs a short-lived URL.
-const SIGNED_URL_ENDPOINT =
-    'https://backend.studentsenior.com/api/v2/aws/signed-url';
+// Uploaded PDFs live in a private bucket. The dashboard API signs a
+// short-lived link for reviewers, whatever the file's status or price.
+const SIGNED_URL_ENDPOINT = '/files/signed-url';
 
 const fileNameOf = (url) => {
     try {
@@ -17,10 +17,13 @@ const fileNameOf = (url) => {
 
 /**
  * PDF preview panel for review pages. Loads only when asked, since each
- * preview signs a URL and downloads the file.
+ * preview signs a URL and downloads the file. `resourceType` is 'pyq' or
+ * 'notes'; `resourceId` is that record's id.
  */
 export default function FilePreview({
     fileUrl,
+    resourceType,
+    resourceId,
     title = 'Document preview',
     height = 640,
 }) {
@@ -29,10 +32,10 @@ export default function FilePreview({
     const [state, setState] = useState('idle');
 
     useEffect(() => {
-        if (!requested || !fileUrl || signedUrl) return;
+        if (!requested || !fileUrl || !resourceId || signedUrl) return;
         let cancelled = false;
         setState('loading');
-        api.get(`${SIGNED_URL_ENDPOINT}?fileUrl=${encodeURIComponent(fileUrl)}`)
+        api.get(SIGNED_URL_ENDPOINT, { params: { resourceType, resourceId } })
             .then((response) => {
                 if (cancelled) return;
                 setSignedUrl(response.data.data.signedUrl);
@@ -42,7 +45,7 @@ export default function FilePreview({
         return () => {
             cancelled = true;
         };
-    }, [requested, fileUrl, signedUrl]);
+    }, [requested, fileUrl, resourceType, resourceId, signedUrl]);
 
     return (
         <section

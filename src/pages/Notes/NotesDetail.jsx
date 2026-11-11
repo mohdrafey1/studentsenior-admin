@@ -151,7 +151,12 @@ const NotesDetail = () => {
 
             <div className='grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start'>
                 <div className='flex flex-col gap-5 min-w-0'>
-                    <FilePreview fileUrl={note.fileUrl} title='Note preview' />
+                    <FilePreview
+                        fileUrl={note.fileUrl}
+                        resourceType='notes'
+                        resourceId={note._id}
+                        title='Note preview'
+                    />
 
                     <Panel
                         title='Description'

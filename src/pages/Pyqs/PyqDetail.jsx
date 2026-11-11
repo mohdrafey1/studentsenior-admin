@@ -160,6 +160,8 @@ const PyqDetail = () => {
                 <div className='flex flex-col gap-5 min-w-0'>
                     <FilePreview
                         fileUrl={pyq.fileUrl}
+                        resourceType='pyq'
+                        resourceId={pyq._id}
                         title='Exam paper preview'
                     />
 
