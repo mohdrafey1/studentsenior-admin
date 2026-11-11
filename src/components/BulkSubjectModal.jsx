@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
     Check,
     FileText,
@@ -105,6 +105,11 @@ const BulkSubjectModal = ({
         college || colleges[0]?._id || '',
     );
     const fileInputRef = useRef(null);
+
+    // The college list can arrive after the first render.
+    useEffect(() => {
+        if (college) setSelectedCollege(college);
+    }, [college]);
 
     if (!showModal) return null;
 
@@ -383,20 +388,24 @@ const BulkSubjectModal = ({
 
             {step === 1 ? (
                 <div className='flex flex-col gap-4'>
-                    <Field
-                        label='College'
-                        hint='The subjects are added for this college.'
-                    >
-                        <Select
-                            value={selectedCollege}
-                            onChange={(e) => setSelectedCollege(e.target.value)}
-                            placeholder='Choose a college'
-                            options={colleges.map((c) => ({
-                                value: c._id,
-                                label: c.name,
-                            }))}
-                        />
-                    </Field>
+                    {colleges.length > 1 && (
+                        <Field
+                            label='College'
+                            hint='The subjects are added for this college.'
+                        >
+                            <Select
+                                value={selectedCollege}
+                                onChange={(e) =>
+                                    setSelectedCollege(e.target.value)
+                                }
+                                placeholder='Choose a college'
+                                options={colleges.map((c) => ({
+                                    value: c._id,
+                                    label: c.name,
+                                }))}
+                            />
+                        </Field>
+                    )}
 
                     <div className='flex flex-wrap items-center gap-3 p-4 rounded-xl border border-dashed border-line-strong bg-sunken'>
                         <span className='w-10 h-10 rounded-lg bg-brand-soft text-brand-ink flex items-center justify-center shrink-0'>

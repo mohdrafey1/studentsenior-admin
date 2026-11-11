@@ -1,6 +1,7 @@
 // Shared bits for the catalog pages (courses, branches, subjects, quick notes).
 
-export const SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8];
+// The API allows up to 12 (five- and six-year programmes).
+export const SEMESTERS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 export const SORT_OPTIONS = [
     { value: 'createdAt', label: 'Date added' },
@@ -33,8 +34,13 @@ export const syllabusPath = (subject) =>
         ? `/${subject.college.slug}/syllabus/${subject.syllabi[0]}`
         : null;
 
-export const quickNotesPath = (subject) =>
-    `/reports/subjects/${subject._id}/quick-notes`;
+/** The quick-notes editor, inside the subject's college. */
+export const quickNotesPath = (subject, collegeSlug) => {
+    const slug = subject.college?.slug || collegeSlug;
+    return slug
+        ? `/${slug}/subjects/${subject._id}/quick-notes`
+        : `/reports/subjects/${subject._id}/quick-notes`;
+};
 
 /**
  * Markdown styling that follows the theme tokens, so notes read well in

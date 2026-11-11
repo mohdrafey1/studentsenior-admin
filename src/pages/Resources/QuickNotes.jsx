@@ -109,7 +109,7 @@ Do not remove important syllabus content.`,
 ];
 
 const QuickNotes = () => {
-    const { subjectId } = useParams();
+    const { collegeslug, subjectId } = useParams();
 
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
@@ -444,7 +444,9 @@ const QuickNotes = () => {
                             loadError ? (
                                 <Button onClick={fetchData}>Try again</Button>
                             ) : (
-                                <Button to='/reports/subjects?syllabus=missing'>
+                                <Button
+                                    to={`/${collegeslug}/subjects?syllabus=missing`}
+                                >
                                     Subjects without a syllabus
                                 </Button>
                             )

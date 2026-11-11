@@ -46,7 +46,7 @@ const ROUTES = [
     [['notifications'], [['Push notifications']]],
     [['reports'], [['Reports']]],
     [['community'], [['People'], ['Community']]],
-    [['affiliate-products'], [['Catalog'], ['Affiliate products']]],
+    [['affiliate-products'], [['Affiliate products']]],
     [['users'], [['People'], ['Users']]],
     [
         ['users', ':id'],
@@ -97,26 +97,6 @@ const ROUTES = [
         ['reports', 'dashboard-users'],
         [['People'], ['Admin team']],
     ],
-    [
-        ['reports', 'courses'],
-        [['Catalog'], ['Courses']],
-    ],
-    [
-        ['reports', 'branches'],
-        [['Catalog'], ['Branches']],
-    ],
-    [
-        ['reports', 'branches', ':id', 'subjects'],
-        [['Catalog'], ['Branches', '/reports/branches'], ['Subjects']],
-    ],
-    [
-        ['reports', 'subjects'],
-        [['Catalog'], ['Subjects']],
-    ],
-    [
-        ['reports', 'subjects', ':id', 'quick-notes'],
-        [['Catalog'], ['Subjects', '/reports/subjects'], ['Quick notes']],
-    ],
     [['blog'], [['Blog'], ['Posts']]],
     [
         ['blog', 'create'],
@@ -152,7 +132,14 @@ export function buildBreadcrumbs(pathname, collegeName) {
         );
         if (section) {
             trail.push({ label: section.label, to: `${base}/${section.path}` });
-            if (segments[2]) {
+            // Catalogue pages below a branch or subject have no detail page.
+            const below = {
+                'branches:subjects': 'Subjects',
+                'subjects:quick-notes': 'Quick notes',
+            }[`${section.path}:${segments[3]}`];
+            if (below) {
+                trail.push({ label: below, to: null });
+            } else if (segments[2]) {
                 trail.push({
                     label: 'Details',
                     to: `${base}/${section.path}/${segments[2]}`,

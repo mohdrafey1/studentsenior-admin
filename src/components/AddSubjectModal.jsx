@@ -4,10 +4,13 @@ import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { Button, Dialog, Field, Input, Select } from './ui';
 
-const SEMESTER_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8].map((sem) => ({
-    value: sem,
-    label: `Semester ${sem}`,
-}));
+// The API allows up to 12 (five- and six-year programmes).
+const SEMESTER_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1).map(
+    (sem) => ({
+        value: sem,
+        label: `Semester ${sem}`,
+    }),
+);
 
 const AddSubjectModal = ({
     showModal,
@@ -228,17 +231,22 @@ const AddSubjectModal = ({
                     </Field>
                 </div>
 
-                <Field label='College'>
-                    <Select
-                        value={formData.college}
-                        onChange={(e) => setField('college', e.target.value)}
-                        placeholder='Choose a college'
-                        options={colleges.map((college) => ({
-                            value: college._id,
-                            label: college.name,
-                        }))}
-                    />
-                </Field>
+                {/* Inside a college's catalogue there is nothing to choose. */}
+                {colleges.length > 1 && (
+                    <Field label='College'>
+                        <Select
+                            value={formData.college}
+                            onChange={(e) =>
+                                setField('college', e.target.value)
+                            }
+                            placeholder='Choose a college'
+                            options={colleges.map((college) => ({
+                                value: college._id,
+                                label: college.name,
+                            }))}
+                        />
+                    </Field>
+                )}
 
                 {/* Course and branch - only in full mode */}
                 {isFullMode && (
@@ -252,11 +260,7 @@ const AddSubjectModal = ({
                                 placeholder='Choose a course'
                                 options={courses.map((course) => ({
                                     value: course._id,
-                                    label: `${course.courseName} (${course.courseCode})${
-                                        course.college?.name
-                                            ? ` · ${course.college.name}`
-                                            : ''
-                                    }`,
+                                    label: `${course.courseName} (${course.courseCode})`,
                                 }))}
                             />
                         </Field>

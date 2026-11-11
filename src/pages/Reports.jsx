@@ -86,7 +86,8 @@ const GROUPS = [
         ],
     },
     {
-        title: 'Catalog',
+        // Totals across every college; each link opens the current college's list.
+        title: 'Catalog · all colleges',
         rows: [
             {
                 label: 'Courses',

@@ -2,12 +2,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
+    BookMarked,
     BookOpen,
     Briefcase,
     ExternalLink,
     FileText,
     Grid3x3,
     Info,
+    Layers,
     ListChecks,
     MessageCircle,
     Pencil,
@@ -97,6 +99,19 @@ const TILES = [
 ];
 
 const TOOLS = [
+    // The college's own catalogue, which PYQs, notes and syllabi hang off.
+    {
+        path: 'branches',
+        label: 'Courses & branches',
+        note: 'Departments and the programmes in them',
+        icon: Layers,
+    },
+    {
+        path: 'subjects',
+        label: 'Subjects',
+        note: 'Every subject, and which have a syllabus',
+        icon: BookMarked,
+    },
     {
         path: 'pyqs-coverage',
         label: 'PYQ coverage',

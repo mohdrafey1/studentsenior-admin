@@ -4,13 +4,14 @@ import {
     Routes,
     Route,
     Navigate,
+    useParams,
 } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { SidebarProvider } from './context/SidebarContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import OfflineIndicator from './components/OfflineIndicator';
-import { lazy, Suspense } from 'react';
+import { createElement, lazy, Suspense } from 'react';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorBoundary from './components/ErrorBoundary';
 import AppLayout from './components/layout/AppLayout';
@@ -70,6 +71,14 @@ const Branches = lazy(() => import('./pages/Resources/Branches'));
 const BranchSubjects = lazy(() => import('./pages/Resources/BranchSubjects'));
 const Subjects = lazy(() => import('./pages/Resources/Subjects'));
 const QuickNotes = lazy(() => import('./pages/Resources/QuickNotes'));
+// Catalogue pages start fresh in each college, so filters (course and branch
+// ids) never carry over from the college the admin switched away from.
+function PerCollege({ page }) {
+    const { collegeslug } = useParams();
+    return createElement(page, { key: collegeslug });
+}
+
+const CatalogRedirect = lazy(() => import('./pages/Resources/CatalogRedirect'));
 const QuickNotesList = lazy(() => import('./pages/Resources/QuickNotesList'));
 
 // PYQs
@@ -391,25 +400,53 @@ function App() {
                                             path='/reports/dashboard-users'
                                             element={<DashboardUsers />}
                                         />
+                                        {/* The catalogue moved into each college; old links redirect. */}
+                                        {[
+                                            '/reports/courses',
+                                            '/reports/branches',
+                                            '/reports/branches/:branchId/subjects',
+                                            '/reports/subjects',
+                                            '/reports/subjects/:subjectId/quick-notes',
+                                        ].map((path) => (
+                                            <Route
+                                                key={path}
+                                                path={path}
+                                                element={<CatalogRedirect />}
+                                            />
+                                        ))}
+
+                                        {/* A college's catalogue: courses, branches, subjects */}
                                         <Route
-                                            path='/reports/courses'
-                                            element={<Courses />}
+                                            path='/:collegeslug/courses'
+                                            element={
+                                                <PerCollege page={Courses} />
+                                            }
                                         />
                                         <Route
-                                            path='/reports/branches'
-                                            element={<Branches />}
+                                            path='/:collegeslug/branches'
+                                            element={
+                                                <PerCollege page={Branches} />
+                                            }
                                         />
                                         <Route
-                                            path='/reports/branches/:branchId/subjects'
-                                            element={<BranchSubjects />}
+                                            path='/:collegeslug/branches/:branchId/subjects'
+                                            element={
+                                                <PerCollege
+                                                    page={BranchSubjects}
+                                                />
+                                            }
                                         />
                                         <Route
-                                            path='/reports/subjects'
-                                            element={<Subjects />}
+                                            path='/:collegeslug/subjects'
+                                            element={
+                                                <PerCollege page={Subjects} />
+                                            }
                                         />
                                         <Route
-                                            path='/reports/subjects/:subjectId/quick-notes'
-                                            element={<QuickNotes />}
+                                            path='/:collegeslug/subjects/:subjectId/quick-notes'
+                                            element={
+                                                <PerCollege page={QuickNotes} />
+                                            }
                                         />
 
                                         {/* PYQ routes */}

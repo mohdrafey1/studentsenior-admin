@@ -20,8 +20,8 @@ import {
     Tr,
 } from '../../components/ui';
 
-const editorPath = (note) =>
-    `/reports/subjects/${note.subject._id}/quick-notes?unit=${note.unitNumber}`;
+const editorPath = (slug, note) =>
+    `/${slug}/subjects/${note.subject._id}/quick-notes?unit=${note.unitNumber}`;
 
 const QuickNotesList = () => {
     const { collegeslug } = useParams();
@@ -133,11 +133,7 @@ const QuickNotesList = () => {
                 actions={
                     <Button
                         icon={BookOpen}
-                        to={`/reports/subjects?syllabus=ready${
-                            currentCollege?._id
-                                ? `&college=${currentCollege._id}`
-                                : ''
-                        }`}
+                        to={`/${collegeslug}/subjects?syllabus=ready`}
                     >
                         Subjects with a syllabus
                     </Button>
@@ -225,7 +221,10 @@ const QuickNotesList = () => {
                                             </code>
                                             {note.subject?._id ? (
                                                 <Link
-                                                    to={editorPath(note)}
+                                                    to={editorPath(
+                                                        collegeslug,
+                                                        note,
+                                                    )}
                                                     className='font-medium text-ink hover:underline truncate'
                                                 >
                                                     {note.subject.subjectName ||
@@ -261,7 +260,10 @@ const QuickNotesList = () => {
                                             {note.subject?._id && (
                                                 <Button
                                                     size='sm'
-                                                    to={editorPath(note)}
+                                                    to={editorPath(
+                                                        collegeslug,
+                                                        note,
+                                                    )}
                                                     aria-label={`Open the editor for ${note.subject.subjectName}, unit ${note.unitNumber}`}
                                                 >
                                                     Open editor

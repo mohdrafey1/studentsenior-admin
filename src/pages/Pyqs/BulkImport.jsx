@@ -483,7 +483,7 @@ const BulkImport = () => {
                                     <Button
                                         variant='link'
                                         size='sm'
-                                        to='/reports/subjects'
+                                        to={`/${collegeslug}/subjects`}
                                     >
                                         Review subjects
                                     </Button>
